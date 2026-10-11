@@ -16,8 +16,11 @@ python -m pip install pygame
 | Pong | `python pong/pong.py` | Menu: 1 = vs computer, 2 = two players. Left W/S, right Up/Down, P pause |
 | Flappy | `python flappy/flappy.py` | Space / click / Up to flap |
 | Whack-a-Mole | `python whack_a_mole/whack_a_mole.py` | Click moles with the hammer; 45-second rounds |
+| XO | `python xo/xo.py` | Menu: 1 = two players, 2 = vs computer (easy), 3 = vs computer (hard). Click a square, M menu |
 
 Esc quits any game.
+
+For everything about every game (rules, mechanics, settings and code layout), see the full guide: [GAMES.md](GAMES.md) (English) or [GAMES.th.md](GAMES.th.md) (ภาษาไทย).
 
 ### Snake
 Eat food to grow; each bite speeds you up. Hitting a wall or yourself ends the game. Fill the whole board to win.
@@ -30,3 +33,6 @@ Flap through the gaps between pipes. One point per pipe passed; touching a pipe 
 
 ### Whack-a-Mole
 Moles pop out of 9 holes. They appear faster and hide sooner as the timer runs down. Your score, accuracy and escaped moles are shown at the end.
+
+### XO (Tic-Tac-Toe)
+Get three in a row. Play a friend or the computer: Easy plays randomly but takes an open win; Hard uses minimax and never loses. The starting player alternates each round, and the score is kept until you return to the menu.
