@@ -108,8 +108,6 @@ SKIN = (240, 204, 168)
 SKIN_DARK = (170, 120, 90)
 BLACK = (16, 16, 20)
 WHITE = (255, 255, 255)
-CASE = (62, 64, 72)  # the radio's dark grey plastic
-CASE_BACK = (80, 83, 92)
 BOARD_GREEN = (34, 100, 64)
 TRACE = (58, 134, 86)  # copper under the board's green coating
 SOLDER = (206, 208, 214)
@@ -140,11 +138,11 @@ SUPPLY_INFO = {
 SUPPLY_INFO.update({
     "vinegar": "White vinegar: a mild acid that neutralises the crust leaky batteries leave",
     "cleaner": "Contact cleaner: a spray made for electronics that cleans and leaves nothing behind",
-    "batteries": "Two new AA batteries, 1.5 V each",
+    "batteries": "Two new {} batteries, 1.5 V each",
     "antenna": "A new telescopic antenna, with its screw",
 })
 SUPPLY_LABELS = {"oil": "OIL", "wd40": "WD-40", "fuse": "FUSE", "vinegar": "VINEGAR", "cleaner": "CLEANER",
-                 "batteries": "2 x AA", "antenna": "ANTENNA"}  # what the drawer's label says
+                 "batteries": "2 x {}", "antenna": "ANTENNA"}  # what the drawer's label says
 CAP_VALUES = [1.2, 1.5, 1.8, 2.0, 2.5]  # µF: the usual sizes of fan capacitor (the drawer has a wrong one too)
 # Types of fan. Desk, stand and wall fans are built round the same kind of head (a motor with a run capacitor, a
 # reverse-threaded spinner, a blade and a grille), so the repairs are the same. What differs is the stand, the
@@ -254,8 +252,8 @@ RADIO_LEVELS = [
              "FM is bad, test the antenna first. Spares screw on in the same place."),
     dict(title="No sound", faults=["speaker"], difficulty=3,
          learn="Measure the speaker and solder its wire",
-         tip="A good 8 Ω speaker reads a little under 8 Ω. To solder, heat the tab and the wire together, feed in "
-             "a little solder, then take the iron away: 2 or 3 seconds. Work where there's fresh air."),
+         tip="A good speaker reads a little under the ohms on its label. To solder, heat the tab and the wire "
+             "together, feed in a little solder, then take the iron away: 2 or 3 seconds. Work in fresh air."),
     dict(title="Cuts out when tapped", faults=["joint"], difficulty=4,
          learn="Find a cracked solder joint and reflow it",
          tip="Joints on parts that get pushed and pulled, like sockets and knobs, crack with age: look for a thin "
@@ -265,18 +263,44 @@ RADIO_LEVELS = [
          tip="Listen first: only FM bad points at the antenna, crackles at a knob, silence with headphones still "
              "working at the speaker, and nothing at all at the batteries."),
 ]
+# Types of radio. All three are battery AM/FM radios built the same way inside (a speaker, a board with a volume
+# control, a telescopic antenna for FM and two batteries), so the repairs are the same. What differs is the case,
+# the size of battery, the speaker and how many screws hold the back on. screws are the ones you can see on the
+# back; every model hides one more under the batteries.
+RADIO_MODELS = [
+    dict(key="pocket", name="Pocket radio", label="POCKET RADIO", code="R-7",
+         about="Small enough for a coat pocket, with a thumb wheel for the volume. It runs on two AA batteries.",
+         case=(62, 64, 72), back=(80, 83, 92), trim=None, handle=False, vents="slots", cell="AA", ohms=8, watts=0.5,
+         screws=[(64, 220), (626, 220), (64, 502)]),
+    dict(key="outdoor", name="Outdoor radio", label="OUTDOOR RADIO", code="X-20",
+         about="A tough radio for campsites, with a rubber bumper and a carry handle. Two big D batteries last "
+               "for months.",
+         case=(50, 54, 52), back=(66, 72, 68), trim=(236, 150, 40), handle=True, vents="holes", cell="D", ohms=8,
+         watts=2, screws=[(64, 220), (626, 220), (64, 502), (626, 502)]),
+    dict(key="retro", name="Retro radio", label="RETRO RADIO", code="TR-56",
+         about="Looks like a 1950s set, with a wood case and a big round dial, but it's modern inside. It runs "
+               "on two C batteries.",
+         case=(122, 78, 46), back=(132, 104, 72), trim=None, handle=False, vents="lines", cell="C", ohms=4, watts=1,
+         screws=[(64, 220), (626, 220)]),
+]
 # What you can learn to fix, each with its own levels: the first screen has a card for each.
 PRODUCTS = [
     dict(key="fan", name="Electric fan", noun="fan", color=ACCENT, levels=FAN_LEVELS, models=FAN_MODELS,
          blurb="Dust, squeaks, capacitors, fuses and cords",
          intro="Learn to fix a real electric fan, one real problem at a time. Pick one:",
          safety="Real fans run on mains electricity. Always unplug first, and if you're not sure about a repair, "
-                "ask someone qualified."),
+                "ask someone qualified.",
+         facts=lambda m: f"{' or '.join(f'{c:g}' for c in m['caps'])} µF  ·  {m['watts']} W  ·  {m['blades']} blades",
+         same=("Inside, they're built the same way: the same kind of motor, capacitor, spinner and blade.",
+               "So the repairs are the same. What changes is the stand, the switches and the capacitor's value.")),
     dict(key="radio", name="Portable radio", noun="radio", color=(236, 150, 70), levels=RADIO_LEVELS,
-         blurb="Batteries, crackles, antennas and solder",
+         models=RADIO_MODELS, blurb="Batteries, crackles, antennas and solder",
          intro="Learn to fix a real portable radio, one real problem at a time. Pick one:",
-         safety="This radio runs on batteries. Radios that plug into the wall have mains electricity inside: "
-                "unplug them, and leave those repairs to someone qualified."),
+         safety="These radios run on batteries. Radios that plug into the wall have mains electricity inside: "
+                "unplug them, and leave those repairs to someone qualified.",
+         facts=lambda m: f"2 x {m['cell']}  ·  {m['ohms']} Ω speaker  ·  {len(m['screws']) + 1} screws",
+         same=("Inside, they're built the same way: a speaker, a circuit board, a volume control and an antenna.",
+               "So the repairs are the same. What changes is the case, the batteries, the speaker and the screws.")),
 ]
 
 # The panel on the right
@@ -1694,8 +1718,8 @@ def plug_rect(plug):
 
 
 class Batteries(Piece):
-    """The two AA batteries, side by side in their compartment. They sit opposite ways round, as in most radios:
-    the flat - end of each one goes against a spring."""
+    """The two batteries (AA, C or D), side by side in their compartment. They sit opposite ways round, as in most
+    radios: the flat - end of each one goes against a spring."""
 
     def __init__(self, leaked):
         super().__init__("batteries", "batteries", BATTERY_BOX.inflate(-20, -12), "battery")
@@ -1769,14 +1793,15 @@ class Speaker(Thing):
     """The speaker, seen from behind: its magnet in the middle and two solder tabs on its frame, one wire to each.
     Wires often break off right at the tab."""
 
-    def __init__(self, broken_wire):
+    def __init__(self, broken_wire, ohms=8, watts=0.5):
         super().__init__(*SPEAKER, 46, "inside")  # the multimeter goes on its magnet (on both its tabs, really)
+        self.ohms, self.watts = ohms, watts  # what its label says
         self.tabs = [Thing(277, 326, 9, "inside"), Thing(277, 398, 9, "inside")]
         self.wire = "loose" if broken_wire else "soldered"  # the red wire: soldered on, loose, or hooked on
         self.wire_end = Thing(300, 288, 10, "inside")  # where its broken end hangs
 
     def measure(self):
-        return "7.4 Ω", True  # its coil: a good 8 Ω speaker reads a little under 8
+        return f"{self.ohms * 0.92:.1f} Ω", True  # its coil: a good 8 Ω speaker reads a little under 8
 
 
 class Joint(Thing):
@@ -1810,7 +1835,7 @@ TRACES = [[(334, 252), (334, 270), (440, 270), (440, 318)], [(334, 300), (420, 3
 
 
 class Radio(Device):
-    """A portable AM/FM radio that runs on two AA batteries, face down on the bench. Its back comes off to show the
+    """A portable AM/FM radio that runs on two batteries, face down on the bench. Its back comes off to show the
     speaker, the circuit board (solder side up) and the battery compartment."""
     TOOLS = ["hand", "driver", "iron", "brush", "meter", "magnifier"]
     SUPPLIES = ["vinegar", "cleaner", "wd40", "batteries", "antenna"]
@@ -1831,17 +1856,18 @@ class Radio(Device):
 
     def __init__(self, faults, model=None):
         self.faults = set(faults)
+        self.model = model = model or RADIO_MODELS[0]  # pocket, outdoor or retro
         bx, by = BATTERY_BOX.topleft
         leaked = "leak" in faults
-        # Three screws you can see, and one hiding under the batteries
-        screws = [Screw(64, 220), Screw(626, 220), Screw(64, 502), Screw(BATTERY_BOX.centerx, by + 64)]
+        # The screws you can see, and one hiding under the batteries (always the last)
+        screws = [Screw(x, y) for x, y in model["screws"]] + [Screw(BATTERY_BOX.centerx, by + 64)]
         self.back = Piece("back", "back", RADIO, "out", screws)
         self.door = Piece("door", "battery door", BATTERY_BOX.inflate(8, 8), "cover")
         self.batteries = Batteries(leaked)
         self.crusts = [Crust(bx + 10, by + 26, leaked), Crust(BATTERY_BOX.right - 10, by + 64, leaked)]
         self.pot = Pot("pot" in faults)
         self.antenna = Antenna("antenna" in faults)
-        self.speaker = Speaker("speaker" in faults)
+        self.speaker = Speaker("speaker" in faults, model["ohms"], model["watts"])
         self.joints = [Joint(x, y) for x, y in CRACKABLE + OTHER_JOINTS]
         self.cracked = None
         if "joint" in faults:
@@ -1850,6 +1876,8 @@ class Radio(Device):
         self.tray_pieces = [self.back, self.door, self.batteries]
         self.things = ([self.back, self.door, self.batteries, self.pot, self.antenna, self.antenna.screw, self.speaker,
                         self.speaker.wire_end] + self.speaker.tabs + self.crusts + self.joints + screws)
+        for piece in self.tray_pieces:
+            piece.model = model  # so its picture is in this model's colors
         self.start()
 
     def open(self, zone):
@@ -1894,7 +1922,7 @@ class Radio(Device):
     def screws_in_reach(self):
         if not self.back.on:
             return [self.antenna.screw]
-        return self.back.screws[:3] + ([self.back.screws[3]] if self.open("contacts") else [])
+        return self.back.screws[:-1] + ([self.back.screws[-1]] if self.open("contacts") else [])
 
     def loose_screws(self):
         return [s for s in self.back.screws + [self.antenna.screw] if not s.inserted]
@@ -1964,7 +1992,8 @@ class Radio(Device):
                     "Hold the screwdriver (2) on the antenna's screw")
             if "speaker" in faults:
                 add("meter", [spk], lambda p: p.probed, "Measure the speaker",
-                    "Multimeter (5): click the speaker. About 8 Ω means the speaker itself is fine", optional=True)
+                    f"Multimeter (5): click the speaker. About {spk.ohms} Ω means the speaker itself is fine",
+                    optional=True)
                 add("hand", [spk.wire_end], lambda w: spk.wire != "loose", "Hook the wire on",
                     "Click the loose red wire to hook it back through its tab on the speaker")
                 add("iron", [spk.tabs[0]], lambda t: spk.wire == "soldered", "Solder it on",
@@ -1981,7 +2010,8 @@ class Radio(Device):
                 "Hold the screwdriver (2) on each hole, the one under the batteries too")
         if leak:
             add("drag", [batt], lambda p: p.present and p.on, "Fit 2 new batteries",
-                "Drag the new AA batteries from the drawer into the compartment", source=("supply", "batteries"))
+                f"Drag the new {self.model['cell']} batteries from the drawer into the compartment",
+                source=("supply", "batteries"))
             add("hand", [batt], lambda p: p.present and p.on and not any(p.reversed), "Turn the bottom one round",
                 "Check the marks: each + must match the + by its slot. Click the wrong one to turn it round")
         else:
@@ -2039,7 +2069,7 @@ class Radio(Device):
         elif target is self.back:
             if not any(s.inserted for s in target.screws):
                 game.take_off(target)
-            elif not any(s.inserted for s in target.screws[:3]):
+            elif not any(s.inserted for s in target.screws[:-1]):
                 game.wiggle(target, "Still stuck? Radios often hide a screw in the battery compartment: look under "
                                     "the batteries.")
             else:
@@ -2128,7 +2158,7 @@ class Radio(Device):
         game.play("beep" if good else "buzz")
 
     def battery_reading(self):
-        """Two AA in a row: about 3 V when they're good. One backwards cancels the other out."""
+        """Two 1.5 V cells in a row: about 3 V when they're good. One backwards cancels the other out."""
         b = self.batteries
         if b.leaked:
             return "0.4 V", False
@@ -2219,6 +2249,12 @@ class Radio(Device):
         if key == "wd40":
             return "Not WD-40: it leaves an oily film. Take the contact cleaner."
         return super().wrong_supply(key)
+
+    def supply_info(self, key):
+        return SUPPLY_INFO[key].format(self.model["cell"]) if key == "batteries" else SUPPLY_INFO[key]
+
+    def supply_label(self, key):
+        return SUPPLY_LABELS[key].format(self.model["cell"]) if key == "batteries" else SUPPLY_LABELS[key]
 
     def hold_time(self, target):
         return IRON_TIME
@@ -2401,7 +2437,7 @@ class Game:
         self.shake = 0.0
         self.sound_timer = 0.0
         self.product = PRODUCTS[0]  # what you're learning to fix
-        self.model = None  # which type of it, for a product that has types (the fan)
+        self.model = None  # which type of it, for a product that has types (a desk fan, a pocket radio...)
         self.level = 0  # which of its levels
         self.guided = True
         self.device = None  # what's on the bench: a Fan, a Radio...
@@ -2594,7 +2630,7 @@ class Game:
                 self.set_state("levels")
 
     def back(self):
-        """Esc: one screen back (a repair to its levels, the levels to the fan types or the first screen); returns
+        """Esc: one screen back (a repair to its levels, the levels to the types or the first screen); returns
         False on the first screen, to quit the game."""
         if self.state == "products":
             return False
@@ -3311,12 +3347,13 @@ def piece_image(piece, fonts):
         elif piece.kind == "base":
             draw_base_cover(image, image.get_rect(), fonts["tiny"], model)
         elif piece.kind == "back":
-            draw_radio_back(image, image.get_rect(), fonts["tiny"])
+            draw_radio_back(image, image.get_rect(), fonts["tiny"], model)
         elif piece.kind == "door":
-            draw_battery_door(image, image.get_rect(), fonts["tiny"])
+            draw_battery_door(image, image.get_rect(), fonts["tiny"], model)
         elif piece.kind == "batteries":
             for i, cell in enumerate(piece.cells):
-                draw_cell(image, cell.move(-piece.rect.x, -piece.rect.y), i == 0, False, fonts["tiny"])
+                draw_cell(image, cell.move(-piece.rect.x, -piece.rect.y), i == 0, False, fonts["tiny"],
+                          (model or RADIO_MODELS[0])["cell"])
         else:
             draw_clamp(image, image.get_rect())
         piece.image = image
@@ -3540,8 +3577,8 @@ FLYER_BODIES = {"cap": draw_old_cap, "fuse": draw_new_fuse, "scrap": draw_scrap,
                 "antenna": draw_folded_antenna}
 
 
-def draw_cell(surf, rect, plus_right, leaked, font=None):
-    """One AA battery, lying down: a green wrapper, and a metal cap with a button at its + end."""
+def draw_cell(surf, rect, plus_right, leaked, font=None, size="AA"):
+    """One battery (size AA, C or D), lying down: a green wrapper, and a metal cap with a button at its + end."""
     pygame.draw.rect(surf, shade(BATTERY, 0.55), rect.move(1, 2), border_radius=rect.h // 3)
     pygame.draw.rect(surf, BATTERY, rect, border_radius=rect.h // 3)
     pygame.draw.rect(surf, shade(BATTERY, 1.3), (rect.x + 4, rect.y + rect.h // 6, rect.w - 8, max(2, rect.h // 6)),
@@ -3553,7 +3590,7 @@ def draw_cell(surf, rect, plus_right, leaked, font=None):
     nub.center = (cap.right if plus_right else cap.left, rect.centery)
     pygame.draw.rect(surf, METAL, nub)
     if font:
-        draw_text(surf, font, "AA 1.5V", rect.center, WHITE)
+        draw_text(surf, font, f"{size} 1.5V", rect.center, WHITE)
         draw_text(surf, font, "+", (cap.x - 8 if plus_right else cap.right + 8, rect.centery), WHITE)
     if leaked:  # crust where it's leaked, at both ends
         rnd = random.Random(rect.x * 3 + rect.y)
@@ -3582,9 +3619,9 @@ def draw_battery_box(surf, dev, fonts, turning):
     say which way round each battery goes."""
     box = BATTERY_BOX
     pygame.draw.rect(surf, (24, 24, 28), box, border_radius=8)
-    pygame.draw.rect(surf, shade(CASE, 0.8), box, 2, border_radius=8)
+    pygame.draw.rect(surf, shade(dev.model["case"], 0.8), box, 2, border_radius=8)
     if dev.back.on:
-        draw_screws(surf, [dev.back.screws[3]], turning)  # the one hiding under the batteries
+        draw_screws(surf, [dev.back.screws[-1]], turning)  # the one hiding under the batteries
     b = dev.batteries
     for i, cell in enumerate(b.cells):
         plus_right = i == 0
@@ -3601,7 +3638,7 @@ def draw_battery_box(surf, dev, fonts, turning):
     if b.present and b.on and b.t == 0:
         for i, cell in enumerate(b.cells):
             plus_right = (i == 0) != b.reversed[i]
-            draw_cell(surf, cell.move(jiggle(b.wiggle), 0), plus_right, b.leaked, fonts["tiny"])
+            draw_cell(surf, cell.move(jiggle(b.wiggle), 0), plus_right, b.leaked, fonts["tiny"], dev.model["cell"])
         for crust in dev.crusts:
             if b.leaked:
                 draw_crust(surf, crust)
@@ -3623,7 +3660,7 @@ def draw_speaker(surf, spk, font):
     pygame.draw.circle(surf, (28, 28, 32), (x, y), 46)  # the magnet
     pygame.draw.circle(surf, (96, 98, 108), (x, y), 46, 3)
     pygame.draw.circle(surf, (120, 122, 132), (x, y), 14)
-    draw_text(surf, font, "8Ω 0.5W", (x, y + 28), (170, 172, 180))
+    draw_text(surf, font, f"{spk.ohms}Ω {spk.watts:g}W", (x, y + 28), (170, 172, 180))
     for i, tab in enumerate(spk.tabs):
         pygame.draw.rect(surf, (200, 190, 150), (tab.x - 7, tab.y - 5, 14, 10), border_radius=2)
         pygame.draw.circle(surf, (40, 40, 44), (tab.x - 2, tab.y), 2)
@@ -3692,37 +3729,58 @@ def draw_antenna(surf, ant):
     pygame.draw.circle(surf, (150, 150, 160), (bx + dx, by), 7)  # the swivel
 
 
-def draw_radio_back(surf, rect, font):
+def draw_radio_back(surf, rect, font, model=None):
     """The back cover: vents over the speaker, the label, and the hole the battery door slides into."""
-    pygame.draw.rect(surf, CASE_BACK, rect, border_radius=26)
-    pygame.draw.rect(surf, shade(CASE_BACK, 0.72), rect, 3, border_radius=26)
+    model = model or RADIO_MODELS[0]
+    back = model["back"]
+    pygame.draw.rect(surf, back, rect, border_radius=26)
+    if model["key"] == "retro":  # wood grain
+        rnd = random.Random(7)
+        for _ in range(16):
+            y, bend = rect.y + rnd.uniform(12, rect.h - 12), rnd.uniform(-6, 6)
+            points = [(rect.x + 16 + k * (rect.w - 32) / 8, y + bend * math.sin(k * 0.9)) for k in range(9)]
+            pygame.draw.lines(surf, shade(back, rnd.uniform(0.86, 0.94)), False, points, 2)
+    pygame.draw.rect(surf, shade(back, 0.72), rect, 3, border_radius=26)
     sx, sy = SPEAKER[0] - RADIO.x + rect.x, SPEAKER[1] - RADIO.y + rect.y
-    for row in range(-5, 6):
-        for col in range(-5, 6):
-            if row * row + col * col <= 24:
-                pygame.draw.rect(surf, shade(CASE_BACK, 0.55), (sx + col * 17 - 5, sy + row * 17 - 2, 10, 4),
-                                 border_radius=2)
+    vent = shade(back, 0.55)
+    if model["vents"] == "slots":
+        for row in range(-5, 6):
+            for col in range(-5, 6):
+                if row * row + col * col <= 24:
+                    pygame.draw.rect(surf, vent, (sx + col * 17 - 5, sy + row * 17 - 2, 10, 4), border_radius=2)
+    elif model["vents"] == "holes":
+        for row in range(-5, 6):
+            for col in range(-5, 6):
+                if row * row + col * col <= 24:
+                    pygame.draw.circle(surf, vent, (sx + col * 17, sy + row * 17), 5)
+    else:  # long slots right across, like an old set's
+        for row in range(-4, 5):
+            half = math.sqrt(92 ** 2 - (row * 20) ** 2)
+            pygame.draw.rect(surf, vent, (sx - half, sy + row * 20 - 3, 2 * half, 6), border_radius=3)
     label = pygame.Rect(rect.x + 330, rect.y + 24, 230, 84)
     pygame.draw.rect(surf, (238, 236, 226), label, border_radius=6)
-    for i, (text, color) in enumerate((("AM / FM PORTABLE RADIO", (40, 40, 52)), ("MODEL R-7   3V DC (2 x AA)", DIM),
+    for i, (text, color) in enumerate(((f"AM / FM {model['label']}", (40, 40, 52)),
+                                       (f"MODEL {model['code']}   3V DC (2 x {model['cell']})", DIM),
                                        ("FM 88-108 MHz", DIM), ("AM 530-1600 kHz", DIM))):
         draw_text(surf, font, text, (label.x + 12, label.y + 12 + i * 18), color, "topleft")
     hole = BATTERY_BOX.move(rect.x - RADIO.x, rect.y - RADIO.y)
-    pygame.draw.rect(surf, shade(CASE_BACK, 0.6), hole.inflate(12, 12), 3, border_radius=12)
+    pygame.draw.rect(surf, shade(back, 0.6), hole.inflate(12, 12), 3, border_radius=12)
     surf.fill((0, 0, 0, 0), hole)
 
 
-def draw_battery_door(surf, rect, font):
-    pygame.draw.rect(surf, shade(CASE_BACK, 1.08), rect, border_radius=10)
-    pygame.draw.rect(surf, shade(CASE_BACK, 0.7), rect, 2, border_radius=10)
+def draw_battery_door(surf, rect, font, model=None):
+    model = model or RADIO_MODELS[0]
+    back = model["back"]
+    pygame.draw.rect(surf, shade(back, 1.08), rect, border_radius=10)
+    pygame.draw.rect(surf, shade(back, 0.7), rect, 2, border_radius=10)
     for i in range(6):  # ridges to grip
         x = rect.x + 12 + i * 7
-        pygame.draw.line(surf, shade(CASE_BACK, 0.7), (x, rect.y + 16), (x, rect.bottom - 16), 2)
+        pygame.draw.line(surf, shade(back, 0.7), (x, rect.y + 16), (x, rect.bottom - 16), 2)
     cx = rect.right - 34
-    pygame.draw.polygon(surf, shade(CASE_BACK, 0.6), [(cx - 10, rect.centery - 10), (cx - 10, rect.centery + 10),
-                                                      (cx + 6, rect.centery)])  # slide it this way
-    draw_text(surf, font, "OPEN", (cx - 4, rect.centery + 24), shade(CASE_BACK, 0.6))
-    draw_text(surf, font, "2 x AA  1.5V", (rect.centerx, rect.y + 14), shade(CASE_BACK, 0.6))
+    pygame.draw.polygon(surf, shade(back, 0.6), [(cx - 10, rect.centery - 10), (cx - 10, rect.centery + 10),
+                                                 (cx + 6, rect.centery)])  # slide it this way
+    draw_text(surf, font, "OPEN", (cx - 4, rect.centery + 24), shade(back, 0.6))
+    draw_text(surf, font, f"2 x {model['cell']}  1.5V", (rect.centerx, rect.y + 14), shade(back, 0.6))
 
 
 def draw_radio_inside(surf, dev, fonts, turning):
@@ -3766,20 +3824,42 @@ def draw_radio_inside(surf, dev, fonts, turning):
     draw_screws(surf, [screw], turning, post=(60, 62, 70))
 
 
+def draw_radio_case(surf, model):
+    """The radio's case, face down: and its carry handle, rubber bumper or feet, for the models that have them."""
+    case, trim = model["case"], model["trim"]
+    if model["handle"]:  # folded up over the top edge; its lower half hides behind the case
+        handle = pygame.Rect(244, 152, 244, 80)
+        pygame.draw.rect(surf, (28, 30, 32), handle.move(4, 6), 16, border_radius=28)
+        pygame.draw.rect(surf, shade(case, 1.25), handle, 16, border_radius=28)
+        pygame.draw.line(surf, shade(case, 1.7), (274, 156), (458, 156), 2)
+        for x in range(300, 440, 14):  # the grip
+            pygame.draw.line(surf, shade(case, 0.8), (x, 154), (x, 164), 2)
+    if model["key"] == "retro":  # little feet on its bottom edge
+        for x in (110, 530):
+            pygame.draw.rect(surf, (40, 30, 24), (x, RADIO.bottom - 6, 50, 14), border_radius=5)
+    if trim:  # a rubber bumper all round
+        bumper = RADIO.inflate(18, 18)
+        pygame.draw.rect(surf, (28, 30, 32), bumper.move(4, 6), border_radius=34)
+        pygame.draw.rect(surf, trim, bumper, border_radius=34)
+        pygame.draw.rect(surf, shade(trim, 0.7), bumper, 3, border_radius=34)
+    else:
+        pygame.draw.rect(surf, (28, 30, 32), RADIO.move(4, 6), border_radius=26)
+    pygame.draw.rect(surf, case, RADIO, border_radius=26)
+    pygame.draw.rect(surf, shade(case, 0.7), RADIO, 3, border_radius=26)
+
+
 def draw_radio(surf, game, fonts):
     """The radio, face down on the bench, with whatever's been taken off it."""
     dev = game.device
     turning = game.hold[0] if game.hold and isinstance(game.hold[0], Screw) else None
-    pygame.draw.rect(surf, (28, 30, 32), RADIO.move(4, 6), border_radius=26)
-    pygame.draw.rect(surf, CASE, RADIO, border_radius=26)
-    pygame.draw.rect(surf, shade(CASE, 0.7), RADIO, 3, border_radius=26)
+    draw_radio_case(surf, dev.model)
     if dev.back.t > 0:
         draw_radio_inside(surf, dev, fonts, turning)
     draw_battery_box(surf, dev, fonts, turning)
     back, door, b = dev.back, dev.door, dev.batteries
     if not draw_moving(surf, back, dev.tray_slot(back).center, fonts):
         draw_in_place(surf, back, fonts, shadow=False)
-        draw_screws(surf, back.screws[:3], turning)
+        draw_screws(surf, back.screws[:-1], turning)
     if not draw_moving(surf, door, dev.tray_slot(door).center, fonts):
         draw_in_place(surf, door, fonts, shadow=False)
     if b.present and b.t > 0:
@@ -3910,11 +3990,119 @@ def draw_wall_icon(surf, x, y, model):
     draw_fan_head(surf, hx, hy, model)
 
 
-MODEL_ICONS = {"desk": draw_desk_icon, "stand": draw_stand_icon, "wall": draw_wall_icon}
+def draw_front_antenna(surf, base, tip):
+    """A radio's telescopic antenna from the front, pulled out: for the pictures on the cards."""
+    pygame.draw.line(surf, CHROME, base, tip, 8)
+    pygame.draw.circle(surf, CHROME, tip, 9)
+
+
+def draw_dial(surf, rect, needle):
+    """A tuning dial window: a cream scale with its marks, and the red needle needle of the way along."""
+    pygame.draw.rect(surf, (240, 232, 206), rect, border_radius=8)
+    for k in range(9):
+        lx = rect.x + 12 + k * (rect.w - 24) / 8
+        pygame.draw.line(surf, (90, 84, 70), (lx, rect.y + 12), (lx, rect.y + (rect.h // 2 if k % 2 else rect.h // 3)),
+                         3)
+    nx = rect.x + 12 + needle * (rect.w - 24)
+    pygame.draw.line(surf, (220, 60, 50), (nx, rect.y + 6), (nx, rect.bottom - 6), 5)
+
+
+def draw_holes(surf, cx, cy, r, color, gap=13, size=4):
+    """A round speaker grille of holes."""
+    n = int(r // gap)
+    for row in range(-n, n + 1):
+        for col in range(-n, n + 1):
+            if math.hypot(row * gap, col * gap) <= r - size:
+                pygame.draw.circle(surf, color, (cx + col * gap, cy + row * gap), size)
+
+
+def draw_pocket_icon(surf, x, y, model):
+    """A pocket radio from the front: tall and slim, with a wrist strap and thumb wheels on its side."""
+    case = model["case"]
+    body = pygame.Rect(0, 0, 210, 320)
+    body.center = (x, y + 60)
+    draw_front_antenna(surf, (body.right - 30, body.top + 8), (body.left + 4, body.top - 170))
+    pygame.draw.ellipse(surf, (40, 40, 46), (body.x - 34, body.bottom - 44, 66, 104), 7)  # the wrist strap
+    for k in range(2):  # the thumb wheels, peeping out of its side
+        wheel = pygame.Rect(body.right - 8, body.y + 70 + k * 64, 18, 48)
+        pygame.draw.rect(surf, (150, 152, 160), wheel, border_radius=6)
+        for i in range(5):
+            ry = wheel.y + 7 + i * 8
+            pygame.draw.line(surf, (96, 98, 108), (wheel.x + 4, ry), (wheel.right - 2, ry), 2)
+    pygame.draw.rect(surf, (24, 24, 28), body.move(5, 8), border_radius=30)
+    pygame.draw.rect(surf, case, body, border_radius=30)
+    pygame.draw.rect(surf, shade(case, 1.6), body, 5, border_radius=30)
+    draw_dial(surf, pygame.Rect(body.x + 24, body.y + 28, body.w - 48, 64), 0.55)
+    gx, gy = body.centerx, body.y + 204
+    pygame.draw.circle(surf, (36, 38, 44), (gx, gy), 80)
+    draw_holes(surf, gx, gy, 76, (110, 114, 126))
+    pygame.draw.circle(surf, (110, 220, 120), (body.x + 32, body.y + 112), 5)  # the power light
+
+
+def draw_outdoor_icon(surf, x, y, model):
+    """An outdoor radio from the front: wide, with a rubber bumper all round and a big carry handle."""
+    case, trim = model["case"], model["trim"]
+    body = pygame.Rect(0, 0, 380, 230)
+    body.center = (x, y + 60)
+    draw_front_antenna(surf, (body.right - 46, body.top + 8), (body.left + 84, body.top - 170))
+    handle = pygame.Rect(body.x + 70, body.top - 62, body.w - 140, 110)
+    pygame.draw.rect(surf, shade(case, 1.3), handle, 18, border_radius=34)
+    pygame.draw.rect(surf, (24, 24, 28), body.move(5, 8), border_radius=44)
+    pygame.draw.rect(surf, trim, body, border_radius=44)  # the rubber bumper
+    pygame.draw.rect(surf, shade(trim, 0.7), body, 4, border_radius=44)
+    inner = body.inflate(-34, -34)
+    pygame.draw.rect(surf, case, inner, border_radius=22)
+    gx, gy = inner.x + 96, inner.centery
+    pygame.draw.circle(surf, (32, 34, 36), (gx, gy), 84)
+    draw_holes(surf, gx, gy, 80, (96, 104, 100), gap=14, size=5)
+    draw_dial(surf, pygame.Rect(inner.x + 200, inner.y + 22, inner.w - 222, 62), 0.35)
+    for k in range(2):  # big knobs you can turn with gloves on
+        kx = inner.x + 226 + k * 70
+        pygame.draw.circle(surf, (30, 32, 34), (kx, inner.bottom - 46), 26)
+        pygame.draw.circle(surf, trim, (kx, inner.bottom - 46), 26, 5)
+
+
+def draw_retro_icon(surf, x, y, model):
+    """A retro radio from the front: a wood case, a cloth speaker grille with gold bars, and a big round dial."""
+    case = model["case"]
+    body = pygame.Rect(0, 0, 360, 240)
+    body.center = (x, y + 60)
+    draw_front_antenna(surf, (body.right - 40, body.top + 8), (body.left + 70, body.top - 160))
+    for fx in (body.x + 40, body.right - 90):  # its feet
+        pygame.draw.rect(surf, (40, 30, 24), (fx, body.bottom - 10, 50, 24), border_radius=6)
+    pygame.draw.rect(surf, (24, 24, 28), body.move(5, 8), border_radius=48)
+    pygame.draw.rect(surf, case, body, border_radius=48)
+    rnd = random.Random(3)
+    for _ in range(9):  # wood grain
+        gy = body.y + rnd.uniform(14, body.h - 14)
+        pygame.draw.line(surf, shade(case, 0.85), (body.x + 30, gy), (body.right - 30, gy + rnd.uniform(-5, 5)), 2)
+    pygame.draw.rect(surf, shade(case, 1.35), body, 5, border_radius=48)
+    cloth = pygame.Rect(body.x + 28, body.y + 30, 170, body.h - 60)
+    pygame.draw.rect(surf, (214, 196, 150), cloth, border_radius=18)
+    for k in range(5):  # gold bars over the cloth
+        bx = cloth.x + 22 + k * 31
+        pygame.draw.line(surf, GOLD, (bx, cloth.y + 10), (bx, cloth.bottom - 10), 5)
+    pygame.draw.rect(surf, GOLD, cloth, 4, border_radius=18)
+    dx, dy = body.right - 88, body.y + 96
+    pygame.draw.circle(surf, (240, 232, 206), (dx, dy), 60)
+    for k in range(13):  # the scale round the dial
+        a = math.radians(150 + k * 20)
+        pygame.draw.line(surf, (90, 84, 70), (dx + math.cos(a) * 44, dy + math.sin(a) * 44),
+                         (dx + math.cos(a) * 54, dy + math.sin(a) * 54), 3)
+    pygame.draw.line(surf, (220, 60, 50), (dx, dy), (dx + math.cos(-1.1) * 50, dy + math.sin(-1.1) * 50), 4)
+    pygame.draw.circle(surf, GOLD, (dx, dy), 60, 5)
+    pygame.draw.circle(surf, GOLD, (dx, dy), 8)
+    for kx in (dx - 38, dx + 38):  # the volume and tuning knobs
+        pygame.draw.circle(surf, (236, 228, 204), (kx, body.bottom - 32), 17)
+        pygame.draw.circle(surf, GOLD, (kx, body.bottom - 32), 17, 3)
+
+
+MODEL_ICONS = {"desk": draw_desk_icon, "stand": draw_stand_icon, "wall": draw_wall_icon,
+               "pocket": draw_pocket_icon, "outdoor": draw_outdoor_icon, "retro": draw_retro_icon}
 
 
 def make_model_icon(model, size=(240, 158)):
-    """A picture of a whole fan of this type, drawn big and shrunk to fit size."""
+    """A picture of a whole fan or radio of this type, drawn big and shrunk to fit size."""
     big = pygame.Surface((440, 640), pygame.SRCALPHA)
     MODEL_ICONS[model["key"]](big, 220, 300, model)
     box = big.get_bounding_rect()
@@ -3930,29 +4118,10 @@ def draw_fan_icon(surf, x, y):
 
 
 def draw_radio_icon(surf, x, y):
-    """The portable radio from the front, for its card on the first screen."""
-    body = pygame.Rect(0, 0, 330, 200)
-    body.center = (x, y + 50)
-    pygame.draw.line(surf, CHROME, (body.right - 44, body.top + 6), (body.left + 70, body.top - 160), 8)
-    pygame.draw.circle(surf, CHROME, (body.left + 70, body.top - 160), 9)
-    pygame.draw.rect(surf, shade(CASE, 1.5), (body.x + 70, body.top - 46, body.w - 160, 60), 12, border_radius=26)
-    pygame.draw.rect(surf, (24, 24, 28), body.move(5, 8), border_radius=30)
-    pygame.draw.rect(surf, CASE, body, border_radius=30)
-    pygame.draw.rect(surf, shade(CASE, 1.6), body, 5, border_radius=30)
-    gx, gy = body.x + 100, body.centery
-    pygame.draw.circle(surf, (36, 38, 44), (gx, gy), 74)
-    for row in range(-5, 6):
-        for col in range(-5, 6):
-            if row * row + col * col <= 26:
-                pygame.draw.circle(surf, (110, 114, 126), (gx + col * 13, gy + row * 13), 4)
-    dial = pygame.Rect(body.x + 196, body.y + 36, 114, 70)
-    pygame.draw.rect(surf, (240, 232, 206), dial, border_radius=8)
-    for k in range(9):
-        lx = dial.x + 12 + k * 11
-        pygame.draw.line(surf, (90, 84, 70), (lx, dial.y + 14), (lx, dial.y + (30 if k % 2 else 24)), 3)
-    pygame.draw.line(surf, (220, 60, 50), (dial.x + 62, dial.y + 8), (dial.x + 62, dial.bottom - 8), 5)
-    pygame.draw.circle(surf, (190, 194, 206), (body.x + 252, body.y + 152), 26)
-    pygame.draw.circle(surf, (140, 144, 156), (body.x + 252, body.y + 152), 26, 5)
+    """The radio's card on the first screen: a retro radio, an outdoor radio and a pocket radio side by side."""
+    for model, dx, height in ((RADIO_MODELS[2], -200, 250), (RADIO_MODELS[1], 200, 290), (RADIO_MODELS[0], 0, 260)):
+        icon = make_model_icon(model, (400, height))
+        surf.blit(icon, icon.get_rect(midbottom=(x + dx, y + 200)))
 
 
 PRODUCT_ICONS = {"fan": draw_fan_icon, "radio": draw_radio_icon}  # each product's picture: a new one needs one here
@@ -4401,7 +4570,7 @@ def draw_products(surf, game, fonts, art, mouse):
 
 
 def draw_models(surf, game, fonts, art, mouse):
-    """Pick which type to fix: for the fan, a desk, stand or wall fan."""
+    """Pick which type to fix: a desk, stand or wall fan, or a pocket, outdoor or retro radio."""
     surf.fill(BG)
     product = game.product
     models = product["models"]
@@ -4424,12 +4593,8 @@ def draw_models(surf, game, fonts, art, mouse):
         draw_text(surf, fonts["font"], model["name"], (rect.centerx, rect.y + 210), TEXT)
         for k, line in enumerate(wrap(fonts["small"], model["about"], rect.w - 28)[:5]):
             draw_text(surf, fonts["small"], line, (rect.x + 14, rect.y + 228 + k * 17), DIM, "topleft")
-        caps = " or ".join(f"{c:g}" for c in model["caps"])
-        draw_text(surf, fonts["tiny"], f"{caps} µF  ·  {model['watts']} W  ·  {model['blades']} blades",
-                  (rect.centerx, rect.bottom - 18), GOLD)
-    for k, line in enumerate(("Inside, they're built the same way: the same kind of motor, capacitor, spinner and "
-                              "blade.", "So the repairs are the same. What changes is the stand, the switches and "
-                                        "the capacitor's value.")):
+        draw_text(surf, fonts["tiny"], product["facts"](model), (rect.centerx, rect.bottom - 18), GOLD)
+    for k, line in enumerate(product["same"]):
         draw_text(surf, fonts["small"], line, (WIDTH // 2, 486 + k * 20), DIM)
     draw_button(surf, fonts["font"], BACK_BUTTON, "BACK (Esc)", (70, 90, 150), mouse)
 
@@ -4569,7 +4734,8 @@ def make_art():
     icons["cap"] = make_icon(lambda s, x, y: draw_cap(s, x, y, 0, False))
     return dict(bench=make_bench(), tool_icons={tool: make_tool_icon(tool) for tool in TOOL_NAMES}, icons=icons,
                 products={product["key"]: make_product_icon(product["key"]) for product in PRODUCTS},
-                models={model["key"]: make_model_icon(model) for model in FAN_MODELS})
+                models={model["key"]: make_model_icon(model) for product in PRODUCTS
+                        for model in product.get("models", [])})
 
 
 def main():
