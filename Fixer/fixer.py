@@ -2,6 +2,7 @@ import array
 import math
 import random
 import sys
+from types import SimpleNamespace
 
 import pygame
 
@@ -56,7 +57,7 @@ CRUST_WORK = 260  # px of scrubbing to clean the crust off one battery contact
 # Par seconds for one action with each tool (a drag counts as "drag", a test as "test", turning as "twist").
 # A repair's par is 20 s plus the actions a tidy repair needs; guided repairs get half as long again.
 ACTION_PAR = {"hand": 1.3, "driver": 1.6, "cutters": 1.2, "crimper": 1.6, "brush": 8, "meter": 1.8, "drag": 2.6,
-              "test": 4.5, "twist": 4.0, "iron": 2.2, "magnifier": 3.0}
+              "test": 4.5, "twist": 4.0, "iron": 2.2, "magnifier": 3.0, "puller": 1.6}
 
 WOOD = (150, 108, 72)
 WOOD_DARK = (132, 94, 62)
@@ -117,7 +118,7 @@ CRUST = (228, 234, 206)  # what leaks out of old batteries
 BATTERY = (52, 128, 86)
 
 TOOL_NAMES = {"hand": "Hand", "driver": "Screwdriver", "cutters": "Cutters", "crimper": "Crimper", "brush": "Brush",
-              "meter": "Multimeter", "iron": "Soldering iron", "magnifier": "Magnifier"}
+              "meter": "Multimeter", "iron": "Soldering iron", "magnifier": "Magnifier", "puller": "Keycap puller"}
 TOOL_INFO = {
     "hand": "Hand: click to unclip, lift off, pull out and push on. Hold and circle to turn things",
     "driver": "Screwdriver: hold it on a screw to undo it or do it up",
@@ -126,7 +127,8 @@ TOOL_INFO = {
     "brush": "Brush: hold the button and rub to scrub off dust, old gunk or crust",
     "meter": "Multimeter: click a part to measure it (ohms for wires, fuses and speakers, µF for capacitors, volts)",
     "iron": "Soldering iron: hold it on a joint to melt solder into it (it's about 350 °C: never touch the tip)",
-    "magnifier": "Magnifier: click a solder joint to look at it closely. Hairline cracks are hard to see by eye",
+    "magnifier": "Magnifier: click something to look at it closely. Hairline cracks and hairs are hard to see by eye",
+    "puller": "Keycap puller: click a keycap to lift it straight off. Its prongs also grip a switch to pull it out",
 }
 TOOL_FOR = {"twist": "hand"}  # a step that isn't a tool's own action, and the tool it needs
 SUPPLY_INFO = {
@@ -140,9 +142,16 @@ SUPPLY_INFO.update({
     "cleaner": "Contact cleaner: a spray made for electronics that cleans and leaves nothing behind",
     "batteries": "Two new {} batteries, 1.5 V each",
     "antenna": "A new telescopic antenna, with its screw",
+    "ipa": "Isopropyl alcohol, 99%: cleans off dried drink and evaporates in minutes, leaving nothing behind",
+    "grease": "Dielectric grease: a thin, clear grease that's safe on electronics. Stops stabiliser wires rattling",
+    "cable": "A new USB-C cable, tested and known to be good",
+    "wick": "Desoldering wick: copper braid that soaks up melted solder when you heat it on a joint",
+    "microswitch": "A new click switch for a mouse button: the same size and pins as the old one",
+    "feet": "A sheet of new PTFE mouse feet, cut to fit, with fresh glue on the back",
 })
 SUPPLY_LABELS = {"oil": "OIL", "wd40": "WD-40", "fuse": "FUSE", "vinegar": "VINEGAR", "cleaner": "CLEANER",
-                 "batteries": "2 x {}", "antenna": "ANTENNA"}  # what the drawer's label says
+                 "batteries": "2 x {}", "antenna": "ANTENNA", "ipa": "ALCOHOL", "grease": "GREASE",
+                 "cable": "CABLE", "wick": "WICK", "microswitch": "SWITCH", "feet": "FEET"}  # what the drawer says
 CAP_VALUES = [1.2, 1.5, 1.8, 2.0, 2.5]  # µF: the usual sizes of fan capacitor (the drawer has a wrong one too)
 # Types of fan. Desk, stand and wall fans are built round the same kind of head (a motor with a run capacitor, a
 # reverse-threaded spinner, a blade and a grille), so the repairs are the same. What differs is the stand, the
@@ -283,6 +292,155 @@ RADIO_MODELS = [
          case=(122, 78, 46), back=(132, 104, 72), trim=None, handle=False, vents="lines", cell="C", ohms=4, watts=1,
          screws=[(64, 220), (626, 220)]),
 ]
+# ---- keyboards ----
+# A mechanical keyboard lying on the bench, keys up, with a USB-C cable to the hub. All three types are built the
+# same way: hot-swap switches pushed into sockets on a board, under a steel plate, with keycaps on top. What differs
+# is the size, the colours and the kind of switch, which you can tell by the colour of its stem.
+KB_TOP = 214  # the top edge of the keyboard's case
+KB_CABLE_X = 674  # its cable runs down the right-hand side of the bench to the hub
+KB_SCREEN = pygame.Rect(24, 58, 468, 136)  # the computer's screen, for the typing test
+KEY_PRESSES = 8  # presses to work alcohol into a sticky switch
+CRUMB_WORK = 220  # px of brushing to clear the crumbs from round one switch
+TEST_LINE = "the quick brown fox jumps over the lazy dog"  # every letter, so a dead or sticky key shows up
+SWITCH_COLORS = {"red": (214, 60, 56), "brown": (140, 92, 58), "blue": (64, 120, 220)}
+SWITCH_FEEL = {"red": "linear, smooth and quiet", "brown": "tactile, with a soft bump",
+               "blue": "clicky, with a bump and a click"}
+KEYBOARD_MODELS = [
+    dict(key="full", name="Full-size keyboard", size="full", keys=104, switch="red",
+         about="The classic office layout, with a number pad on the right. Its red switches are smooth and quiet.",
+         case=(46, 48, 56), cap=(70, 72, 82), mod=(54, 56, 64), legend=(226, 228, 236), accent=(214, 60, 56),
+         cable=(36, 36, 40)),
+    dict(key="tkl", name="Tenkeyless keyboard", size="tkl", keys=87, switch="brown",
+         about="A full keyboard without the number pad, so the mouse sits closer. Brown switches give a soft bump.",
+         case=(222, 222, 218), cap=(246, 244, 238), mod=(188, 190, 198), legend=(60, 62, 72), accent=(236, 150, 60),
+         cable=(236, 236, 230)),
+    dict(key="compact", name="Compact 60% keyboard", size="60", keys=61, switch="blue",
+         about="Tiny: no number pad, arrows or F keys (Fn reaches them). Its blue switches click with every press.",
+         case=(58, 74, 120), cap=(232, 226, 210), mod=(84, 132, 196), legend=(48, 52, 66), accent=(250, 205, 60),
+         cable=(250, 205, 60)),
+]
+KEYBOARD_MISTAKES = {
+    "power": ("safety", "Cleaned it or pulled keys while it was plugged in",
+              "Unplug it first: liquid on a live board can short it."),
+    "wrong_switch": ("wrong", "Fitted a different kind of switch",
+                     "Match the stem colour of the others: each kind feels and sounds different."),
+    "good_part": ("wrong", "Replaced a part that was fine", "Test first, and replace only what's broken."),
+}
+KEYBOARD_SYMPTOMS = {
+    "nocable": ("", "Nothing at all: there's no cable in it!"),
+    "unplugged": ("", "Nothing at all... it isn't plugged in!"),
+    "cutout": ("It keeps disconnecting, especially when the cable moves.",
+               "It types... disconnects... comes back. A bad connection!"),
+    "dead": ("One key does nothing at all, however hard I press it.", "Every key types except one, which does nothing."),
+    "nokeycap": ("", "A key has no keycap on it: there's nothing to press!"),
+    "sticky": ("I spilled a drink on it, and now one key sticks down.", "One key sticks down and repeats: eeeeeee!"),
+    "rattle": ("The space bar rattles and sticks at one end.", "The space bar rattles and catches at one end."),
+    "gritty": ("Some keys feel gritty and miss presses. Crumbs, I bet...",
+               "Some keys crunch and miss presses: there's grit under them."),
+}
+KEYBOARD_FAULT_SYMPTOM = {"crumbs": "gritty", "sticky": "sticky", "stab": "rattle", "dead": "dead", "cable": "cutout"}
+KEYBOARD_LEVELS = [
+    dict(title="Crumbs in the keys", faults=["crumbs"], difficulty=1,
+         learn="Pull keycaps and brush out the crumbs",
+         tip="Unplug it, turn it upside down and tap out the loose crumbs first. A keycap puller lifts caps straight "
+             "up without scratching them; a soft brush or a few puffs of air does the rest."),
+    dict(title="Sticky key", faults=["sticky"], difficulty=2,
+         learn="Clean a sticky switch with alcohol",
+         tip="Isopropyl alcohol (90% or more) dissolves dried drink and dries fast, leaving nothing behind. Unplug "
+             "first, press the switch over and over, and let it dry before you plug it back in."),
+    dict(title="Rattly space bar", faults=["stab"], difficulty=2,
+         learn="Grease and refit a stabiliser wire",
+         tip="Long keys sit on a stabiliser: a wire that keeps both ends level. A thin dab of dielectric grease on "
+             "its ends stops the rattle. Lift the space bar straight up so the wire doesn't pop out."),
+    dict(title="Dead key", faults=["dead"], difficulty=3,
+         learn="Test and swap a hot-swap switch",
+         tip="On a hot-swap board the switches push into sockets. A dead key is often a bent pin that missed its "
+             "socket. Pull the switch straight out; push the new one in with its pins straight."),
+    dict(title="Keeps disconnecting", faults=["cable"], difficulty=3,
+         learn="Test and replace a worn USB cable",
+         tip="If it cuts out when the cable moves, test the cable first: it's cheap to replace and the usual "
+             "culprit. A cable you know is good is the quickest test of all."),
+    dict(title="Mystery keyboard", faults=None, difficulty=5,
+         learn="No steps: type, look, test, work it out",
+         tip="Type a line with every letter in it (the quick brown fox...) to find a dead or sticky key, then pull "
+             "just that keycap and look underneath."),
+]
+
+# ---- mice ----
+# A wired optical mouse, big on the bench. Its screws hide under its feet, so you turn it over, peel them off and
+# undo the screws, then turn it back and lift the top shell. Inside: a board with two click switches, the scroll
+# wheel and its encoder, the optical sensor, and the cable's plug.
+MOUSE_C = (230, 290)  # the middle of the mouse
+MOUSE_CABLE_X = 374  # its cable runs down here to the hub
+MOUSE_SCREEN = pygame.Rect(398, 206, 278, 166)  # the computer's screen, for the pointer test
+WHEEL_WORK = 4 * 2 * math.pi  # how far to roll the scroll wheel to work cleaner into its encoder
+GLUE_WORK = 200  # px of rubbing to get the old glue off where a foot was
+FLUFF_WORK = 240  # px of brushing to clear the sensor window
+# feet are (x, y, w, h) from the middle of the mouse; screws are (which foot hides it, x, y)
+MOUSE_MODELS = [
+    dict(key="office", name="Office mouse", label="M-100", w=212, h=372,
+         about="A plain wired mouse, made by the million for desks everywhere. Two screws hide under its feet.",
+         shell=(198, 200, 208), bottom=(70, 72, 80), accent=(80, 140, 200), cable=(40, 40, 44), braided=False,
+         feet=[(-46, -150, 92, 16), (-62, 128, 124, 18)], screws=[(0, 0, -142), (1, 0, 137)]),
+    dict(key="gaming", name="Gaming mouse", label="RAPTOR X", w=236, h=404,
+         about="Light and fast, with side buttons, coloured lights and a braided cable. Four screws, under four "
+               "feet.",
+         shell=(36, 38, 44), bottom=(28, 30, 34), accent=(90, 220, 160), cable=(30, 30, 34), braided=True,
+         feet=[(-70, -142, 32, 28), (38, -142, 32, 28), (-80, 118, 36, 32), (44, 118, 36, 32)],
+         screws=[(0, -54, -128), (1, 54, -128), (2, -62, 134), (3, 62, 134)]),
+    dict(key="travel", name="Travel mouse", label="MINI", w=184, h=316,
+         about="Small enough for a laptop bag, with a short cable. Three screws hide under its three feet.",
+         shell=(214, 92, 84), bottom=(64, 60, 66), accent=(250, 236, 220), cable=(230, 230, 226), braided=False,
+         feet=[(-36, -128, 72, 14), (-60, 96, 32, 28), (28, 96, 32, 28)], screws=[(0, 0, -121), (1, -44, 110),
+                                                                              (2, 44, 110)]),
+]
+MOUSE_MISTAKES = {
+    "power": ("safety", "Opened it or soldered with it plugged in", "Unplug it before you open it up."),
+    "wd40": ("wrong", "Sprayed WD-40 into the scroll wheel",
+             "It leaves an oily film that collects dust: use contact cleaner."),
+    "good_part": ("wrong", "Replaced a part that was fine", "Test first, and replace only what's broken."),
+}
+MOUSE_SYMPTOMS = {
+    "unplugged": ("", "Nothing at all... it isn't plugged in!"),
+    "upside": ("", "The pointer won't move: the mouse is upside down!"),
+    "noshell": ("", "The top shell is off: there are no buttons to press!"),
+    "cutout": ("It keeps freezing, then comes back if I wiggle the cable.",
+               "The pointer freezes... comes back... freezes again."),
+    "noclick": ("", "The left button does nothing: its switch isn't soldered in!"),
+    "double": ("It double-clicks when I only click once.", "Click... click-click! One click opens things twice."),
+    "scroll": ("The scroll wheel jumps back up when I scroll down.", "Scroll down... it jumps back up! The wheel "
+                                                                     "skips."),
+    "jumpy": ("The pointer jumps about and sometimes won't move at all.", "The pointer jitters and jumps about."),
+    "scratchy": ("It scratches and drags on the mouse pad.", "It drags and scratches: the feet are worn down."),
+}
+MOUSE_FAULT_SYMPTOM = {"lens": "jumpy", "feet": "scratchy", "loose": "cutout", "wheel": "scroll", "double": "double"}
+MOUSE_LEVELS = [
+    dict(title="Jumpy pointer", faults=["lens"], difficulty=1,
+         learn="Clean the fluff out of the sensor window",
+         tip="An optical mouse films the desk thousands of times a second. One hair across its little window is "
+             "enough to confuse it. A soft brush or a cotton bud with a drop of alcohol clears it."),
+    dict(title="Scratchy glide", faults=["feet"], difficulty=2,
+         learn="Peel worn feet and stick on new ones",
+         tip="The feet are slippery PTFE pads. Worn ones scratch the desk and drag. Peel them from one end, rub off "
+             "every bit of old glue, and press the new ones down firmly."),
+    dict(title="Keeps freezing", faults=["loose"], difficulty=2,
+         learn="Open a mouse and reseat a connector",
+         tip="Mice get dropped, and a knock can shake the cable's plug half out of its socket inside. Screws often "
+             "hide under the feet or a label: peel them slowly so they go back on."),
+    dict(title="Jumpy scroll wheel", faults=["wheel"], difficulty=3,
+         learn="Clean hair and dirt out of the scroll wheel",
+         tip="The wheel turns a little encoder that counts clicks. Dirt in it makes the count jump. Pull out any "
+             "hair round the axle, spray contact cleaner into the encoder and roll the wheel."),
+    dict(title="Double-clicks", faults=["double"], difficulty=4,
+         learn="Desolder and replace a worn click switch",
+         tip="The click is a tiny switch with a springy metal leaf, which wears out after millions of clicks. "
+             "Desolder it with wick (or a pump), fit the same size switch and solder its 3 pins."),
+    dict(title="Mystery mouse", faults=None, difficulty=5,
+         learn="No steps: test, look, measure, work it out",
+         tip="Watch the pointer first: jumping means the sensor, double clicks a switch, freezing the cable or its "
+             "plug, and a skipping scroll the wheel."),
+]
+
 # What you can learn to fix, each with its own levels: the first screen has a card for each.
 PRODUCTS = [
     dict(key="fan", name="Electric fan", noun="fan", color=ACCENT, levels=FAN_LEVELS, models=FAN_MODELS,
@@ -301,6 +459,22 @@ PRODUCTS = [
          facts=lambda m: f"2 x {m['cell']}  ·  {m['ohms']} Ω speaker  ·  {len(m['screws']) + 1} screws",
          same=("Inside, they're built the same way: a speaker, a circuit board, a volume control and an antenna.",
                "So the repairs are the same. What changes is the case, the batteries, the speaker and the screws.")),
+    dict(key="keyboard", name="Keyboard", noun="keyboard", color=(90, 190, 170), levels=KEYBOARD_LEVELS,
+         models=KEYBOARD_MODELS, blurb="Crumbs, sticky keys, switches and cables",
+         intro="Learn to fix a real mechanical keyboard, one real problem at a time. Pick one:",
+         safety="Keyboards run on a safe 5 V from USB, but unplug before you clean or pull keys: liquid on a live "
+                "board can short it.",
+         facts=lambda m: f"{m['keys']} keys  ·  {m['switch']} switches  ·  USB-C",
+         same=("Inside, they're built the same way: hot-swap switches on a board, keycaps on top, a USB-C cable.",
+               "So the repairs are the same. What changes is the size, the colours and the kind of switch.")),
+    dict(key="mouse", name="Computer mouse", noun="mouse", color=(220, 110, 160), levels=MOUSE_LEVELS,
+         models=MOUSE_MODELS, blurb="Sensors, feet, scroll wheels and clicks",
+         intro="Learn to fix a real computer mouse, one real problem at a time. Pick one:",
+         safety="A USB mouse runs on a safe 5 V, but unplug it before you open it up or solder: that protects the "
+                "mouse and the computer.",
+         facts=lambda m: f"{len(m['screws'])} hidden screws  ·  {len(m['feet'])} feet  ·  USB",
+         same=("Inside, they're built the same way: two click switches, a scroll wheel, a sensor and a cable.",
+               "So the repairs are the same. What changes is the shape, the feet and where the screws hide.")),
 ]
 
 # The panel on the right
@@ -318,6 +492,52 @@ BACK_BUTTON = pygame.Rect(30, 600, 220, 42)  # from a product's levels back to t
 RESULT_BOX = pygame.Rect(40, 30, 920, 640)
 RETRY_BUTTON = pygame.Rect(WIDTH // 2 - 230, RESULT_BOX.bottom - 56, 210, 40)
 LEVELS_BUTTON = pygame.Rect(WIDTH // 2 + 20, RESULT_BOX.bottom - 56, 210, 40)
+
+# ---- build mode ----
+# Take every part off into the parts box, then build it back up, step by step like a building-block set, choosing
+# a style for each part as it goes on. "Original" is the type you picked; each product has four more styles.
+BUILD_STYLES = {
+    "fan": [("Midnight", dict(body=(44, 46, 54), blade=(96, 104, 120), grille=(150, 154, 166), badge=(90, 200, 255))),
+            ("Mint", dict(body=(196, 234, 216), blade=(250, 250, 246), grille=(232, 238, 236), badge=(60, 160, 130))),
+            ("Sunset", dict(body=(248, 160, 80), blade=(252, 222, 120), grille=(244, 238, 226), badge=(214, 70, 60))),
+            ("Ocean", dict(body=(40, 92, 150), blade=(120, 200, 232), grille=(214, 226, 236), badge=(250, 205, 60)))],
+    "radio": [("Mint", dict(case=(130, 200, 176), back=(156, 216, 194), trim=None)),
+              ("Cherry", dict(case=(176, 36, 46), back=(204, 66, 70), trim=None)),
+              ("Arctic", dict(case=(214, 218, 226), back=(236, 238, 242), trim=(90, 160, 230))),
+              ("Racing", dict(case=(36, 36, 40), back=(58, 58, 64), trim=(250, 205, 60)))],
+    "keyboard": [("Retro", dict(case=(206, 200, 186), cap=(236, 230, 214), mod=(150, 146, 140), legend=(60, 60, 70),
+                                accent=(200, 80, 60), cable=(206, 200, 186), switch="brown")),
+                 ("Ocean", dict(case=(30, 60, 100), cap=(120, 190, 230), mod=(40, 110, 170), legend=(20, 30, 50),
+                                accent=(250, 205, 60), cable=(30, 60, 100), switch="blue")),
+                 ("Mint", dict(case=(232, 240, 236), cap=(196, 234, 216), mod=(244, 246, 244), legend=(40, 90, 80),
+                               accent=(240, 120, 140), cable=(232, 240, 236), switch="red")),
+                 ("Midnight", dict(case=(24, 24, 28), cap=(42, 42, 48), mod=(32, 32, 38), legend=(130, 220, 255),
+                                   accent=(130, 220, 255), cable=(24, 24, 28), switch="red"))],
+    "mouse": [("Arctic", dict(shell=(236, 238, 242), bottom=(196, 200, 208), accent=(90, 160, 230),
+                              cable=(236, 238, 242))),
+              ("Ink", dict(shell=(32, 34, 40), bottom=(22, 24, 28), accent=(250, 90, 90), cable=(32, 34, 40))),
+              ("Lime", dict(shell=(170, 220, 80), bottom=(58, 62, 58), accent=(40, 40, 44), cable=(58, 62, 58))),
+              ("Grape", dict(shell=(132, 82, 192), bottom=(62, 42, 92), accent=(250, 205, 60), cable=(62, 42, 92)))],
+}
+SWATCH_KEYS = {"fan": ("body", "blade"), "radio": ("case", "back"), "keyboard": ("cap", "mod"),
+               "mouse": ("shell", "accent")}  # the two colours a style's swatch shows
+BUILD_TIPS = {
+    "fan": "Real repairers take a photo at every step and keep each cover's screws together. Screws of different "
+           "lengths can crack the plastic if they go back in the wrong hole.",
+    "radio": "Before you take anything apart, photograph where every wire goes. Keep the screws in an egg box, one "
+             "cup per step, so each goes back where it came from.",
+    "keyboard": "Keycaps in different rows are shaped differently, so note which row each came from. A keycap puller "
+                "and a tray make a deep clean easy.",
+    "mouse": "Warm the feet gently with a hairdryer and they peel off without tearing, so the same ones can go back "
+             "on. Screws also hide under labels.",
+}
+BUILD_CARD = pygame.Rect(PANEL_X + 14, HUD_H + 12, 282, 122)  # the build mode panel, top to bottom
+STYLE_RECTS = [pygame.Rect(PANEL_X + 14 + i * 57, BUILD_CARD.bottom + 28, 52, 30) for i in range(5)]
+BOX_RECTS = [pygame.Rect(PANEL_X + 14 + (i % 4) * 72, STYLE_RECTS[0].bottom + 28 + (i // 4) * 84, 66, 78)
+             for i in range(16)]  # the parts box: a picture of each part, with its name
+BOX_THUMB = (58, 44)  # the size of the pictures in it
+BUILD_TOOL_RECTS = [pygame.Rect(PANEL_X + 14 + i * 48, BOX_RECTS[-1].bottom + 14, 42, 34) for i in range(2)]
+BUILD_BUTTON = pygame.Rect(WIDTH - 330, 600, 300, 42)  # on a product's levels screen
 
 
 def model_rect(i, count):
@@ -918,7 +1138,7 @@ class Device:
     def update_test(self, game, dt):
         """Every frame of a power test."""
 
-    def draw_test(self, surf, game):
+    def draw_test(self, surf, game, fonts):
         """What it does on the bench during a power test."""
 
     def supply_info(self, key):
@@ -1685,7 +1905,7 @@ class Fan(Device):
     def draw(self, surf, game, fonts, mouse):
         draw_fan(surf, game, fonts, mouse)
 
-    def draw_test(self, surf, game):
+    def draw_test(self, surf, game, fonts):
         draw_fan_test(surf, game)
 
     def supply_info(self, key):
@@ -2345,7 +2565,7 @@ class Radio(Device):
     def draw(self, surf, game, fonts, mouse):
         draw_radio(surf, game, fonts)
 
-    def draw_test(self, surf, game):
+    def draw_test(self, surf, game, fonts):
         draw_radio_test(surf, game)
 
     def draw_details(self, lens, to_lens, zoom):
@@ -2375,7 +2595,1435 @@ class Radio(Device):
         return found
 
 
-DEVICES = {"fan": Fan, "radio": Radio}  # each product's key, and the class for what goes on the bench
+class UsbDevice(Device):
+    """A keyboard or a mouse: it runs off a USB cable plugged into the hub on the bench (where the fan's power
+    strip goes). Its plug works like the fan's: click it to pull it out, drag it back in."""
+
+    def make_plug(self):
+        return Piece("plug", "USB plug", (OUTLET[0] - 13, OUTLET[1] - 16, 26, 32), "out")
+
+    def cable_in(self):
+        """Is there a cable between it and the plug?"""
+        return True
+
+    def powered(self):
+        return self.plug.on and self.cable_in()
+
+    def unplug(self, game, pos):
+        """The hand on the plug pulls it out of the hub. True if the plug is what you clicked."""
+        plug = self.plug
+        if not (self.cable_in() and plug.on and plug.hit(pos)):
+            return False
+        if game.allowed(plug):
+            plug.on = False
+            game.power_warned = False
+            game.play("usb_out")
+        return True
+
+    def moving_pieces(self):
+        return self.tray_pieces + [self.plug]
+
+    def drag_source_at(self, pos):
+        if self.cable_in() and not self.plug.on and plug_rect(self.plug).inflate(8, 8).collidepoint(pos):
+            return "plug", self.plug
+        return super().drag_source_at(pos)
+
+    def drop(self, game, source, pos):
+        kind, thing = source
+        if kind == "plug":
+            if thing.rect.inflate(30, 30).collidepoint(pos) and game.allowed(thing, "drag"):
+                thing.on = True
+                game.play("usb_in")
+            return
+        super().drop(game, source, pos)
+
+
+def keyboard_layout(size):
+    """Every key on a keyboard of this size, in key widths ("units"): (label, x, y, w, h), and the width and height
+    of the whole layout. "full" has a number pad, "tkl" stops after the arrows, "60" is just the main block."""
+    keys = []
+    top = 0.0 if size == "60" else 1.25
+    if size != "60":  # the F row
+        keys.append(("Esc", 0, 0, 1, 1))
+        for i in range(12):
+            keys.append((f"F{i + 1}", 2 + i + (i // 4) * 0.5, 0, 1, 1))
+    rows = [[("Esc" if size == "60" else "`", 1)] + [(c, 1) for c in "1234567890-="] + [("Back", 2)],
+            [("Tab", 1.5)] + [(c, 1) for c in "QWERTYUIOP[]"] + [("\\", 1.5)],
+            [("Caps", 1.75)] + [(c, 1) for c in "ASDFGHJKL;'"] + [("Enter", 2.25)],
+            [("Shift", 2.25)] + [(c, 1) for c in "ZXCVBNM,./"] + [("Shift", 2.75)],
+            [("Ctrl", 1.25), ("Win", 1.25), ("Alt", 1.25), ("Space", 6.25), ("Alt", 1.25), ("Fn", 1.25),
+             ("Menu", 1.25), ("Ctrl", 1.25)]]
+    for r, row in enumerate(rows):
+        x = 0.0
+        for label, w in row:
+            keys.append((label, x, top + r, w, 1))
+            x += w
+    width = 15.0
+    if size != "60":  # the arrows and the keys above them
+        for i, label in enumerate(("PrtSc", "ScrLk", "Pause")):
+            keys.append((label, 15.25 + i, 0, 1, 1))
+        for r, labels in ((0, ("Ins", "Home", "PgUp")), (1, ("Del", "End", "PgDn"))):
+            for i, label in enumerate(labels):
+                keys.append((label, 15.25 + i, top + r, 1, 1))
+        keys.append(("Up", 16.25, top + 3, 1, 1))
+        for i, label in enumerate(("Left", "Down", "Right")):
+            keys.append((label, 15.25 + i, top + 4, 1, 1))
+        width = 18.25
+    if size == "full":  # the number pad
+        for label, x, y in (("Num", 0, 0), ("/", 1, 0), ("*", 2, 0), ("-", 3, 0), ("7", 0, 1), ("8", 1, 1),
+                            ("9", 2, 1), ("4", 0, 2), ("5", 1, 2), ("6", 2, 2), ("1", 0, 3), ("2", 1, 3),
+                            ("3", 2, 3), (".", 2, 4)):
+            keys.append((label, 18.5 + x, top + y, 1, 1))
+        keys += [("+", 21.5, top + 1, 1, 2), ("Ent", 21.5, top + 3, 1, 2), ("0", 18.5, top + 4, 2, 1)]
+        width = 22.5
+    return keys, width, top + 5
+
+
+def keyboard_geometry(model):
+    """Where a keyboard of this type sits on the bench: its case, the width of one key, and every key's rect."""
+    layout, wu, hu = keyboard_layout(model["size"])
+    u = min(36.0, 600 / wu)
+    case = pygame.Rect(0, 0, round(wu * u) + 28, round(hu * u) + 28)
+    case.midtop = (PANEL_X // 2, KB_TOP)
+    ox, oy = case.x + 14, case.y + 14
+    keys = [(label, pygame.Rect(round(ox + x * u) + 1, round(oy + y * u) + 1, round(w * u) - 2, round(h * u) - 2))
+            for label, x, y, w, h in layout]
+    return case, u, keys
+
+
+class Keycap(Piece):
+    """A keycap: it pulls straight up off its switch's stem, and pushes back down onto it."""
+
+    def __init__(self, label, rect, model):
+        super().__init__("keycap", "space bar" if label == "Space" else f"{label} keycap", rect, "out")
+        self.label, self.model = label, model
+
+    def paint(self, image, fonts):
+        draw_keycap(image, image.get_rect(), self.label, self.model, fonts["tiny"])
+
+
+class KeySwitch(Thing):
+    """A mechanical key switch, pushed into a hot-swap socket on the board. The colour of its stem says how it
+    feels: red is smooth, brown has a bump, blue clicks."""
+
+    def __init__(self, x, y, r, color, state="ok"):
+        super().__init__(x, y, r, "out")
+        self.color = color
+        self.state = state  # ok, sticky (dried drink inside) or bent (a pin bent flat: it missed its socket)
+        self.present = True
+        self.soaked = False  # alcohol dripped in
+        self.presses = 0  # since the alcohol went in
+        self.pressed_at = -9.0  # when you last pressed it, for the picture
+
+
+class Smudge(Thing):
+    """Dirt the brush rubs off: crumbs under a keycap, old glue where a mouse foot was, fluff in a sensor window."""
+
+    def __init__(self, x, y, r, amount, work):
+        super().__init__(x, y, r, "out")
+        self.amount = amount  # 1 is all there, 0 is clean
+        self.work = work  # px of rubbing to clean it all off
+        self.looked = False  # looked at with the magnifier
+
+
+class StabEnd(Thing):
+    """One end of the space bar's stabiliser wire, clipped into a little housing on the plate."""
+
+    def __init__(self, x, y, seated, greased):
+        super().__init__(round(x), round(y), 10, "out")
+        self.seated, self.greased = seated, greased
+
+
+class Keyboard(UsbDevice):
+    """A mechanical keyboard, keys up. You can pull a few of its keycaps (where the crumbs are, the key with the
+    trouble and the space bar) and get at the switches and the stabiliser under them."""
+    TOOLS = ["hand", "puller", "brush", "meter"]
+    SUPPLIES = ["ipa", "grease", "switch_a", "switch_b", "cable"]
+    SYMPTOMS = KEYBOARD_SYMPTOMS
+    FAULT_SYMPTOM = KEYBOARD_FAULT_SYMPTOM
+    FAULT_NAMES = {"crumbs": "crumbs under the keys", "sticky": "a sticky switch", "stab": "a loose stabiliser wire",
+                   "dead": "a switch with a bent pin", "cable": "a worn-out cable"}
+    MISTAKES = KEYBOARD_MISTAKES
+    WORKS = "It works! Every key types, cleanly and just once."
+
+    @staticmethod
+    def mystery():
+        """Usually one thing wrong; sometimes crumbs as well."""
+        faults = ["sticky", "stab", "dead", "cable"]
+        if random.random() < 0.3:
+            return ["crumbs", random.choice(faults)]
+        return [random.choice(faults + ["crumbs"])]
+
+    def __init__(self, faults, model=None):
+        self.faults = set(faults)
+        self.model = model = model or KEYBOARD_MODELS[0]
+        self.case, u, self.keys = keyboard_geometry(model)
+        self.unit = u
+        rects = {label: rect for label, rect in self.keys}  # letters and Space are only on it once
+        self.label = random.choice("ERTASDO")  # the key with the trouble, if a switch is what's wrong
+        self.cap = Keycap(self.label, rects[self.label], model)
+        self.crumb_caps = [Keycap(c, rects[c], model) for c in random.sample("ZXCVBNM", 3)]  # crumbs sink down here
+        self.space = Keycap("Space", rects["Space"], model)
+        self.keycaps = [self.cap] + self.crumb_caps + [self.space]
+        r = round(u * 0.36)
+        state = "sticky" if "sticky" in faults else "bent" if "dead" in faults else "ok"
+        self.switch = KeySwitch(*self.cap.rect.center, r, model["switch"], state)
+        self.crumbs = [Smudge(*c.rect.center, r + 4, 1.0 if "crumbs" in faults else 0.0, CRUMB_WORK)
+                       for c in self.crumb_caps]
+        sp, loose = self.space.rect, "stab" in faults
+        self.stabs = [StabEnd(sp.x + u * 0.6, sp.centery, True, not loose),
+                      StabEnd(sp.right - u * 0.6, sp.centery, not loose, not loose)]
+        self.cable_present, self.cable_broken = True, "cable" in faults
+        self.port = Thing(self.case.right - 70, self.case.top + 2, 12, "out")  # its USB-C socket, on the back edge
+        self.probe = Thing(KB_CABLE_X, (self.case.top + OUTLET[1]) // 2, 12, "out")  # where the meter tests the cable
+        self.plug = self.make_plug()
+        values = [model["switch"], random.choice([c for c in SWITCH_COLORS if c != model["switch"]])]
+        keys = ["switch_a", "switch_b"]
+        random.shuffle(keys)
+        self.switch_colors = dict(zip(keys, values))  # what's in the drawer: the right kind of switch and a wrong one
+        self.tray_pieces = list(self.keycaps)
+        self.things = [self.plug, self.port, self.probe, self.switch] + self.keycaps + self.crumbs + self.stabs
+        self.plug.model = model
+        self.art = None  # the case and the keys you can't pull, drawn once
+        self.legend = None  # the font for the keys' legends, sized to fit them
+        self.pressed = None  # the key being typed in a test, for the picture
+        self.start()
+
+    def cable_in(self):
+        return self.cable_present
+
+    def open(self, zone):
+        return True
+
+    def closed(self):
+        return self.cable_present and all(c.on for c in self.keycaps)
+
+    def symptom(self, testing=False):
+        """The worst thing wrong with it when you type, or None if it works."""
+        if not self.cable_present:
+            return "nocable"
+        if testing and not self.plug.on:
+            return "unplugged"
+        found = set()
+        if self.cable_broken:
+            found.add("cutout")
+        sw = self.switch
+        if not sw.present or sw.state == "bent":
+            found.add("dead")
+        elif sw.state == "sticky":
+            found.add("sticky")
+        if not all(c.on for c in self.keycaps):
+            found.add("nokeycap")
+        if not all(s.seated and s.greased for s in self.stabs):
+            found.add("rattle")
+        if any(c.amount > 0 for c in self.crumbs):
+            found.add("gritty")
+        return next((s for s in self.SYMPTOMS if s in found), None)
+
+    def screws_in_reach(self):
+        return []
+
+    def loose_screws(self):
+        return []
+
+    def issues(self):
+        found = []
+        off = sum(not c.on for c in self.keycaps)
+        if off:
+            found.append("A keycap left off" if off == 1 else f"{off} keycaps left off")
+        if not self.closed_ok:
+            found.append("Not tested with everything back on")
+        return found
+
+    def danger(self, doing):
+        if self.powered() and doing in ("puller", "brush", "spray"):
+            return "UNPLUG IT FIRST! Never clean it or pull keys while it's plugged in."
+        return None
+
+    def plan(self):
+        """The steps of a tidy repair, from typing a test line to finishing."""
+        steps = []
+        faults = self.faults
+
+        def add(tool, targets, goal, label, text, **more):
+            steps.append(Step(tool, targets, goal, label, text, **more))
+
+        cap, sw, space, L = self.cap, self.switch, self.space, self.label
+        add("button", ["TEST"], lambda t: self.tests >= 1, "Try typing", "Press TEST to type a line and see what "
+                                                                          "happens", optional=True)
+        add("hand", [self.plug], lambda p: not p.on, "Unplug it",
+            "Click the USB plug to pull it out of the hub: never clean it or pull keys while it's live")
+        if "cable" in faults:
+            add("meter", [self.probe], lambda t: t.probed, "Test the cable",
+                "Multimeter (4): click the cable. Every wire in a good one reads almost 0 Ω", optional=True)
+            add("hand", [self.port], lambda t: not self.cable_present, "Pull out the old cable",
+                "Click the cable's USB-C end, where it goes into the keyboard, to pull it out")
+            add("drag", [self.port], lambda t: self.cable_present, "Fit a new cable",
+                "Drag the new cable from the drawer onto the keyboard's USB-C socket", source=("supply", "cable"))
+        if "crumbs" in faults:
+            caps = self.crumb_caps
+            add("puller", caps, lambda c: not c.on, f"Pull {len(caps)} keycaps",
+                "Pick the keycap puller (2) and click each key where the crumbs have sunk in, by the space bar")
+            add("brush", self.crumbs, lambda c: c.amount == 0, "Brush out the crumbs",
+                "Pick the brush (3), hold the button and rub the crumbs off round each switch")
+            add("drag", caps, lambda c: c.on, f"Push {len(caps)} keycaps back on",
+                "Drag each keycap from the tray back onto its switch", source=("tray", caps[0]))
+        if faults & {"sticky", "dead"}:
+            add("puller", [cap], lambda c: not c.on, f"Pull off the {L} keycap",
+                f"Pick the keycap puller (2) and click the {L} key to lift its cap straight up")
+            add("meter", [sw], lambda s: s.probed, "Test the switch",
+                "Multimeter (4): click the switch. Pressed, a good one reads almost 0 Ω; let go, it's OPEN",
+                optional=True)
+            if "sticky" in faults:
+                add("drag", [sw], lambda s: s.soaked, "Drip in some alcohol",
+                    "Drag the isopropyl alcohol from the drawer onto the sticky switch: it dissolves the dried drink",
+                    source=("supply", "ipa"))
+                add("hand", [sw], lambda s: s.state != "sticky", f"Press it {KEY_PRESSES} times",
+                    "Click the switch over and over with the hand (1) to work the alcohol right through it",
+                    badge=f"CLICK x{KEY_PRESSES}")
+            else:
+                key = next(k for k, v in self.switch_colors.items() if v == self.model["switch"])
+                color = self.model["switch"]
+                add("puller", [sw], lambda s: not s.present, "Pull out the switch",
+                    "Click the switch with the puller (2): its prongs grip the clips above and below it")
+                add("drag", [sw], lambda s: s.present and s.color == color, f"Fit a new {color} switch",
+                    f"Drag the {color} switch from the drawer into the socket. Match the others' stems!",
+                    source=("supply", key))
+            add("drag", [cap], lambda c: c.on, "Push the keycap back on",
+                f"Drag the {L} keycap from the tray back onto its switch", source=("tray", cap))
+        if "stab" in faults:
+            add("puller", [space], lambda c: not c.on, "Pull off the space bar",
+                "Use the keycap puller (2) on the space bar: lift it straight up, both ends together")
+            add("drag", self.stabs, lambda s: s.greased, "Grease both wire ends",
+                "Drag the dielectric grease from the drawer onto each end of the stabiliser wire",
+                source=("supply", "grease"))
+            add("hand", [self.stabs[1]], lambda s: s.seated, "Snap the wire back in",
+                "Click the loose end of the wire with the hand (1) to snap it back into its housing")
+            add("drag", [space], lambda c: c.on, "Put the space bar back",
+                "Drag the space bar from the tray back on, over its stabiliser", source=("tray", space))
+        add("drag", [self.plug], lambda p: p.on, "Plug it back in", "Drag the USB plug back into the hub",
+            source=("plug", self.plug))
+        add("button", ["TEST"], lambda t: self.closed_ok, "Try it again", "Press TEST again: every key should type "
+                                                                           "now")
+        add("button", ["FINISH"], lambda t: self.finished, "Finish", "Press FINISH to see how you did")
+        return steps
+
+    # ---- what each tool does to the keyboard ----
+
+    def loose_cap_at(self, pos):
+        """A keycap you can pull, on and under pos."""
+        return next((c for c in self.keycaps if c.on and c.hit(pos)), None)
+
+    def other_key_at(self, pos):
+        """One of the keys there's no reason to pull."""
+        return next((label for label, rect in self.keys if rect.collidepoint(pos)), None)
+
+    def bare_switch(self, pos):
+        """The switch under the pulled keycap, if that's what's at pos."""
+        sw = self.switch
+        return sw if not self.cap.on and sw.present and sw.hit(pos) else None
+
+    def use_hand(self, game, pos):
+        if self.unplug(game, pos):
+            return
+        if self.cable_present and self.port.hit(pos):
+            if game.can(self.port, "hand"):
+                self.plug.on, self.plug.t = False, 1.0  # the whole cable comes away
+                game.power_warned = False
+                if self.cable_broken:
+                    self.found.add("cable")
+                game.take_out(self.port, "cable", not self.cable_broken)
+                self.cable_present = self.cable_broken = False
+            return
+        sw = self.bare_switch(pos)
+        if sw:
+            if game.can(sw, "hand"):
+                self.press_switch(game)
+            return
+        if not self.space.on:
+            end = next((s for s in self.stabs if s.hit(pos)), None)
+            if end:
+                if game.can(end, "hand"):
+                    if end.seated:
+                        game.floats.append(FloatText("Clipped in", end.x, end.y - 24, WHITE))
+                    else:
+                        end.seated = True
+                        game.floats.append(FloatText("Snapped in", end.x, end.y - 24, WHITE))
+                        game.play("snap")
+                return
+        if self.loose_cap_at(pos) or self.other_key_at(pos):
+            game.say("Fingernails scratch keycaps and can snap a stem: use the keycap puller (2).")
+
+    def press_switch(self, game):
+        sw = self.switch
+        sw.pressed_at = game.clock
+        if sw.state == "sticky":
+            self.found.add("sticky")
+            if not sw.soaked:
+                game.wiggle(sw, "It sticks down: there's dried drink inside. Drip some alcohol in first.")
+                return
+            sw.presses += 1
+            if sw.presses >= KEY_PRESSES:
+                sw.state = "ok"
+                burst(game.particles, sw.x, sw.y, WHITE, 12, speed=140, life=0.5, size=3)
+                game.floats.append(FloatText("Unstuck!", sw.x, sw.y - 28, GREEN))
+                game.play("clean")
+                return
+            game.floats.append(FloatText(str(sw.presses), sw.x, sw.y - 26, WHITE, 0.6))
+        game.play("clack" if sw.color == "blue" else "tick")
+
+    def use_puller(self, game, pos):
+        cap = self.loose_cap_at(pos)
+        if cap:
+            if game.can(cap, "puller"):
+                game.take_off(cap, "pop")
+                if cap is self.space and not self.stabs[1].seated:
+                    self.found.add("stab")
+                    game.say("There: the stabiliser wire has popped out of its clip at one end. That's the rattle.")
+                elif cap in self.crumb_caps and self.crumbs[self.crumb_caps.index(cap)].amount > 0:
+                    self.found.add("crumbs")
+            return
+        sw = self.bare_switch(pos)
+        if sw:
+            if game.can(sw, "puller"):
+                if sw.state == "bent":
+                    self.found.add("dead")
+                    game.floats.append(FloatText("A bent pin!", sw.x, sw.y - 28, RED))
+                    game.say("There: one pin is bent flat, so it never reached its socket. That's the dead key.")
+                game.take_out(sw, f"kbswitch_{sw.color}", sw.state == "ok")
+                sw.present, sw.state, sw.soaked, sw.presses = False, "ok", False, 0
+            return
+        if self.other_key_at(pos):
+            game.say("That key types fine: leave it on.")
+
+    def crumbs_at(self, pos):
+        return next((c for c, cap in zip(self.crumbs, self.crumb_caps) if not cap.on and c.amount > 0 and c.hit(pos)),
+                    None)
+
+    def use_brush(self, game, pos):
+        crumb = self.crumbs_at(pos)
+        if crumb is None:
+            cap = self.loose_cap_at(pos)
+            if cap in self.crumb_caps and self.crumbs[self.crumb_caps.index(cap)].amount > 0:
+                game.say("The crumbs are down under the keycap: pull it off first.")
+            return
+        if not game.can(crumb, "brush"):
+            return
+        game.scrub_from = pos
+        self.scrub(game, pos, pos)
+
+    def scrub(self, game, a, b):
+        crumb = self.crumbs_at(b)
+        dist = math.dist(a, b)
+        if crumb is None or not dist:
+            return
+        self.found.add("crumbs")
+        scrub_smudge(game, crumb, b, dist, (200, 160, 100), "Clean!")
+
+    def use_meter(self, game, pos):
+        found = []
+        if self.cable_present:
+            found.append((self.probe, "Cable", lambda: ("OPEN", False) if self.cable_broken else ("0.2 Ω", True)))
+        if self.bare_switch(pos):
+            found.append((self.switch, "Switch", self.switch_reading))
+        hit = next((f for f in found if f[0].hit(pos)), None)
+        if hit is None or not game.can(hit[0], "meter"):
+            return
+        thing, name, measure = hit
+        if thing is self.probe and self.plug.on:
+            game.say("Unplug it first: to test a cable, the meter needs both of its ends free.")
+            return
+        text, good = measure()
+        thing.probed = True
+        self.readings.append((name, text, good))
+        if thing is self.probe and self.cable_broken:
+            self.found.add("cable")
+        elif thing is self.switch and not good:
+            self.found.add("dead" if self.switch.state == "bent" else "sticky")
+        game.floats.append(FloatText(text, thing.x, thing.y - 30, GREEN if good else RED))
+        game.play("beep" if good else "buzz")
+
+    def switch_reading(self):
+        """Across the switch's socket, with the key pressed and let go."""
+        state = self.switch.state
+        if state == "bent":
+            return "OPEN", False  # pressed or not: the bent pin isn't touching anything
+        if state == "sticky":
+            return "STUCK", False  # still 0 Ω when you let go: it's stuck down
+        return "0.1 Ω", True
+
+    def drop_supply(self, game, key, pos):
+        sw = self.switch
+        if key == "ipa":
+            if self.bare_switch(pos) is None:
+                if self.crumbs_at(pos):
+                    game.say("Dry crumbs just need brushing out.")
+                return
+            if not game.can(sw, "drag", doing="spray"):
+                return
+            sw.soaked, sw.presses = True, 0
+            for _ in range(8):
+                game.particles.append(Particle(sw.x + random.uniform(-4, 4), sw.y - 8, random.uniform(-20, 20),
+                                               random.uniform(20, 70), (200, 226, 250), 0.5, 3, gravity=300))
+            game.floats.append(FloatText("Alcohol in", sw.x, sw.y - 30, WHITE))
+            game.play("drip")
+        elif key == "grease":
+            end = next((s for s in self.stabs if not self.space.on and s.hit(pos)), None)
+            if end is None or not game.can(end, "drag"):
+                return
+            end.greased = True
+            game.floats.append(FloatText("Greased", end.x, end.y - 24, WHITE))
+            game.play("drip")
+        elif key.startswith("switch"):
+            if self.cap.on or not sw.hit(pos):
+                return
+            if sw.present:
+                game.say("There's a switch in that socket already: pull it out first.")
+                return
+            if not game.can(sw, "drag"):
+                return
+            sw.present, sw.state, sw.soaked, sw.presses = True, "ok", False, 0
+            sw.color = self.switch_colors[key]
+            if sw.color != self.model["switch"]:
+                self.mistake("wrong_switch")
+            game.floats.append(FloatText(f"{sw.color.capitalize()} switch in", sw.x, sw.y - 30, WHITE))
+            game.play("snap")
+        elif key == "cable":
+            if math.dist(pos, (self.port.x, self.port.y)) > 50:
+                return
+            if self.cable_present:
+                game.say("There's a cable in it already: pull the old one out first.")
+                return
+            if not game.can(self.port, "drag"):
+                return
+            self.cable_present, self.cable_broken = True, False
+            self.plug.on, self.plug.t = False, 1.0  # its other end lies by the hub, ready to plug in
+            game.play("plug")
+
+    def blocked(self, piece):
+        if piece is self.cap and not self.switch.present:
+            return piece, "There's no switch for it to sit on: fit a new switch first."
+        if piece is self.space and not self.stabs[1].seated:
+            return self.stabs[1], "The wire's loose: snap it back into its housing first."
+        return None
+
+    def refitted(self, game, piece):
+        game.play("snap")
+
+    def wrong_supply(self, key):
+        if key.startswith("switch"):
+            return f"Not that one: this keyboard has {self.model['switch']} switches. Match them."
+        return super().wrong_supply(key)
+
+    def supply_info(self, key):
+        if key.startswith("switch"):
+            color = self.switch_colors[key]
+            return f"A {color} key switch: {SWITCH_FEEL[color]}"
+        return SUPPLY_INFO[key]
+
+    def supply_label(self, key):
+        return self.switch_colors[key].upper() if key.startswith("switch") else SUPPLY_LABELS[key]
+
+    def supply_icon(self, key):
+        return f"kbswitch_{self.switch_colors[key]}" if key.startswith("switch") else key
+
+    def draw_supply(self, surf, key, pos, fonts):
+        if key.startswith("switch"):
+            draw_kb_switch(surf, *pos, self.switch_colors[key])
+        else:
+            SUPPLY_BODIES[key](surf, *pos)
+
+    def test_sounds(self, symptom):
+        if symptom in ("nocable", "unplugged"):
+            return []
+        sounds = ["typing_cut" if symptom == "cutout" else "typing"]
+        return sounds + (["rattle"] if symptom == "rattle" else [])
+
+    def update_test(self, game, dt):
+        self.pressed = keyboard_typing(self, game.test_symptom, game.state_time)[1]
+
+    def draw(self, surf, game, fonts, mouse):
+        draw_keyboard(surf, game, fonts, mouse)
+
+    def draw_test(self, surf, game, fonts):
+        draw_keyboard_test(surf, game, fonts)
+
+    def notes(self):
+        found = []
+        if "crumbs" in self.found:
+            found.append(("Crumbs under the keycaps", False))
+        if "stab" in self.found:
+            found.append(("Space bar wire: popped out of its clip", False))
+        if "sticky" in self.found:
+            found.append((f"{self.label} switch: sticks down", False))
+        if "dead" in self.found:
+            found.append((f"{self.label} switch: a pin bent flat", False))
+        return found
+
+
+def scrub_smudge(game, smudge, pos, dist, color, done_text):
+    """Rub dist px of dirt off a smudge with the brush, with bits flying off and a cheer when it's clean."""
+    smudge.amount = max(0.0, smudge.amount - dist / smudge.work)
+    if random.random() < 0.4:
+        game.particles.append(Particle(pos[0], pos[1], random.uniform(-70, 70), random.uniform(-80, 0), color, 0.5, 3,
+                                       gravity=300))
+    game.sound_timer -= 0.03
+    if game.sound_timer <= 0:
+        game.sound_timer = 0.09
+        game.play("scrub")
+    if smudge.amount == 0:
+        burst(game.particles, smudge.x, smudge.y, WHITE, 12, speed=140, life=0.5, size=3)
+        game.floats.append(FloatText(done_text, smudge.x, smudge.y - 26, WHITE))
+        game.play("clean")
+
+
+class Foot(Piece):
+    """One of the slippery PTFE pads on a mouse's underside. The screws hide under them."""
+
+    def __init__(self, rect, worn, model):
+        super().__init__("foot", "foot", rect, "under")
+        self.worn, self.model = worn, model
+        self.present = True  # False once a worn one has gone in the bin
+
+    def paint(self, image, fonts):
+        draw_foot(image, image.get_rect(), self.worn)
+
+
+class MicroSwitch(Box):
+    """The little switch under the left button: a springy metal leaf inside clicks over when you press it. Its
+    three pins come through the board and are soldered there."""
+
+    def __init__(self, x, y, worn):
+        super().__init__((x - 15, y - 11, 30, 22), "inside")
+        self.worn = worn  # its leaf has lost its spring: it bounces, so one click counts as two
+        self.present = True
+        self.wicked = False  # desoldering wick laid over its pins
+        self.pins = [Thing(x - 10 + i * 10, y + 19, 5, "inside") for i in range(3)]
+        for pin in self.pins:
+            pin.state = "soldered"  # soldered, clear (the solder soaked away) or loose (a new switch's, not soldered)
+
+
+class Mouse(UsbDevice):
+    """A wired optical mouse. Turn it over to get at its feet, the screws under them and the sensor window; turn it
+    back and lift the top shell to get at the board."""
+    TOOLS = ["hand", "driver", "iron", "brush", "meter", "magnifier"]
+    SUPPLIES = ["cleaner", "wd40", "wick", "microswitch", "feet"]
+    SYMPTOMS = MOUSE_SYMPTOMS
+    FAULT_SYMPTOM = MOUSE_FAULT_SYMPTOM
+    FAULT_NAMES = {"lens": "fluff in the sensor window", "feet": "worn-out feet", "loose": "a loose cable plug inside",
+                   "wheel": "a dirty scroll wheel", "double": "a worn click switch"}
+    MISTAKES = MOUSE_MISTAKES
+    WORKS = "It works! The pointer glides, clicks once and scrolls smoothly."
+
+    @staticmethod
+    def mystery():
+        """Usually one thing wrong; sometimes fluff in the sensor as well."""
+        inside = ["loose", "wheel", "double", "feet"]
+        if random.random() < 0.3:
+            return ["lens", random.choice(inside)]
+        return [random.choice(inside + ["lens"])]
+
+    def __init__(self, faults, model=None):
+        self.faults = set(faults)
+        self.model = model = model or MOUSE_MODELS[0]
+        cx, cy = MOUSE_C
+        hw, hh = self.hw, self.hh = model["w"] // 2, model["h"] // 2
+        self.rect = pygame.Rect(cx - hw, cy - hh, 2 * hw, 2 * hh)
+        self.flipped = False  # on its back, showing its underside
+        self.plug = self.make_plug()
+        self.flipper = Thing(cx, cy + hh + 34, 22, "out")  # the TURN OVER button by it
+        worn = "feet" in faults
+        self.feet = [Foot((cx + x, cy + y, w, h), worn, model) for x, y, w, h in model["feet"]]
+        self.glues = [Smudge(*f.rect.center, max(f.rect.size) // 2 + 4, 1.0 if worn else 0.0, GLUE_WORK)
+                      for f in self.feet]  # what a worn foot leaves behind when it comes off
+        self.screws = []
+        for i, x, y in model["screws"]:
+            screw = Screw(cx + x, cy + y)
+            screw.foot = self.feet[i]
+            self.screws.append(screw)
+        self.shell = Piece("shell", "top shell", self.rect, "upright", self.screws)
+        self.shell.paint = lambda image, fonts: draw_mouse_top(image, image.get_rect(), model, fonts["tiny"])
+        self.lens = Smudge(cx, cy + round(hh * 0.12), 20, 1.0 if "lens" in faults else 0.0, FLUFF_WORK)
+        wy = cy - round(hh * 0.55)
+        self.wheel = Thing(cx, wy, 16, "inside")
+        self.wheel.angle, self.wheel.looked = 0.0, False
+        self.hair = Thing(cx - 16, wy, 9, "inside")
+        self.hair.present = "wheel" in faults  # wound round the axle
+        self.encoder = Thing(cx + 25, wy, 11, "inside")  # counts the wheel's clicks
+        self.encoder.dirty = "wheel" in faults
+        self.encoder.sprayed, self.encoder.worked = False, 0.0
+        sy = cy - round(hh * 0.5)
+        self.switch = MicroSwitch(cx - round(hw * 0.46), sy, "double" in faults)
+        self.right_switch = (cx + round(hw * 0.46), sy)
+        self.conn = Thing(cx - round(hw * 0.34), cy - round(hh * 0.76), 13, "inside")  # the cable's plug on the board
+        self.conn.seated = "loose" not in faults
+        self.tray_pieces = self.feet + [self.shell]
+        self.things = ([self.plug, self.flipper, self.shell, self.lens, self.wheel, self.hair, self.encoder,
+                        self.switch, self.conn] + self.switch.pins + self.feet + self.glues + self.screws)
+        for piece in self.tray_pieces + [self.plug]:
+            piece.model = model
+        self.start()
+
+    def open(self, zone):
+        """Can you get at things in this zone right now?"""
+        up = not self.flipped
+        return {"out": True, "under": self.flipped, "upright": up, "top": up and self.shell.on,
+                "inside": up and not self.shell.on}[zone]
+
+    def closed(self):
+        return (self.shell.on and not self.flipped and all(s.inserted for s in self.screws)
+                and all(f.on for f in self.feet))
+
+    def symptom(self, testing=False):
+        """The worst thing wrong with it when you use it, or None if it works."""
+        if testing and not self.plug.on:
+            return "unplugged"
+        if testing and self.flipped:
+            return "upside"
+        found = set()
+        if not self.shell.on:
+            found.add("noshell")
+        if not self.conn.seated:
+            found.add("cutout")
+        sw, enc = self.switch, self.encoder
+        if not sw.present or any(p.state != "soldered" for p in sw.pins):
+            found.add("noclick")
+        elif sw.worn:
+            found.add("double")
+        if self.hair.present or (enc.dirty and not (enc.sprayed and enc.worked >= WHEEL_WORK)):
+            found.add("scroll")
+        if self.lens.amount > 0:
+            found.add("jumpy")
+        if any(f.worn or not f.on for f in self.feet):
+            found.add("scratchy")
+        return next((s for s in self.SYMPTOMS if s in found), None)
+
+    def screws_in_reach(self):
+        return [s for s in self.screws if self.flipped and not s.foot.on]
+
+    def loose_screws(self):
+        return [s for s in self.screws if not s.inserted]
+
+    def issues(self):
+        found = []
+
+        def add(count, one, many=""):
+            if count:
+                found.append(one if count == 1 else f"{count} {many}")
+
+        add(sum(not s.inserted for s in self.screws), "A screw left out", "screws left out")
+        add(sum(not f.on for f in self.feet), "A foot left off: it'll scratch the desk", "feet left off")
+        add(not self.shell.on, "Top shell left off")
+        add(self.flipped, "Left upside down")
+        add(not self.closed_ok, "Not tested with everything back on")
+        return found
+
+    def danger(self, doing):
+        if self.plug.on and doing in ("driver", "iron", "spray"):
+            return "UNPLUG IT FIRST! Never open it up or solder while it's plugged in."
+        return None
+
+    def plan(self):
+        """The steps of a tidy repair, from trying it out to finishing."""
+        steps = []
+        faults = self.faults
+
+        def add(tool, targets, goal, label, text, **more):
+            steps.append(Step(tool, targets, goal, label, text, **more))
+
+        feet, screws, shell, flip, sw = self.feet, self.screws, self.shell, self.flipper, self.switch
+        opening = bool(faults & {"loose", "wheel", "double"})
+        screws_out = lambda: not any(s.inserted for s in screws)
+        add("button", ["TEST"], lambda t: self.tests >= 1, "Try it out", "Press TEST to see what the pointer does",
+            optional=True)
+        if opening:
+            add("hand", [self.plug], lambda p: not p.on, "Unplug it",
+                "Click the USB plug to pull it out of the hub before you open it up")
+        add("hand", [flip], lambda f: self.flipped, "Turn it over", "Click TURN OVER to lay the mouse on its back")
+        if "lens" in faults:
+            add("magnifier", [self.lens], lambda s: s.looked, "Look in the sensor window",
+                "Pick the magnifier (6) and click the little window in the middle: what can you see?", optional=True)
+            add("brush", [self.lens], lambda s: s.amount == 0, "Brush out the sensor window",
+                "Pick the brush (4), hold the button and rub the fluff and hair out of the window")
+        if "feet" in faults or opening:
+            worn = "feet" in faults
+            add("hand", feet, lambda f: not f.on, f"Peel off {len(feet)} feet",
+                "Click each foot to peel it off. They're worn out: they go in the bin" if worn else
+                "The screws hide under the feet. Click each one to peel it off slowly, so it can go back on")
+        if "feet" in faults:
+            add("brush", self.glues, lambda g: g.amount == 0, "Rub off the old glue",
+                "Pick the brush (4) and rub the old glue off where each foot was, so the new ones sit flat")
+        if opening:
+            n = len(screws)
+            add("driver", screws, lambda s: not s.inserted, f"Undo {n} screws",
+                "Pick the screwdriver (2) and hold it on each screw until it comes out")
+            add("hand", [flip], lambda f: not self.flipped and screws_out(), "Turn it back over",
+                "Click TURN OVER: the top shell lifts off from above")
+            add("hand", [shell], lambda p: not p.on, "Lift off the top shell",
+                "Click the shell with the hand (1) to lift it off")
+            if "loose" in faults:
+                add("meter", [self.conn], lambda t: t.probed, "Test the cable",
+                    "Multimeter (5): click the cable's plug on the board. Does the reading hold steady?",
+                    optional=True)
+                add("hand", [self.conn], lambda c: c.seated, "Push the plug in",
+                    "The cable's white plug has worked half out of its socket: click it to push it home")
+            if "wheel" in faults:
+                enc = self.encoder
+                add("magnifier", [self.wheel], lambda w: w.looked,
+                    "Look at the wheel", "Magnifier (6): click the scroll wheel. Anything round its axle?",
+                    optional=True)
+                add("hand", [self.hair], lambda h: not h.present, "Pull off the hair",
+                    "Hair is wound round the wheel's axle: click it with the hand (1) to pull it off")
+                add("drag", [enc], lambda e: e.sprayed, "Spray the encoder",
+                    "Drag the contact cleaner from the drawer onto the little metal box by the wheel. Not WD-40!",
+                    source=("supply", "cleaner"))
+                add("twist", [self.wheel], lambda w: enc.worked >= WHEEL_WORK, "Roll the wheel",
+                    "Hold the wheel with the hand and circle the mouse to roll it round and round", badge="TURN IT")
+            if "double" in faults:
+                add("meter", [sw], lambda s: s.probed, "Test the left switch",
+                    "Multimeter (5): click the left switch. A good one reads a steady 0 Ω when pressed",
+                    optional=True)
+                add("drag", [sw], lambda s: s.wicked, "Lay wick on the pins",
+                    "Drag the desoldering wick from the drawer onto the left switch's 3 pins",
+                    source=("supply", "wick"))
+                add("iron", sw.pins, lambda p: p.state == "clear", "Desolder 3 pins",
+                    "Pick the soldering iron (3) and hold it on each pin: the wick soaks the solder up")
+                add("hand", [sw], lambda s: not s.present, "Take out the old switch",
+                    "Click the switch with the hand (1) to lift it out")
+                add("drag", [sw], lambda s: s.present, "Fit a new switch",
+                    "Drag the new click switch from the drawer into the gap", source=("supply", "microswitch"))
+                add("iron", sw.pins, lambda p: p.state == "soldered", "Solder 3 pins",
+                    "Hold the soldering iron (3) on each pin to melt in a little fresh solder")
+            add("drag", [shell], lambda p: p.on, "Put the top shell back",
+                "Drag the top shell from the tray back on", source=("tray", shell))
+            add("hand", [flip], lambda f: self.flipped and shell.on and screws_out(), "Turn it over again",
+                "Click TURN OVER to get at the screw holes")
+            add("driver", screws, lambda s: s.inserted, f"Do up {n} screws", "Hold the screwdriver (2) on each hole")
+        if "feet" in faults:
+            add("drag", feet, lambda f: f.on, f"Stick on {len(feet)} new feet",
+                "Drag the new feet from the drawer onto each spot and press them down", source=("supply", "feet"))
+        elif opening:
+            add("drag", feet, lambda f: f.on, "Stick the feet back on",
+                "Drag each foot from the tray back over its screw", source=("tray", feet[0]))
+        add("hand", [flip], lambda f: not self.flipped, "Turn it the right way up",
+            "Click TURN OVER: the sensor needs to see the desk")
+        if opening:
+            add("drag", [self.plug], lambda p: p.on, "Plug it back in", "Drag the USB plug back into the hub",
+                source=("plug", self.plug))
+        add("button", ["TEST"], lambda t: self.closed_ok, "Test it", "Press TEST again: it should work now")
+        add("button", ["FINISH"], lambda t: self.finished, "Finish", "Press FINISH to see how you did")
+        return steps
+
+    # ---- what each tool does to the mouse ----
+
+    def pin_at(self, pos):
+        hits = [p for p in self.switch.pins if p.hit(pos)]
+        return min(hits, key=lambda p: math.dist(pos, (p.x, p.y))) if hits else None
+
+    def use_hand(self, game, pos):
+        if self.unplug(game, pos):
+            return
+        if self.flipper.hit(pos):
+            if game.can(self.flipper, "hand"):
+                self.flip(game)
+            return
+        if self.flipped:
+            foot = next((f for f in self.feet if f.on and f.hit(pos)), None)
+            if foot and game.can(foot, "hand"):
+                self.peel(game, foot)
+            return
+        if self.shell.on:
+            if self.shell.hit(pos) and game.can(self.shell, "hand"):
+                if any(s.inserted for s in self.screws):
+                    hidden = all(f.on for f in self.feet)
+                    game.wiggle(self.shell, "It's screwed together from underneath." + (
+                        " Mice often hide their screws under the feet." if hidden else ""))
+                else:
+                    game.take_off(self.shell)
+            return
+        if self.conn.hit(pos):
+            if game.can(self.conn, "hand"):
+                if self.conn.seated:
+                    game.floats.append(FloatText("It's in firmly", self.conn.x, self.conn.y - 24, WHITE))
+                else:
+                    self.conn.seated = True
+                    self.found.add("loose")
+                    game.floats.append(FloatText("Click! In firmly", self.conn.x, self.conn.y - 24, GREEN))
+                    game.play("plug")
+            return
+        if self.hair.present and self.hair.hit(pos):
+            if game.can(self.hair, "hand"):
+                self.hair.present = False
+                self.found.add("wheel")
+                game.flyers.append(Flyer("hair", self.hair.x, self.hair.y))
+                game.floats.append(FloatText("Got it!", self.hair.x, self.hair.y - 24, WHITE))
+                game.play("peel")
+            return
+        sw = self.switch
+        if sw.present and sw.hit(pos):
+            if game.can(sw, "hand"):
+                if any(p.state == "soldered" for p in sw.pins):
+                    game.wiggle(sw, "It's soldered in: desolder all 3 of its pins first.")
+                else:
+                    game.take_out(sw, "microswitch", not sw.worn)
+                    sw.present = sw.worn = sw.wicked = False
+                    for p in sw.pins:
+                        p.state = "clear"
+            return
+        if self.wheel.hit(pos) and game.can(self.wheel, "twist"):
+            game.twist = [self.wheel, None]
+            game.turned = game.wrong_way = 0.0
+            game.update_twist(pos)
+
+    def flip(self, game):
+        if not self.shell.on:
+            game.wiggle(self.flipper, "Put the top shell back first, or everything falls out.")
+            return
+        self.flipped = not self.flipped
+        game.play("cover")
+
+    def peel(self, game, foot):
+        if foot.worn:  # it's had it: straight in the bin
+            foot.on = foot.present = False
+            foot.t = 1.0
+            self.found.add("feet")
+            game.flyers.append(Flyer("foot", *foot.rect.center))
+            game.floats.append(FloatText("Worn thin!", *foot.rect.midtop, WHITE))
+            game.play("peel")
+        else:
+            game.take_off(foot, "peel")
+
+    def use_driver(self, game, pos):
+        screw = next((s for s in self.screws_in_reach() if s.hit(pos)), None)
+        if screw:
+            if game.can(screw, "driver"):
+                game.hold = [screw, 0.0]
+        elif self.flipped and any(s.foot.on and s.foot.hit(pos) for s in self.screws):
+            game.say("Feel that? There's a screw under this foot: peel it off first.")
+
+    def use_iron(self, game, pos):
+        if not self.open("inside"):
+            return
+        pin = self.pin_at(pos)
+        if pin is None or not game.can(pin, "iron"):
+            return
+        sw = self.switch
+        if not sw.present:
+            game.wiggle(pin, "There's nothing to solder yet: fit the new switch first.")
+        elif pin.state == "clear":
+            game.floats.append(FloatText("No solder left", pin.x, pin.y - 22, WHITE))
+        elif pin.state == "soldered" and not sw.wicked:
+            game.say("It melts, then just sets again. Lay desoldering wick on the pins first, to soak it up.")
+            game.play("sizzle")
+        else:
+            game.hold = [pin, 0.0]
+
+    def smudge_at(self, pos):
+        if not self.flipped:
+            return None
+        found = [self.lens] + [g for g, f in zip(self.glues, self.feet) if not f.on]
+        return next((s for s in found if s.amount > 0 and s.hit(pos)), None)
+
+    def use_brush(self, game, pos):
+        smudge = self.smudge_at(pos)
+        if smudge is None or not game.can(smudge, "brush"):
+            return
+        game.scrub_from = pos
+        self.scrub(game, pos, pos)
+
+    def scrub(self, game, a, b):
+        smudge = self.smudge_at(b)
+        dist = math.dist(a, b)
+        if smudge is None or not dist:
+            return
+        if smudge is self.lens:
+            self.found.add("lens")
+            scrub_smudge(game, smudge, b, dist, (170, 166, 158), "Clear!")
+        else:
+            scrub_smudge(game, smudge, b, dist, (236, 226, 190), "Clean!")
+
+    def use_meter(self, game, pos):
+        if not self.open("inside"):
+            return
+        found = [(self.conn, "Cable", lambda: ("0.2 Ω", True) if self.conn.seated else ("FLICKER", False))]
+        if self.switch.present:
+            found.append((self.switch, "Left switch", self.switch_reading))
+        hit = next((f for f in found if f[0].hit(pos)), None)
+        if hit is None or not game.can(hit[0], "meter"):
+            return
+        thing, name, measure = hit
+        text, good = measure()
+        thing.probed = True
+        self.readings.append((name, text, good))
+        if thing is self.conn and not good:
+            self.found.add("loose")
+            game.say("It flickers: the wires are fine, but the plug isn't making proper contact.")
+        elif thing is self.switch and self.switch.worn:
+            self.found.add("double")
+        game.floats.append(FloatText(text, thing.x, thing.y - 30, GREEN if good else RED))
+        game.play("beep" if good else "buzz")
+
+    def switch_reading(self):
+        sw = self.switch
+        if any(p.state != "soldered" for p in sw.pins):
+            return "OPEN", False
+        return ("BOUNCES", False) if sw.worn else ("0.1 Ω", True)
+
+    def use_magnifier(self, game, pos):
+        if self.flipped and self.lens.hit(pos):
+            thing, bad = self.lens, self.lens.amount > 0
+            text, why = "Hair in the window!", "There: fluff and a hair across the sensor's window. It can't see the " \
+                                               "desk properly."
+            fault = "lens"
+        elif self.open("inside") and (self.wheel.hit(pos) or self.hair.hit(pos)):
+            thing, bad = self.wheel, self.hair.present
+            text, why = "Hair round the axle!", "There: hair wound round the axle, and grime in the encoder."
+            fault = "wheel"
+        else:
+            return
+        if not game.can(thing, "magnifier"):
+            return
+        thing.looked = True
+        if bad:
+            self.found.add(fault)
+            game.floats.append(FloatText(text, thing.x, thing.y - 30, RED))
+            game.say(why)
+            game.play("buzz")
+        else:
+            game.floats.append(FloatText("Looks clean", thing.x, thing.y - 30, GREEN))
+            game.play("tick")
+
+    def drop_supply(self, game, key, pos):
+        sw = self.switch
+        if key in ("cleaner", "wd40"):
+            enc = self.encoder
+            if not (self.open("inside") and enc.hit(pos)) or not game.can(enc, "drag", doing="spray"):
+                return
+            burst(game.particles, enc.x, enc.y, (220, 230, 240), 16, speed=120, life=0.5, size=3)
+            game.play("spray")
+            if key == "wd40":
+                if "wd40" not in self.mistakes:
+                    self.mistake("wd40")
+                game.say("WD-40 leaves an oily film in there that collects dust. Use contact cleaner.")
+                return
+            enc.sprayed = True
+            if enc.dirty:
+                self.found.add("wheel")
+            game.floats.append(FloatText("Sprayed", enc.x, enc.y - 30, WHITE))
+        elif key == "wick":
+            if not (self.open("inside") and sw.present and (sw.hit(pos) or self.pin_at(pos))):
+                return
+            if not any(p.state == "soldered" for p in sw.pins):
+                game.say("There's no old solder left on it to soak up.")
+                return
+            if not game.can(sw, "drag"):
+                return
+            sw.wicked = True
+            game.floats.append(FloatText("Wick on", sw.x, sw.y - 30, WHITE))
+            game.play("place")
+        elif key == "microswitch":
+            if not (self.open("inside") and sw.rect.inflate(30, 30).collidepoint(pos)):
+                return
+            if sw.present:
+                game.say("The old switch is still in: desolder it and take it out first.")
+                return
+            if not game.can(sw, "drag"):
+                return
+            sw.present, sw.worn, sw.wicked = True, False, False
+            for p in sw.pins:
+                p.state = "loose"
+            game.play("place")
+        elif key == "feet":
+            foot = next((f for f in self.feet if self.flipped and not f.on and f.rect.inflate(20, 20).collidepoint(
+                pos)), None)
+            if foot is None:
+                return
+            if foot.present:
+                game.say("Its old foot is in the tray, and it's fine: stick that one back on.")
+                return
+            if self.glues[self.feet.index(foot)].amount > 0:
+                game.say("Rub the old glue off with the brush first, or the new foot won't sit flat.")
+                return
+            if any(s.foot is foot and not s.inserted for s in self.screws):
+                game.say("Do the screw up first: the foot covers it.")
+                return
+            if not game.can(foot, "drag"):
+                return
+            foot.present = foot.on = True
+            foot.worn, foot.t, foot.image = False, 0.0, None
+            game.play("peel")
+
+    def blocked(self, piece):
+        if piece is self.shell and self.flipped:
+            return self.flipper, "Turn it the right way up first: the shell goes on from above."
+        if piece in self.feet:
+            if not self.flipped:
+                return self.flipper, "Turn it over first: the feet go on the bottom."
+            screw = next((s for s in self.screws if s.foot is piece and not s.inserted), None)
+            if screw:
+                return screw, "Do the screw up first: the foot covers it."
+        return None
+
+    def refitted(self, game, piece):
+        game.play("snap" if piece is self.shell else "peel")
+
+    def wrong_supply(self, key):
+        if key == "wd40":
+            return "Not WD-40: it leaves an oily film. Take the contact cleaner."
+        return super().wrong_supply(key)
+
+    def hold_time(self, target):
+        return IRON_TIME
+
+    def holding(self, game, target, mouse):
+        if random.random() < 0.35:  # a wisp of smoke from the flux
+            game.particles.append(Particle(target.x + random.uniform(-3, 3), target.y - 4, random.uniform(-12, 12),
+                                           random.uniform(-70, -40), (200, 200, 206), 0.9, 3))
+        if game.sound_timer <= 0:
+            game.sound_timer = 0.4
+            game.play("sizzle")
+
+    def held(self, game, target):
+        if target.state == "soldered":
+            target.state = "clear"
+            text = "Soaked up"
+            burst(game.particles, target.x, target.y, COPPER, 6, speed=60, life=0.3, size=2)
+        else:
+            target.state = "soldered"
+            text = "Soldered!"
+            burst(game.particles, target.x, target.y, SOLDER, 8, speed=80, life=0.4, size=2)
+        game.floats.append(FloatText(text, target.x, target.y - 22, WHITE))
+        game.play("clean")
+        sw = self.switch
+        if sw.present and all(p.state == "soldered" for p in sw.pins):
+            sw.wicked = False
+
+    def turn(self, game, thing, delta):
+        """Rolling the scroll wheel. Hair round the axle jams it; cleaner in the encoder works in as it turns."""
+        enc = self.encoder
+        if self.hair.present:
+            game.wrong_way += abs(delta)
+            if game.wrong_way > 0.8:
+                game.wrong_way = -100  # once per grip
+                game.wiggle(self.wheel, "It's stiff: there's hair wound round the axle. Pull it off first.")
+            return
+        self.wheel.angle += delta
+        game.turned += abs(delta)
+        if game.turned > 0.4:  # the encoder's little clicks
+            game.turned = 0.0
+            game.play("tick")
+        if enc.sprayed:
+            before = enc.worked
+            enc.worked += abs(delta)
+            if enc.dirty and before < WHEEL_WORK <= enc.worked:
+                game.floats.append(FloatText("Smooth!", self.wheel.x, self.wheel.y - 34, GREEN))
+                game.play("clean")
+
+    def twist_progress(self, thing):
+        return self.encoder.worked / WHEEL_WORK
+
+    def test_sounds(self, symptom):
+        return {None: ["mclick"], "double": ["mdouble"], "scroll": ["mclick", "rattle"], "jumpy": ["mclick"],
+                "scratchy": ["scratch"], "cutout": ["usb_out"]}.get(symptom, [])
+
+    def draw(self, surf, game, fonts, mouse):
+        draw_mouse(surf, game, fonts, mouse)
+
+    def draw_test(self, surf, game, fonts):
+        draw_mouse_test(surf, game, fonts)
+
+    def notes(self):
+        found = []
+        if "lens" in self.found:
+            found.append(("Sensor window: fluff and a hair", False))
+        if "feet" in self.found:
+            found.append(("Feet: worn thin", False))
+        if "wheel" in self.found:
+            found.append(("Scroll wheel: hair round the axle", False))
+        if "loose" in self.found:
+            found.append(("Cable plug: half out of its socket", False))
+        return found
+
+
+DEVICES = {"fan": Fan, "radio": Radio, "keyboard": Keyboard, "mouse": Mouse}  # each product's device class
+
+
+# ---- build mode ----
+
+class Part:
+    """One part in build mode: it lifts off into the parts box, and goes back on in whatever style you pick."""
+
+    def __init__(self, key, name, draw, below=(), layer=0, side="top", pivot=None):
+        self.key, self.name = key, name
+        self.draw = draw  # draw(surf, palette, fonts): draws it where it sits on the bench
+        self.under_draw = None  # how it looks from underneath, for the one part you see when a mouse is turned over
+        self.below = list(below)  # the parts it sits on or fits into: they go on first
+        self.layer = layer  # higher layers are drawn on top
+        self.side = side  # "top", or "under" for a mouse's underside
+        self.pivot = pivot  # the point it spins round when it all comes to life at the end
+        self.placed = True
+        self.style = 0  # which style it's in
+        self.t = 0.0  # 0 is in place, 1 is in the parts box
+        self.wiggle = 0.0
+        self.cache, self.thumbs = {}, {}  # its picture in each style
+
+
+class BuildScrew(Screw):
+    """A screw in build mode: undone and done up with the screwdriver, just like in the repairs."""
+
+    def __init__(self, key, x, y, below, layer=9, side="top"):
+        super().__init__(round(x), round(y))
+        self.key, self.name, self.below, self.layer, self.side = key, "screw", list(below), layer, side
+
+    @property
+    def placed(self):
+        return self.inserted
+
+
+HIT_GROW = None  # widens each part's clickable shape a little, so thin wires and grilles are easy to click
+
+
+def hit_mask(image):
+    global HIT_GROW
+    if HIT_GROW is None:
+        HIT_GROW = pygame.mask.Mask((7, 7), fill=True)
+    return pygame.mask.from_surface(image, 40).convolve(HIT_GROW)
+
+
+class BuildSet(Device):
+    """Build mode: the whole thing on the bench, made of parts. Take every one of them off, then build it back up
+    step by step, in whatever style you like."""
+    TOOLS = ["hand", "driver"]
+    SUPPLIES = []
+
+    def __init__(self, product, model):
+        self.product, self.model = product, model
+        key = product["key"]
+        self.parts = BUILD_PARTS[key](model)
+        self.styles = [("Original", {})] + BUILD_STYLES[key]
+        self.boxed = [p for p in self.parts if not isinstance(p, BuildScrew)]  # what goes in the parts box
+        self.screws = [p for p in self.parts if isinstance(p, BuildScrew)]
+        self.by_key = {p.key: p for p in self.parts}
+        self.flipped = False
+        self.flipper = Thing(MOUSE_C[0], MOUSE_C[1] + model["h"] // 2 + 34, 22, "out") if key == "mouse" else None
+        self.keys = keyboard_geometry(model)[2] if key == "keyboard" else []
+        self.phase = "apart"  # take it all apart, then build it
+        self.fonts = None
+        self.WORKS = f"It works! Your {product['noun']} is all back together."
+        # What the game expects of any device
+        self.faults, self.tray_pieces, self.steps = set(), [], []
+        self.things = self.parts + ([self.flipper] if self.flipper else [])
+        self.time, self.tests, self.hints, self.step, self.par = 0.0, 0, 0, 0, 0
+        self.mistakes, self.found, self.readings, self.observations = {}, set(), [], []
+        self.done, self.undo, self.before = [], [], []
+        self.worked = self.closed_ok = self.finished = False
+
+    def palette(self, style):
+        """The type's own colours, with a style's laid over them."""
+        return dict(self.model, **self.styles[style][1])
+
+    def render(self, part, style, under=False):
+        """A part's picture in a style, drawn once: (image, where its top left goes, the shape you can click)."""
+        key = (style, under)
+        if key not in part.cache:
+            layer = pygame.Surface((WIDTH, HEIGHT), pygame.SRCALPHA)
+            (part.under_draw if under else part.draw)(layer, self.palette(style), self.fonts or ui_fonts())
+            box = layer.get_bounding_rect()
+            if part.pivot and not under:  # a square round the point it spins on
+                px, py = part.pivot
+                half = max(px - box.left, box.right - px, py - box.top, box.bottom - py)
+                box = pygame.Rect(px - half, py - half, 2 * half, 2 * half).clip(layer.get_rect())
+            image = layer.subsurface(box).copy()
+            part.cache[key] = (image, box.topleft, hit_mask(image))
+        return part.cache[key]
+
+    def thumb(self, part, style, size=BOX_THUMB):
+        key = (style, size)
+        if key not in part.thumbs:
+            image = self.render(part, style)[0]
+            w, h = image.get_size()
+            if w > 4 * h:  # a long thin part, like a row of keycaps: show one end of it close up
+                image = image.subsurface((0, 0, min(w, round(h * 2.6)), h))
+            elif h > 4 * w:
+                image = image.subsurface((0, 0, w, min(h, round(w * 2.6))))
+            k = min(size[0] / max(1, image.get_width()), size[1] / max(1, image.get_height()), 1)
+            part.thumbs[key] = pygame.transform.smoothscale(image, (max(1, round(image.get_width() * k)),
+                                                                    max(1, round(image.get_height() * k))))
+        return part.thumbs[key]
+
+    def side(self):
+        return "under" if self.flipped else "top"
+
+    def blockers(self, part):
+        """The parts still in place that sit on this one."""
+        return [q for q in self.parts if q.placed and part.key in q.below]
+
+    def ready(self, part):
+        """Is everything it sits on in place?"""
+        return all(self.by_key[k].placed for k in part.below)
+
+    def part_at(self, pos):
+        """The part on top at pos, on the side you're looking at (screws aside)."""
+        for p in sorted(self.boxed, key=lambda p: -p.layer):
+            if p.placed and p.side == self.side() and p.t == 0:
+                image, (x, y), mask = self.render(p, p.style)
+                lx, ly = pos[0] - x + 3, pos[1] - y + 3  # the mask is 3 px bigger all round
+                if 0 <= lx < mask.get_size()[0] and 0 <= ly < mask.get_size()[1] and mask.get_at((lx, ly)):
+                    return p
+        return None
+
+    def box_part_at(self, pos):
+        return next((p for p, rect in zip(self.boxed, BOX_RECTS) if rect.collidepoint(pos)), None)
+
+    def done_building(self):
+        return self.phase == "build" and not self.flipped and all(p.placed for p in self.parts)
+
+    # ---- what you do to it ----
+
+    def use(self, game, pos):
+        """The tool you're holding, on the bench at pos."""
+        if self.flipper and self.flipper.hit(pos):
+            if game.tool == "hand":
+                self.flip(game)
+            else:
+                game.say("Use the hand (1) to turn it over.")
+            return
+        screw = next((s for s in self.screws if s.side == self.side() and s.hit(pos) and (s.placed or self.ready(s))),
+                     None)
+        if game.tool == "driver":
+            if screw is None:
+                if self.part_at(pos):
+                    game.say("The screwdriver is for screws: lift parts off with the hand (1).")
+                return
+            if screw.placed:
+                cover = self.blockers(screw)
+                if cover:
+                    game.wiggle(screw, f"The {cover[0].name} covers it: take that off first.")
+                    return
+            elif self.phase == "apart":
+                game.say("Take everything apart first, then build it back up.")
+                return
+            game.hold = [screw, 0.0]
+            return
+        part = self.part_at(pos)
+        if part is None:
+            if screw:
+                game.say("Screws need the screwdriver (2).")
+            return
+        above = self.blockers(part)
+        if above:
+            screws = [q for q in above if isinstance(q, BuildScrew)]
+            if len(screws) < len(above):
+                q = next(q for q in above if not isinstance(q, BuildScrew))
+                game.wiggle(part, f"The {q.name} is in the way: take it off first.")
+            elif any(q.side != self.side() for q in screws):
+                game.wiggle(part, "It's screwed together from underneath: turn it over to get at the screws.")
+            else:
+                game.wiggle(part, f"It's screwed down: undo its {len(screws)} screw{'s' if len(screws) > 1 else ''} "
+                                  f"with the screwdriver (2).")
+            return
+        part.placed = False
+        image, (x, y), _ = self.render(part, part.style)
+        burst(game.particles, x + image.get_width() // 2, y + image.get_height() // 2, WHITE, 6, speed=90, life=0.3,
+              size=2)
+        game.play("pop")
+
+    def flip(self, game):
+        if not (self.by_key["top_shell"].placed and self.by_key["bottom"].placed):
+            game.wiggle(self.flipper, "Put both halves of the shell together first, or everything falls out.")
+            return
+        self.flipped = not self.flipped
+        game.play("cover")
+
+    def pick_up(self, game, pos):
+        """A click on the parts box: pick up a part to build with."""
+        part = self.box_part_at(pos)
+        if part is None:
+            return
+        if part.placed:
+            game.say(f"The {part.name} is on the {self.product['noun']}.")
+        elif self.phase == "apart":
+            game.say("Take everything apart first: every part into the box. Then build it back up.")
+            game.play("nope")
+        else:
+            game.start_drag(("part", part))
+
+    def drop(self, game, source, pos):
+        kind, part = source
+        image, topleft, _ = self.render(part, game.build_style)
+        home = pygame.Rect(topleft, image.get_size())
+        if not home.inflate(40, 40).collidepoint(pos):
+            return  # dropped somewhere else: it goes back in the box
+        if part.side != self.side():
+            game.say("Turn it over first: that goes on the other side." if part.side == "under" else
+                     "Turn it the right way up first.")
+            game.play("nope")
+            return
+        missing = [self.by_key[k] for k in part.below if not self.by_key[k].placed]
+        if missing:
+            m = missing[0]
+            game.say("Do up the screws first: it goes on over them." if isinstance(m, BuildScrew) else
+                     f"Put the {m.name} on first: the {part.name} sits on it.")
+            game.play("nope")
+            return
+        part.placed, part.style, part.t = True, game.build_style, 0.0
+        burst(game.particles, pos[0], pos[1], GOLD, 10, speed=140, life=0.4, size=3)
+        game.floats.append(FloatText("Click!", pos[0], pos[1] - 20, WHITE, 0.8))
+        game.play("snap")
+
+    def update_build(self, game, dt):
+        """Every frame: slide parts into the box, move on to building once it's all apart, and bring it to life
+        once it's all back together."""
+        for p in self.boxed:
+            target, step = (0.0 if p.placed else 1.0), dt / ANIM_TIME
+            p.t = min(target, p.t + step) if p.t < target else max(target, p.t - step)
+        if self.phase == "apart" and not any(p.placed for p in self.parts):
+            self.phase = "build"
+            game.say("Everything's apart! Now build it back up, your way.", GREEN)
+            game.play("cheer")
+        if self.done_building() and game.drag is None and game.hold is None:
+            self.tests += 1
+            game.test_symptom = None
+            game.set_state("test")
+            for name in self.test_sounds(None):
+                game.play(name)
+
+    def test_sounds(self, symptom):
+        return {"fan": ["whoosh"], "radio": ["music"], "keyboard": ["typing"], "mouse": ["mclick"]}[self.product["key"]]
+
+    def symptom(self, testing=False):
+        return None
+
+    def loose_screws(self):
+        return [s for s in self.screws if not s.placed]
+
+    def draw(self, surf, game, fonts, mouse):
+        draw_build_device(surf, game, fonts, mouse)
+
+    def draw_test(self, surf, game, fonts):
+        draw_build_show(surf, game, fonts)
+
+
+_FONTS = {}
+
+
+def ui_fonts():
+    """The game's fonts, made once."""
+    if not _FONTS:
+        for name, size in (("tiny", 12), ("small", 15), ("font", 18), ("big", 30), ("huge", 64)):
+            _FONTS[name] = pygame.font.SysFont("consolas", size, bold=True)
+    return _FONTS
+
+
+_LEGEND_FONTS = {}
+
+
+def legend_font(unit):
+    """A font for keycap legends that fits keys this wide."""
+    size = 9 if unit < 30 else 11
+    if size not in _LEGEND_FONTS:
+        _LEGEND_FONTS[size] = pygame.font.SysFont("consolas", size, bold=True)
+    return _LEGEND_FONTS[size]
 
 
 class Game:
@@ -2428,6 +4076,22 @@ class Game:
             "hiss": make_sound(4000, 3000, 0.05, wave="noise"),
             "crackle": make_tune([2600, 0, 0, 3400, 0, 0, 0, 2200, 0, 3000, 0, 0, 2800, 0, 0, 0, 3600, 0, 2400, 0, 0,
                                   3000, 0, 0], 120, 0.16, "noise"),
+            # Keyboards and mice
+            "pop": make_sound(1100, 50, 0.2, end_freq=1900, wave="sine"),
+            "clack": make_sound(2800, 30, 0.22, end_freq=1900),
+            "usb_in": make_tune([587, 880], 90, 0.12, "sine"),
+            "usb_out": make_tune([880, 587], 90, 0.12, "sine"),
+            "typing": make_tune([3000, 0, 2600, 0, 0, 3200, 0, 2800, 0, 3000, 0, 0, 2700, 0, 3100, 0, 2900, 0, 0,
+                                 3300, 0, 2600, 0, 3000, 0, 0, 2800, 0, 3100, 0, 0, 2700, 0, 3000, 0, 2900], 75, 0.1,
+                                "noise"),
+            "typing_cut": make_tune([3000, 0, 2600, 0, 0, 3200, 0, 2800, 0, 0, 0, 0, 0, 0, 0, 0, 2900, 0, 0, 3300, 0,
+                                     2600, 0, 0, 0, 0, 0, 0, 0, 0, 3100, 0, 2700, 0, 3000, 0], 75, 0.1, "noise"),
+            "mclick": make_tune([2600, 0, 0, 0, 0, 0, 0, 0, 0, 2600, 0, 0, 0, 0, 0, 0, 0, 0, 2600, 0], 110, 0.14,
+                                "noise"),
+            "mdouble": make_tune([2600, 0, 2600, 0, 0, 0, 0, 0, 0, 2600, 0, 2600, 0, 0, 0, 0, 0, 0, 2600, 0, 2600],
+                                 110, 0.14, "noise"),
+            "scratch": make_tune([1500, 900, 0, 1700, 1100, 0, 0, 1400, 1000, 0, 1600, 900, 0, 0, 1500, 1200], 160,
+                                 0.07, "noise"),
         }
         self.stamp = pygame.Surface((SCRUB_RADIUS * 2, SCRUB_RADIUS * 2), pygame.SRCALPHA)  # wipes dust away
         pygame.draw.circle(self.stamp, (0, 0, 0, SCRUB_STRENGTH), (SCRUB_RADIUS, SCRUB_RADIUS), SCRUB_RADIUS)
@@ -2440,12 +4104,36 @@ class Game:
         self.model = None  # which type of it, for a product that has types (a desk fan, a pocket radio...)
         self.level = 0  # which of its levels
         self.guided = True
-        self.device = None  # what's on the bench: a Fan, a Radio...
+        self.device = None  # what's on the bench: a Fan, a Radio... or a BuildSet in build mode
+        self.mode = "repair"  # repair (the levels) or build (take it all apart, build it your way)
+        self.build_style = 0  # the style the next part you put on comes out in
+        self.build_photo = None  # the picture of what you built, for the result screen
         self.result = None
         self.message, self.message_color, self.message_time = "", GOLD, 0.0
         self.reset_bench()
 
+    def start_build(self):
+        """Build mode, for the type you picked: take every part off, then build it back up in any style."""
+        self.mode, self.guided = "build", False
+        self.device = BuildSet(self.product, self.model or self.product["models"][0])
+        self.reset_bench()
+        self.build_style, self.build_photo = 0, None
+        self.set_state("bench")
+
+    def finish_build(self):
+        dev = self.device
+        counts = {}
+        for p in dev.boxed:
+            name = dev.styles[p.style][0]
+            counts[name] = counts.get(name, 0) + 1
+        self.result = dict(time=round(dev.time, 1), parts=len(dev.boxed), screws=len(dev.screws),
+                           styles=sorted(counts.items(), key=lambda kv: -kv[1]))
+        self.build_photo = None
+        self.set_state("result")
+        self.play("cheer")
+
     def start_level(self, level, guided):
+        self.mode = "repair"
         self.level, self.guided = level, guided
         device = DEVICES[self.product["key"]]
         self.device = device(self.level_info()["faults"] or device.mystery(), self.model)
@@ -2554,7 +4242,7 @@ class Game:
         elif self.state == "result":
             if self.state_time > RESULT_DELAY:
                 if RETRY_BUTTON.collidepoint(pos):
-                    self.start_level(self.level, self.guided)
+                    self.retry()
                 elif LEVELS_BUTTON.collidepoint(pos):
                     self.set_state("levels")
         else:
@@ -2576,9 +4264,19 @@ class Game:
                 self.model = model
                 self.set_state("levels")
 
+    def retry(self):
+        """Try again: the same level, or another build."""
+        if self.mode == "build":
+            self.start_build()
+        else:
+            self.start_level(self.level, self.guided)
+
     def press_levels(self, pos):
         if BACK_BUTTON.collidepoint(pos):
             self.set_state("models" if self.model else "products")
+            return
+        if BUILD_BUTTON.collidepoint(pos):
+            self.start_build()
             return
         for i, level in enumerate(self.product["levels"]):
             guided, solo = card_buttons(i, level)
@@ -2587,8 +4285,28 @@ class Game:
             elif solo.collidepoint(pos):
                 self.start_level(i, False)
 
+    def press_build(self, pos):
+        """A click in build mode: a tool, a style, a part from the box, or something on the bench."""
+        dev = self.device
+        for tool, rect in zip(dev.TOOLS, BUILD_TOOL_RECTS):
+            if rect.collidepoint(pos):
+                self.tool = tool
+                return
+        for i, rect in enumerate(STYLE_RECTS[:len(dev.styles)]):
+            if rect.collidepoint(pos):
+                self.build_style = i
+                self.play("pick")
+                return
+        if dev.box_part_at(pos):
+            dev.pick_up(self, pos)
+        elif BENCH.collidepoint(pos):
+            dev.use(self, pos)
+
     def press_bench(self, pos):
         dev = self.device
+        if self.mode == "build":
+            self.press_build(pos)
+            return
         for tool, rect in zip(dev.TOOLS, TOOL_RECTS):
             if rect.collidepoint(pos):
                 self.tool = tool
@@ -2613,7 +4331,13 @@ class Game:
     def key(self, key):
         """1-6 pick a tool, T tests, H gives a hint, R tries again after a repair; Enter goes on."""
         go_on = key in (pygame.K_RETURN, pygame.K_KP_ENTER, pygame.K_SPACE)
-        if self.state == "bench":
+        if self.state == "levels" and key == pygame.K_b:
+            self.start_build()
+        elif self.state == "bench" and self.mode == "build":
+            tools = self.device.TOOLS
+            if pygame.K_1 <= key < pygame.K_1 + len(tools):
+                self.tool = tools[key - pygame.K_1]
+        elif self.state == "bench":
             tools = self.device.TOOLS
             if pygame.K_1 <= key < pygame.K_1 + len(tools):
                 self.tool = tools[key - pygame.K_1]
@@ -2625,7 +4349,7 @@ class Game:
             self.end_test()
         elif self.state == "result" and self.state_time > RESULT_DELAY:
             if key == pygame.K_r:
-                self.start_level(self.level, self.guided)
+                self.retry()
             elif go_on:
                 self.set_state("levels")
 
@@ -2651,8 +4375,11 @@ class Game:
     def start_drag(self, source):
         if self.guided:
             step = self.step()
-            if not (step and step.tool == "drag" and step.source == source):
-                kind, key = source
+            kind, key = source
+            # A step that puts several pieces back from the tray takes any of them
+            wanted = step and step.tool == "drag" and (step.source == source or (
+                kind == "tray" and step.source[0] == "tray" and key in step.left()))
+            if not wanted:
                 if step and step.tool == "drag" and kind == "supply" and step.source[0] == "supply":
                     self.say(self.device.wrong_supply(key))
                 else:
@@ -2739,6 +4466,8 @@ class Game:
     # ---- testing, hints and finishing ----
 
     def test(self):
+        if self.mode == "build":
+            return  # it comes to life by itself once it's built
         dev = self.device
         step = self.step()
         if self.guided and not (step and step.targets == ["TEST"]):
@@ -2759,12 +4488,15 @@ class Game:
 
     def end_test(self):
         self.spin = self.spin_speed = 0.0
-        self.set_state("bench")
+        if self.mode == "build" and self.device.done_building():
+            self.finish_build()  # the show's over: on to what you built
+        else:
+            self.set_state("bench")
 
     def hint(self):
         """On your own, a hint lights up the next step for a few seconds (and counts against you)."""
         dev = self.device
-        if self.guided:
+        if self.guided or self.mode == "build":
             return
         i = 0 if dev.tests == 0 and not dev.worked else dev.next_step()
         if i >= len(dev.steps):
@@ -2774,6 +4506,8 @@ class Game:
         self.play("hint")
 
     def finish(self):
+        if self.mode == "build":
+            return
         dev = self.device
         step = self.step()
         if self.guided and not (step and step.targets == ["FINISH"]):
@@ -2838,6 +4572,8 @@ class Game:
             if self.dust_timer <= 0:
                 self.dust_timer = 0.12
                 dev.count_dust(self)
+        if self.mode == "build":
+            dev.update_build(self, dt)
         dev.track()
         if self.hint_step is not None and dev.done[self.hint_step]:
             self.hint_time = 0.0  # you've done what the hint showed
@@ -2866,7 +4602,8 @@ class Game:
         for key, rect in zip(dev.SUPPLIES, SUPPLY_RECTS):
             if rect.collidepoint(mouse):
                 return dev.supply_info(key), DIM
-        return f"{TOOL_NAMES[self.tool]}  ·  1-6 or wheel: change tool  ·  H: hint  ·  Esc: back to the levels", DIM
+        return (f"{TOOL_NAMES[self.tool]}  ·  1-{len(dev.TOOLS)} or wheel: change tool  ·  H: hint  ·  Esc: back to "
+                f"the levels"), DIM
 
 def fan_speed(symptom, t):
     """How fast the blade should be turning, in degrees a second, t seconds into a power test."""
@@ -3334,7 +5071,10 @@ def piece_image(piece, fonts):
         image = pygame.Surface((w + pad, h + pad), pygame.SRCALPHA)
         c = ((w + pad) // 2, (h + pad) // 2)
         model = getattr(piece, "model", None)
-        if piece.kind == "grille":
+        paint = getattr(piece, "paint", None)  # a piece that knows how to draw itself
+        if paint:
+            paint(image, fonts)
+        elif piece.kind == "grille":
             draw_grille(image, *c, model)
         elif piece.kind == "blade":
             draw_blade(image, *c, BLADE_REST, model)
@@ -4097,8 +5837,1495 @@ def draw_retro_icon(surf, x, y, model):
         pygame.draw.circle(surf, GOLD, (kx, body.bottom - 32), 17, 3)
 
 
+# ---- keyboards and mice ----
+
+PLATE = (150, 154, 162)  # the steel plate the key switches clip into
+KEY_LEGENDS = {"Up": "^", "Down": "v", "Left": "<", "Right": ">", "Space": ""}
+
+
+def draw_hub(surf, lit):
+    """The USB hub on the bench, where keyboards and mice plug in. Its light is on while something's plugged in."""
+    pygame.draw.line(surf, (30, 30, 34), (STRIP.right - 6, STRIP.centery), (BENCH.right, STRIP.centery + 34), 6)
+    pygame.draw.rect(surf, (24, 24, 28), STRIP.move(3, 4), border_radius=10)
+    pygame.draw.rect(surf, (58, 60, 68), STRIP, border_radius=10)
+    pygame.draw.rect(surf, (92, 94, 104), STRIP, 2, border_radius=10)
+    for k in range(3):  # its USB ports
+        x = OUTLET[0] + k * 30
+        pygame.draw.rect(surf, (20, 20, 24), (x - 9, OUTLET[1] - 5, 18, 10), border_radius=2)
+        pygame.draw.rect(surf, (60, 110, 200), (x - 7, OUTLET[1] - 3, 14, 3))
+    pygame.draw.circle(surf, (110, 220, 255) if lit else (40, 60, 70), (STRIP.right - 14, STRIP.centery), 4)
+
+
+def draw_usb_cable(surf, plug, route, color, braided, dragging, mouse):
+    """A USB cable along route, ending in its plug: in the hub, lying beside it, or in your hand."""
+    rect = pygame.Rect(plug.rect)
+    rect.center = mouse if dragging else plug_rect(plug).center
+    rect.x += jiggle(plug.wiggle)
+    points = list(route) + [(rect.centerx, route[-1][1]), (rect.centerx, rect.top)]
+    edge = shade(color, 0.6) if sum(color) > 200 else shade(color, 1.8)
+    pygame.draw.lines(surf, edge, False, points, 9)
+    pygame.draw.lines(surf, color, False, points, 6)
+    if braided:  # a woven sleeve
+        for a, b in zip(points, points[1:]):
+            steps = int(math.dist(a, b) // 7)
+            for i in range(steps):
+                p = lerp(a, b, i / max(1, steps))
+                pygame.draw.line(surf, shade(color, 2.2), (p[0] - 2, p[1] - 2), (p[0] + 2, p[1] + 2), 1)
+    pygame.draw.rect(surf, (20, 20, 24), rect.move(2, 3), border_radius=5)
+    grip = pygame.Rect(rect.x, rect.y, rect.w, rect.h - 10)  # the moulded grip, then the metal end
+    pygame.draw.rect(surf, color, grip, border_radius=5)
+    pygame.draw.rect(surf, edge, grip, 1, border_radius=5)
+    pygame.draw.rect(surf, METAL, (rect.x + 5, rect.bottom - 11, rect.w - 10, 11), border_radius=1)
+    pygame.draw.line(surf, METAL_DARK, (rect.x + 9, rect.bottom - 6), (rect.right - 10, rect.bottom - 6), 2)
+
+
+def draw_monitor(surf, rect, lit):
+    """The computer's screen, for testing keyboards and mice: dark until a test switches it on."""
+    pygame.draw.rect(surf, (40, 42, 48), (rect.centerx - 16, rect.bottom, 32, 8))  # its stand
+    pygame.draw.rect(surf, (20, 20, 24), rect.move(3, 4), border_radius=8)
+    pygame.draw.rect(surf, (34, 36, 42), rect, border_radius=8)
+    screen = rect.inflate(-14, -14)
+    pygame.draw.rect(surf, (36, 70, 110) if lit else (14, 16, 20), screen, border_radius=3)
+    if not lit:
+        pygame.draw.line(surf, (34, 36, 44), (screen.x + 20, screen.bottom - 10), (screen.x + 70, screen.y + 10), 6)
+    pygame.draw.circle(surf, (110, 220, 120) if lit else (60, 64, 70), (rect.right - 12, rect.bottom - 4), 2)
+    return screen
+
+
+def draw_keycap(surf, rect, label, model, font=None, down=0):
+    """A keycap from above: its sloped sides, the dished top you press, and its legend."""
+    base = model["accent"] if label in ("Esc", "Enter") else model["cap"] if len(label) == 1 or label == "Space" \
+        else model["mod"]
+    pygame.draw.rect(surf, shade(base, 0.7), rect, border_radius=4)
+    top = pygame.Rect(rect.x + 3, rect.y + 2 + down, rect.w - 6, rect.h - 7)
+    pygame.draw.rect(surf, shade(base, 1.06), top, border_radius=4)
+    pygame.draw.rect(surf, shade(base, 0.86), top, 1, border_radius=4)
+    text = KEY_LEGENDS.get(label, label)
+    if font and text:
+        img = font.render(text, True, model["legend"])
+        if img.get_width() <= top.w - 2 and img.get_height() <= top.h:
+            surf.blit(img, img.get_rect(center=top.center) if len(text) == 1 or img.get_width() > top.w - 6
+                      else img.get_rect(topleft=(top.x + 3, top.y + 1)))
+
+
+def draw_switch_body(surf, x, y, size, color, down=0):
+    """A key switch from above, its keycap off: the housing, its light window and the coloured cross-shaped stem."""
+    house = pygame.Rect(0, 0, size, size)
+    house.center = (x, y)
+    pygame.draw.rect(surf, (26, 26, 30), house.move(1, 2), border_radius=3)
+    pygame.draw.rect(surf, (52, 54, 62), house, border_radius=3)
+    pygame.draw.rect(surf, (84, 86, 96), house.inflate(-6, -6), border_radius=3)
+    pygame.draw.rect(surf, (230, 230, 220), (x - 3, house.top + 2, 6, 3))  # the window for the key's light
+    stem, arm = SWITCH_COLORS[color], max(4, size // 4)
+    pygame.draw.circle(surf, shade(stem, 0.55), (x, y + down), arm + 2)
+    pygame.draw.rect(surf, stem, (x - arm, y - 1 + down, 2 * arm, 3))
+    pygame.draw.rect(surf, stem, (x - 1, y - arm + down, 3, 2 * arm))
+
+
+def draw_key_switch(surf, sw, size, now):
+    """The switch under the key with the trouble: stained with dried drink, wet with alcohol, or fine."""
+    x, y = sw.x + jiggle(sw.wiggle), sw.y
+    down = 2 if now - sw.pressed_at < 0.12 or sw.state == "sticky" else 0
+    draw_switch_body(surf, x, y, size, sw.color, down)
+    rnd = random.Random(sw.x * 5 + sw.y)
+    if sw.state == "sticky":  # a glossy brown stain round the stem
+        for _ in range(6):
+            pygame.draw.circle(surf, (150, 96, 40), (x + rnd.uniform(-size / 3, size / 3),
+                                                     y + rnd.uniform(-size / 3, size / 3)), rnd.uniform(2, 4))
+    if sw.soaked and sw.state == "sticky":
+        pygame.draw.circle(surf, (200, 226, 250), (x, y), size // 2 - 2, 1)
+
+
+def draw_kb_socket(surf, x, y, size):
+    """The square hole in the plate where a switch goes, with the board's two hot-swap sockets showing through."""
+    hole = pygame.Rect(0, 0, size, size)
+    hole.center = (x, y)
+    pygame.draw.rect(surf, BOARD_GREEN, hole)
+    pygame.draw.rect(surf, (110, 114, 122), hole, 1)
+    for dx, dy in ((-0.22, -0.2), (0.18, -0.3)):
+        pygame.draw.circle(surf, BRASS, (x + dx * size, y + dy * size), max(2, size // 8))
+        pygame.draw.circle(surf, HOLE, (x + dx * size, y + dy * size), max(1, size // 18))
+    pygame.draw.circle(surf, (24, 26, 30), (x, y), max(2, size // 7))  # the hole for the switch's middle post
+
+
+def draw_crumbs(surf, crumb):
+    """Crumbs round a switch: fewer and fewer as you brush them out."""
+    rnd = random.Random(crumb.x * 13 + crumb.y)
+    for i in range(14):
+        a, r = rnd.uniform(0, 2 * math.pi), rnd.uniform(5, crumb.r)
+        color = rnd.choice(((196, 150, 86), (170, 120, 64), (226, 196, 140)))
+        size = rnd.uniform(1.5, 3.5)
+        if i < math.ceil(14 * crumb.amount):
+            pygame.draw.circle(surf, color, (crumb.x + math.cos(a) * r, crumb.y + math.sin(a) * r), size)
+
+
+def draw_space_under(surf, dev, size):
+    """Under the space bar: its switch in the middle, a stabiliser housing at each end, and the wire that keeps
+    both ends level, running under the bar from one to the other."""
+    sp = dev.space.rect
+    draw_switch_body(surf, *sp.center, size, dev.model["switch"])
+    wire_y = sp.bottom - 3
+    tips = []
+    for end in dev.stabs:
+        x = end.x + jiggle(end.wiggle)
+        house = pygame.Rect(0, 0, 14, 20)
+        house.center = (x, end.y)
+        pygame.draw.rect(surf, (240, 240, 236), house, border_radius=3)
+        pygame.draw.rect(surf, (176, 176, 172), house, 1, border_radius=3)
+        pygame.draw.rect(surf, (204, 204, 198), (house.x + 4, house.y + 4, 6, 8))  # its stem
+        tips.append((x, end.y + 6) if end.seated else (x + 12, end.y - 10))  # popped out: sticking up and away
+    a, b = dev.stabs
+    pygame.draw.lines(surf, METAL_DARK, False, [tips[0], (a.x, wire_y), (b.x, wire_y), tips[1]], 4)
+    pygame.draw.lines(surf, METAL, False, [tips[0], (a.x, wire_y), (b.x, wire_y), tips[1]], 2)
+    for end, tip in zip(dev.stabs, tips):
+        if end.greased:
+            pygame.draw.circle(surf, (238, 236, 220), tip, 4)
+            pygame.draw.circle(surf, WHITE, (tip[0] - 1, tip[1] - 1), 1)
+
+
+def make_keyboard_art(dev, fonts):
+    """The keyboard's case and every key there's no reason to pull, drawn once."""
+    art = pygame.Surface((WIDTH, HEIGHT), pygame.SRCALPHA)
+    model, case = dev.model, dev.case
+    pygame.draw.rect(art, (20, 30, 28), case.move(5, 7), border_radius=14)
+    pygame.draw.rect(art, model["case"], case, border_radius=14)
+    pygame.draw.rect(art, shade(model["case"], 0.7 if sum(model["case"]) > 300 else 1.4), case, 2, border_radius=14)
+    pygame.draw.rect(art, shade(model["case"], 0.55), case.inflate(-16, -16), border_radius=6)  # the plate
+    pulled = {c.label for c in dev.keycaps}
+    for label, rect in dev.keys:
+        if label not in pulled:
+            draw_keycap(art, rect, label, model, dev.legend)
+    for k in range(3):  # the lock lights
+        pygame.draw.circle(art, (40, 46, 40), (case.right - 22 - k * 14, case.y + 7), 3)
+    return art
+
+
+def draw_keyboard(surf, game, fonts, mouse):
+    """The keyboard, keys up, with whatever keycaps are off, its cable, the hub and the screen."""
+    dev = game.device
+    model, testing = dev.model, game.state == "test"
+    draw_monitor(surf, KB_SCREEN, testing)
+    draw_hub(surf, dev.powered())
+    if dev.art is None:
+        dev.legend = pygame.font.SysFont("consolas", 9 if dev.unit < 30 else 11, bold=True)
+        dev.art = make_keyboard_art(dev, fonts)
+    surf.blit(dev.art, (0, 0))
+    legend = dev.legend
+    size = round(dev.unit * 0.74)
+    for cap in dev.keycaps:
+        if cap.t <= 0:
+            continue
+        pygame.draw.rect(surf, PLATE, cap.rect.inflate(2, 2), border_radius=2)  # what's under it
+        if cap is dev.space:
+            draw_space_under(surf, dev, size)
+        elif cap is dev.cap:
+            if dev.switch.present:
+                draw_key_switch(surf, dev.switch, size, game.clock)
+            else:
+                draw_kb_socket(surf, dev.switch.x, dev.switch.y, size)
+        else:
+            draw_switch_body(surf, *cap.rect.center, size, model["switch"])
+            draw_crumbs(surf, dev.crumbs[dev.crumb_caps.index(cap)])
+    pressed = dev.pressed if testing else None
+    pulled = {c.label for c in dev.keycaps}
+    for label, rect in dev.keys:
+        if label == pressed and label not in pulled:
+            draw_keycap(surf, rect, label, model, legend, 2)
+    for cap in dev.keycaps:
+        if not draw_moving(surf, cap, dev.tray_slot(cap).center, fonts):
+            draw_keycap(surf, cap.rect.move(jiggle(cap.wiggle), 0), cap.label, model, legend,
+                        2 if pressed == cap.label else 0)
+    if dev.powered():  # the lock lights come on
+        pygame.draw.circle(surf, (110, 220, 120), (dev.case.right - 22, dev.case.y + 7), 3)
+    port, top = dev.port, dev.case.top
+    pygame.draw.rect(surf, (18, 18, 22), (port.x - 9, top - 2, 18, 6), border_radius=3)  # the USB-C socket
+    if dev.cable_present:
+        route = [(port.x, top - 14), (port.x, top - 18), (KB_CABLE_X, top - 18), (KB_CABLE_X, OUTLET[1] - 46)]
+        draw_usb_cable(surf, dev.plug, route, model["cable"], False, game.drag == ("plug", dev.plug), mouse)
+        head = pygame.Rect(port.x - 8 + jiggle(port.wiggle), top - 16, 16, 15)  # its USB-C end, in the socket
+        pygame.draw.rect(surf, model["cable"], head, border_radius=4)
+        pygame.draw.rect(surf, shade(model["cable"], 0.6 if sum(model["cable"]) > 200 else 1.8), head, 1,
+                         border_radius=4)
+
+
+def keyboard_typing(dev, symptom, t):
+    """What's on the screen t seconds into a typing test, which key is down right now, and any warning. Every
+    fault shows in its own way: a dead key's letter is missing, a sticky one repeats, a gritty one misses some
+    presses, a rattly space bar doubles or drops spaces, and a bad cable loses whole words."""
+    if symptom in ("nocable", "unplugged"):
+        return "", None, "No keyboard found"
+    span = TEST_TIME * 0.8
+    n = min(len(TEST_LINE), int(t / span * len(TEST_LINE)))
+    sw, mine = dev.switch, dev.label.lower()
+    dead = {" " if c.label == "Space" else c.label.lower() for c in dev.keycaps if not c.on}
+    if not sw.present or sw.state == "bent":
+        dead.add(mine)
+    gritty = {c.label.lower() for c, s in zip(dev.crumb_caps, dev.crumbs) if s.amount > 0}
+    rattly = not all(s.seated and s.greased for s in dev.stabs)
+    rnd = random.Random(11)  # the same misses every frame
+    out = []
+    for i, ch in enumerate(TEST_LINE[:n]):
+        miss = rnd.random()
+        if dev.cable_broken and (i / len(TEST_LINE) * span) % 1.3 > 0.8:
+            continue
+        if ch in dead or (ch in gritty and miss < 0.6):
+            continue
+        if ch == mine and sw.present and sw.state == "sticky":
+            out.append(ch * 7)
+        elif ch == " " and rattly and miss < 0.5:
+            out.append("  " if miss < 0.25 else "")
+        else:
+            out.append(ch)
+    notice = "USB device disconnected" if dev.cable_broken and t % 1.3 > 0.8 else None
+    pressed = None if n >= len(TEST_LINE) else "Space" if TEST_LINE[n] == " " else TEST_LINE[n].upper()
+    return "".join(out), pressed, notice
+
+
+def draw_keyboard_test(surf, game, fonts):
+    """The typing test: the line appears on the screen as the keys go down."""
+    dev = game.device
+    text, _, notice = keyboard_typing(dev, game.test_symptom, game.state_time)
+    screen = KB_SCREEN.inflate(-14, -14)
+    draw_text(surf, fonts["tiny"], "Notes - typing test", (screen.x + 8, screen.y + 4), (190, 200, 220), "topleft")
+    page = pygame.Rect(screen.x + 8, screen.y + 20, screen.w - 16, screen.h - 28)
+    pygame.draw.rect(surf, (240, 240, 236), page, border_radius=3)
+    x = page.x + 8
+    if text:
+        x = draw_text(surf, fonts["small"], text[-50:], (page.x + 8, page.y + 10), (30, 32, 40), "topleft").right
+    if int(game.state_time * 3) % 2:
+        pygame.draw.line(surf, (30, 32, 40), (x + 2, page.y + 9), (x + 2, page.y + 25), 2)
+    if notice:
+        bar = pygame.Rect(page.x + 30, page.bottom - 30, page.w - 60, 22)
+        pygame.draw.rect(surf, (200, 60, 50), bar, border_radius=5)
+        draw_text(surf, fonts["small"], notice, bar.center, WHITE)
+
+
+def draw_kb_switch(surf, x, y, color="red"):
+    """A key switch from the side: its coloured stem on top, the housing, and two metal pins underneath."""
+    stem = SWITCH_COLORS[color]
+    for dx in (-5, 4):
+        pygame.draw.line(surf, BRASS, (x + dx, y + 8), (x + dx, y + 16), 2)
+    pygame.draw.rect(surf, (40, 40, 46), (x - 12, y - 2, 24, 11), border_radius=2)
+    pygame.draw.rect(surf, (72, 74, 82), (x - 11, y - 10, 22, 9), border_radius=3)
+    pygame.draw.rect(surf, stem, (x - 3, y - 18, 6, 9), border_radius=1)
+    pygame.draw.rect(surf, shade(stem, 0.75), (x - 6, y - 15, 12, 3))
+
+
+def draw_ipa(surf, x, y):
+    """A bottle of isopropyl alcohol with a thin nozzle for dripping it in."""
+    pygame.draw.polygon(surf, (236, 240, 244), [(x - 5, y - 10), (x + 5, y - 10), (x + 1, y - 24), (x - 1, y - 24)])
+    pygame.draw.rect(surf, (200, 60, 50), (x - 2, y - 27, 4, 4))
+    pygame.draw.rect(surf, (236, 240, 244), (x - 10, y - 10, 20, 28), border_radius=5)
+    pygame.draw.rect(surf, (60, 120, 200), (x - 10, y - 1, 20, 10))
+    pygame.draw.rect(surf, WHITE, (x - 6, y + 2, 12, 3))
+
+
+def draw_grease(surf, x, y):
+    """A little syringe of dielectric grease."""
+    pygame.draw.line(surf, (60, 64, 76), (x + 14, y - 14), (x + 21, y - 21), 4)  # the plunger
+    pygame.draw.line(surf, (220, 224, 230), (x - 8, y + 8), (x + 14, y - 14), 9)  # the barrel
+    pygame.draw.line(surf, (250, 248, 236), (x - 6, y + 6), (x + 6, y - 6), 5)  # the grease inside
+    pygame.draw.line(surf, METAL, (x - 8, y + 8), (x - 16, y + 16), 2)  # the tip
+
+
+def draw_cable_coil(surf, x, y):
+    """A USB cable, coiled up, with its USB-C end."""
+    for r in (14, 10):
+        pygame.draw.circle(surf, (40, 40, 44), (x - 4, y), r, 3)
+    pygame.draw.line(surf, (40, 40, 44), (x + 8, y + 6), (x + 18, y - 8), 3)
+    pygame.draw.rect(surf, (40, 40, 44), (x + 14, y - 18, 8, 10), border_radius=2)
+    pygame.draw.rect(surf, METAL, (x + 15, y - 24, 6, 6), border_radius=2)
+
+
+def draw_keyboard_icon(surf, x, y, model):
+    """A whole keyboard from above, for the pictures on the cards."""
+    layout, wu, hu = keyboard_layout(model["size"])
+    u = 17
+    case = pygame.Rect(0, 0, round(wu * u) + 16, round(hu * u) + 16)
+    case.center = (x, y)
+    pygame.draw.rect(surf, (20, 20, 24), case.move(4, 6), border_radius=10)
+    pygame.draw.rect(surf, model["case"], case, border_radius=10)
+    pygame.draw.rect(surf, shade(model["case"], 0.55), case.inflate(-8, -8), border_radius=4)
+    for label, kx, ky, w, h in layout:
+        draw_keycap(surf, pygame.Rect(round(case.x + 8 + kx * u) + 1, round(case.y + 8 + ky * u) + 1,
+                                      round(w * u) - 2, round(h * u) - 2), label, model)
+
+
+def draw_keyboards_icon(surf, x, y):
+    """The keyboard's card on the first screen: the three sizes, front to back."""
+    for model, dx, dy, width in ((KEYBOARD_MODELS[0], -70, -120, 600), (KEYBOARD_MODELS[1], 20, 0, 490),
+                                 (KEYBOARD_MODELS[2], 100, 120, 410)):
+        icon = make_model_icon(model, (width, 400))
+        surf.blit(icon, icon.get_rect(center=(x + dx, y + dy)))
+
+
+def mouse_outline(cx, cy, hw, hh, n=64):
+    """A mouse's outline from above: a rounded egg, a little narrower at the front (the top)."""
+    points = []
+    for k in range(n):
+        a = 2 * math.pi * k / n
+        c, s = math.cos(a), math.sin(a)
+        points.append((cx + hw * math.copysign(abs(c) ** 0.7, c) * (0.84 + 0.08 * (1 + s)), cy + hh * s))
+    return points
+
+
+RGB = [(255, 70, 70), (255, 170, 50), (240, 236, 70), (90, 230, 100), (60, 200, 240), (90, 110, 255), (200, 90, 255)]
+
+
+def draw_mouse_top(surf, rect, model, font=None):
+    """A mouse from above with its top shell on: the two buttons, the scroll wheel and the maker's touches."""
+    cx, cy = rect.center
+    hw, hh = rect.w // 2, rect.h // 2
+    shell, dark = model["shell"], sum(model["shell"]) < 300
+    outline = mouse_outline(cx, cy, hw, hh)
+    pygame.draw.polygon(surf, shell, outline)
+    pygame.draw.ellipse(surf, shade(shell, 1.5 if dark else 1.08), (cx - hw * 0.5, cy - hh * 0.1, hw * 0.5, hh * 0.7))
+    line = shade(shell, 1.9 if dark else 0.62)
+    pygame.draw.polygon(surf, line, outline, 2)
+    split = cy - hh * 0.22  # where the buttons end
+    pygame.draw.line(surf, line, (cx, cy - hh + 4), (cx, split), 2)
+    pygame.draw.lines(surf, line, False, [(cx + hw * 0.85 * k, split + 10 * (1 - k * k))
+                                          for k in (i / 10 - 1 for i in range(21))], 2)
+    wy = cy - hh * 0.55
+    slot = pygame.Rect(cx - 13, wy - 32, 26, 64)
+    pygame.draw.rect(surf, (24, 24, 28), slot, border_radius=10)
+    wheel = slot.inflate(-10, -8)
+    pygame.draw.rect(surf, (72, 74, 82), wheel, border_radius=7)
+    for k in range(7):
+        y = wheel.y + 5 + k * 7
+        pygame.draw.line(surf, (46, 48, 54), (wheel.x + 2, y), (wheel.right - 3, y), 2)
+    if model["key"] == "gaming":
+        for k in range(2):  # the side buttons, for the thumb
+            pygame.draw.rect(surf, shade(shell, 2.2), (cx - hw * 0.88 + 4, cy - hh * 0.2 + k * 42, 12, 34),
+                             border_radius=5)
+        pygame.draw.rect(surf, model["accent"], (cx - 6, wy + 38, 12, 16), border_radius=3)  # the speed button
+        for k, color in enumerate(RGB):  # the coloured lights along the back
+            pygame.draw.circle(surf, color, (cx - 36 + k * 12, cy + hh * 0.72), 4)
+    if font:
+        draw_text(surf, font, model["label"], (cx, cy + hh * 0.5), model["accent"] if dark or model["key"] == "travel"
+                  else shade(shell, 0.55))
+
+
+def draw_foot(surf, rect, worn):
+    """A PTFE foot: smooth and white, or worn grey and thin with scratches across it."""
+    color = (176, 174, 166) if worn else (242, 242, 236)
+    radius = min(rect.w, rect.h) // 2
+    pygame.draw.rect(surf, color, rect, border_radius=radius)
+    pygame.draw.rect(surf, shade(color, 0.8), rect, 1, border_radius=radius)
+    if worn:
+        rnd = random.Random(rect.w * 7 + rect.h)
+        for _ in range(5):
+            x = rect.x + rnd.uniform(3, rect.w - 3)
+            pygame.draw.line(surf, (118, 116, 110), (x, rect.y + 3), (x + rnd.uniform(-4, 4), rect.bottom - 3), 1)
+    else:
+        pygame.draw.line(surf, WHITE, (rect.x + radius, rect.y + 3), (rect.right - radius, rect.y + 3), 1)
+
+
+def draw_fluff(surf, s):
+    """Fluff and a hair in the sensor window."""
+    rnd = random.Random(5)
+    for i in range(10):
+        a, r, size = rnd.uniform(0, 2 * math.pi), rnd.uniform(0, s.r - 5), rnd.uniform(2, 5)
+        if i < math.ceil(10 * s.amount):
+            pygame.draw.circle(surf, (172, 168, 160), (s.x + math.cos(a) * r, s.y + math.sin(a) * r), size)
+    if s.amount > 0.3:
+        pygame.draw.lines(surf, (46, 36, 30), False, [(s.x - 22 + k * 5, s.y - 4 + 6 * math.sin(k * 0.8))
+                                                      for k in range(10)], 1)
+
+
+def draw_glue(surf, glue, rect):
+    """Old glue left where a foot was: a sticky yellow film with lumps of fluff stuck in it."""
+    if glue.amount <= 0:
+        return
+    patch = pygame.Surface(rect.size, pygame.SRCALPHA)
+    pygame.draw.rect(patch, (236, 214, 150, round(60 + 140 * glue.amount)), patch.get_rect(),
+                     border_radius=min(rect.size) // 2)
+    surf.blit(patch, rect)
+    rnd = random.Random(rect.x + rect.y)
+    for i in range(6):
+        if i < math.ceil(6 * glue.amount):
+            pygame.draw.circle(surf, (150, 140, 120), (rect.x + rnd.uniform(3, rect.w - 3),
+                                                       rect.y + rnd.uniform(3, rect.h - 3)), 2)
+
+
+def draw_mouse_under(surf, dev, fonts, turning):
+    """The mouse on its back: the bottom shell, the feet (and the screws, once the feet are off), the sensor window
+    and the label."""
+    model = dev.model
+    cx, cy = MOUSE_C
+    outline = mouse_outline(cx, cy, dev.hw, dev.hh)
+    pygame.draw.polygon(surf, model["bottom"], outline)
+    pygame.draw.polygon(surf, shade(model["bottom"], 1.7), outline, 2)
+    label = pygame.Rect(0, 0, dev.hw, 34)
+    label.center = (cx, cy + dev.hh * 0.45)
+    pygame.draw.rect(surf, (236, 234, 226), label, border_radius=4)
+    draw_text(surf, fonts["tiny"], f"MODEL {model['label']}", (label.centerx, label.y + 10), (60, 60, 70))
+    draw_text(surf, fonts["tiny"], "5V  100mA  USB", (label.centerx, label.y + 24), MUTED)
+    lens = dev.lens
+    pygame.draw.circle(surf, (20, 20, 24), (lens.x, lens.y), 22)
+    pygame.draw.circle(surf, (230, 50, 40) if dev.powered() else (110, 30, 30), (lens.x, lens.y), 15)  # its light
+    pygame.draw.circle(surf, (200, 210, 230), (lens.x - 5, lens.y - 5), 4)
+    if lens.amount > 0:
+        draw_fluff(surf, lens)
+    for foot, glue in zip(dev.feet, dev.glues):
+        if foot.t > 0:  # off: the shallow recess it sits in, any old glue, and the screw it was hiding
+            radius = min(foot.rect.size) // 2
+            pygame.draw.rect(surf, shade(model["bottom"], 0.75), foot.rect, border_radius=radius)
+            draw_glue(surf, glue, foot.rect)
+            draw_screws(surf, [s for s in dev.screws if s.foot is foot], turning, post=shade(model["bottom"], 1.4))
+    for foot in dev.feet:
+        if foot.present and not draw_moving(surf, foot, dev.tray_slot(foot).center, fonts):
+            draw_in_place(surf, foot, fonts, shadow=False)
+
+
+def draw_micro_switch(surf, x, y):
+    """A click switch: a little black box with the red plunger the button presses on."""
+    body = pygame.Rect(x - 15, y - 11, 30, 22)
+    pygame.draw.rect(surf, (16, 16, 20), body.move(1, 2), border_radius=3)
+    pygame.draw.rect(surf, (36, 36, 42), body, border_radius=3)
+    pygame.draw.rect(surf, (72, 74, 82), body, 1, border_radius=3)
+    pygame.draw.rect(surf, (220, 60, 50), (x - 4, y - 6, 8, 8), border_radius=2)
+
+
+def draw_pin(surf, x, y, state):
+    """One of a switch's pins through the board: soldered, bare in its hole, or an empty hole."""
+    pygame.draw.circle(surf, (170, 130, 70), (x, y), 5)  # the copper pad
+    if state == "soldered":
+        pygame.draw.circle(surf, SOLDER, (x, y), 4)
+        pygame.draw.circle(surf, WHITE, (x - 1, y - 1), 1)
+    else:
+        pygame.draw.circle(surf, HOLE, (x, y), 2)
+        if state == "loose":
+            pygame.draw.circle(surf, METAL, (x, y), 1)
+
+
+def draw_mouse_inside(surf, dev, fonts):
+    """Inside, with the top shell off: the board with its two click switches, the scroll wheel and its encoder,
+    the sensor, and the cable's plug."""
+    model = dev.model
+    cx, cy = MOUSE_C
+    hw, hh = dev.hw, dev.hh
+    pygame.draw.polygon(surf, shade(model["bottom"], 1.3), mouse_outline(cx, cy, hw, hh))
+    pygame.draw.polygon(surf, (34, 35, 40), mouse_outline(cx, cy, hw - 8, hh - 8))
+    board = mouse_outline(cx, cy - hh * 0.12, hw * 0.8, hh * 0.74)
+    pygame.draw.polygon(surf, BOARD_GREEN, board)
+    pygame.draw.polygon(surf, (24, 70, 44), board, 2)
+    for dx in (-0.3, 0.1, 0.4):  # copper tracks
+        pygame.draw.line(surf, TRACE, (cx + dx * hw, cy - hh * 0.3), (cx + dx * hw * 0.6, cy + hh * 0.4), 3)
+    for s in dev.screws:  # the posts the screws come up into
+        pygame.draw.circle(surf, shade(model["bottom"], 1.6), (s.x, s.y), 9)
+        pygame.draw.circle(surf, HOLE, (s.x, s.y), 3)
+    # The cable: in through a rubber sleeve at the front, its four wires to the plug on the board
+    pygame.draw.rect(surf, shade(model["cable"], 0.8), (cx - 7, cy - hh - 4, 14, 22), border_radius=4)
+    conn = dev.conn
+    lift = 0 if conn.seated else -7
+    cx2 = conn.x + jiggle(conn.wiggle)
+    for i, color in enumerate((WIRE_RED, WHITE, (60, 170, 80), WIRE_BLACK)):
+        pygame.draw.lines(surf, color, False, [(cx - 3 + i * 2, cy - hh + 16), (cx - 3 + i * 2, conn.y - 22),
+                                               (cx2 - 6 + i * 4, conn.y - 10 + lift)], 2)
+    pygame.draw.rect(surf, (226, 222, 206), (conn.x - 14, conn.y - 3, 28, 11), border_radius=2)  # its socket
+    if not conn.seated:  # the pins show in the gap
+        for i in range(4):
+            pygame.draw.line(surf, BRASS, (conn.x - 9 + i * 6, conn.y - 3), (conn.x - 9 + i * 6, conn.y - 9), 2)
+    plug = pygame.Rect(cx2 - 12, conn.y - 10 + lift, 24, 10)
+    pygame.draw.rect(surf, (248, 246, 238), plug, border_radius=2)
+    pygame.draw.rect(surf, (180, 176, 164), plug, 1, border_radius=2)
+    # The sensor
+    lx, ly = dev.lens.x, dev.lens.y
+    for i in range(4):
+        for side in (-1, 1):
+            pygame.draw.line(surf, METAL, (lx + side * 16, ly - 9 + i * 6), (lx + side * 21, ly - 9 + i * 6), 2)
+    pygame.draw.rect(surf, (24, 24, 28), (lx - 16, ly - 14, 32, 28), border_radius=3)
+    pygame.draw.circle(surf, (70, 72, 80), (lx, ly), 7)
+    pygame.draw.rect(surf, (200, 40, 40), (lx + 24, ly - 4, 6, 8), border_radius=1)  # its light
+    # The click switches: the right one, and the left one with its pins
+    rx, ry = dev.right_switch
+    draw_micro_switch(surf, rx, ry)
+    for i in range(3):
+        draw_pin(surf, rx - 10 + i * 10, ry + 19, "soldered")
+    sw = dev.switch
+    for pin in sw.pins:
+        draw_pin(surf, pin.x + jiggle(pin.wiggle), pin.y, pin.state)
+    if sw.present:
+        draw_micro_switch(surf, sw.x + jiggle(sw.wiggle), sw.y)
+        if sw.wicked:  # copper braid laid over its pins
+            braid = pygame.Rect(sw.pins[0].x - 8, sw.pins[0].y - 4, 36, 8)
+            pygame.draw.rect(surf, COPPER, braid, border_radius=2)
+            for x in range(braid.x + 2, braid.right - 2, 4):
+                pygame.draw.line(surf, shade(COPPER, 0.7), (x, braid.y + 1), (x + 3, braid.bottom - 2), 1)
+    else:
+        pygame.draw.rect(surf, SILK, sw.rect, 1, border_radius=3)  # its outline, printed on the board
+    # The scroll wheel on its axle, with the encoder at one end
+    wheel, enc, hair = dev.wheel, dev.encoder, dev.hair
+    pygame.draw.rect(surf, (120, 122, 132), (wheel.x - 32, wheel.y - 8, 8, 16), border_radius=2)  # the axle's holder
+    pygame.draw.line(surf, METAL, (wheel.x - 26, wheel.y), (enc.x, wheel.y), 3)
+    box = pygame.Rect(enc.x - 8, enc.y - 11, 16, 22)
+    for i in range(3):
+        pygame.draw.line(surf, METAL, (box.right, box.y + 4 + i * 7), (box.right + 5, box.y + 4 + i * 7), 2)
+    pygame.draw.rect(surf, (176, 178, 186), box, border_radius=2)
+    pygame.draw.rect(surf, (120, 122, 132), box, 1, border_radius=2)
+    if enc.dirty and not enc.sprayed:
+        for dx, dy in ((-3, -5), (2, 2), (-1, 6), (4, -2)):
+            pygame.draw.circle(surf, (110, 86, 50), (box.centerx + dx, box.centery + dy), 2)
+    if enc.sprayed:
+        pygame.draw.circle(surf, (210, 230, 246), (box.centerx - 3, box.y + 5), 2)
+    rim = pygame.Rect(wheel.x - 9 + jiggle(wheel.wiggle), wheel.y - 26, 18, 52)
+    pygame.draw.rect(surf, (40, 42, 48), rim, border_radius=7)
+    roll = (wheel.angle * 8) % 7
+    for k in range(-4, 4):
+        y = wheel.y + k * 7 + roll
+        if rim.y + 3 < y < rim.bottom - 3:
+            pygame.draw.line(surf, (80, 82, 92), (rim.x + 2, y), (rim.right - 3, y), 2)
+    if hair.present:  # wound round and round the axle
+        for k in range(5):
+            pygame.draw.ellipse(surf, (56, 42, 32), (hair.x - 6 + k, hair.y - 9 + (k % 2) * 2, 11, 18), 1)
+        pygame.draw.lines(surf, (56, 42, 32), False, [(hair.x, hair.y + 9), (hair.x - 8, hair.y + 22),
+                                                      (hair.x - 2, hair.y + 34)], 1)
+
+
+def draw_flipper(surf, dev, font, mouse):
+    """The TURN OVER button by the mouse."""
+    f = dev.flipper
+    x = f.x + jiggle(f.wiggle)
+    pygame.draw.circle(surf, (24, 30, 30), (x + 2, f.y + 3), f.r)
+    pygame.draw.circle(surf, (90, 112, 180) if f.hit(mouse) else (70, 90, 150), (x, f.y), f.r)
+    pygame.draw.arc(surf, WHITE, (x - 11, f.y - 11, 22, 22), 0.5, 5.4, 3)
+    tip = (x + math.cos(0.5) * 11, f.y - math.sin(0.5) * 11)
+    pygame.draw.polygon(surf, WHITE, [(tip[0] - 6, tip[1] - 3), (tip[0] + 5, tip[1] - 4), (tip[0], tip[1] + 6)])
+    draw_text(surf, font, "TURN OVER", (x + f.r + 8, f.y), TEXT, "midleft")
+
+
+def draw_mouse(surf, game, fonts, mouse):
+    """The mouse, the right way up or on its back, with whatever's been taken off it; its cable, the hub and the
+    screen."""
+    dev = game.device
+    turning = game.hold[0] if game.hold and isinstance(game.hold[0], Screw) else None
+    model = dev.model
+    cx, cy = MOUSE_C
+    draw_monitor(surf, MOUSE_SCREEN, game.state == "test")
+    draw_hub(surf, dev.powered())
+    route = [(cx, cy - dev.hh), (cx, 70), (MOUSE_CABLE_X, 70), (MOUSE_CABLE_X, OUTLET[1] - 46)]
+    draw_usb_cable(surf, dev.plug, route, model["cable"], model["braided"], game.drag == ("plug", dev.plug), mouse)
+    pygame.draw.polygon(surf, (20, 30, 28), mouse_outline(cx + 5, cy + 7, dev.hw, dev.hh))  # its shadow
+    if dev.flipped:
+        draw_mouse_under(surf, dev, fonts, turning)
+    else:
+        if dev.shell.t > 0:
+            draw_mouse_inside(surf, dev, fonts)
+        if not draw_moving(surf, dev.shell, dev.tray_slot(dev.shell).center, fonts):
+            draw_in_place(surf, dev.shell, fonts, shadow=False)
+        for foot in dev.feet:  # any that are off wait in the tray
+            if foot.present and foot.t > 0:
+                draw_moving(surf, foot, dev.tray_slot(foot).center, fonts)
+    draw_flipper(surf, dev, fonts["small"], mouse)
+
+
+def pointer_arrow(surf, x, y):
+    points = [(x, y), (x, y + 17), (x + 4, y + 13), (x + 8, y + 20), (x + 11, y + 19), (x + 7, y + 12), (x + 13, y + 12)]
+    pygame.draw.polygon(surf, WHITE, points)
+    pygame.draw.polygon(surf, BLACK, points, 1)
+
+
+def draw_mouse_test(surf, game, fonts):
+    """The pointer test on the screen: the pointer loops round, a click opens a folder, and the page scrolls. Each
+    fault shows: jumping, dragging, double windows, a scroll that jumps back, freezing."""
+    dev, symptom, t = game.device, game.test_symptom, game.state_time
+    screen = MOUSE_SCREEN.inflate(-14, -14)
+    surf.set_clip(screen)
+    folder = pygame.Rect(screen.x + 12, screen.y + 12, 30, 22)
+    pygame.draw.rect(surf, (236, 196, 80), (folder.x, folder.y - 4, 12, 6), border_radius=2)
+    pygame.draw.rect(surf, (236, 196, 80), folder, border_radius=3)
+    draw_text(surf, fonts["tiny"], "Photos", (folder.centerx, folder.bottom + 8), WHITE)
+    if symptom == "unplugged":
+        draw_text(surf, fonts["small"], "No mouse found", screen.center, WHITE)
+        surf.set_clip(None)
+        return
+    clicks = symptom not in ("noclick", "noshell", "upside")
+    frozen = symptom == "cutout" and t % 1.3 > 0.8
+    tt = t - (t % 1.3 - 0.8) if frozen else round(t * 4) / 4 if symptom == "scratchy" else t
+    px = screen.x + screen.w * (0.5 + 0.34 * math.sin(tt * 1.7))
+    py = screen.y + screen.h * (0.5 + 0.3 * math.sin(tt * 2.9 + 0.6))
+    if symptom == "jumpy":
+        rnd = random.Random(int(t * 10))
+        px, py = px + rnd.uniform(-34, 34), py + rnd.uniform(-24, 24)
+    if symptom == "upside":
+        px, py = screen.center
+    if clicks and t > 1.0:
+        for k in range(2 if symptom == "double" else 1):
+            win = pygame.Rect(screen.x + 70 + k * 20, screen.y + 14 + k * 14, 150, 100)
+            pygame.draw.rect(surf, (20, 24, 34), win.move(3, 3), border_radius=4)
+            pygame.draw.rect(surf, (236, 238, 242), win, border_radius=4)
+            pygame.draw.rect(surf, (60, 110, 200), (win.x, win.y, win.w, 14), border_top_left_radius=4,
+                             border_top_right_radius=4)
+            scroll = (t - 1.0) * 30
+            if symptom == "scroll":
+                scroll -= 34 * (int((t - 1.0) * 2.5) % 2)  # down... and it jumps back up
+            for i in range(7):
+                ly = win.y + 20 + (i * 12 - scroll) % 80
+                pygame.draw.line(surf, (150, 156, 170), (win.x + 8, ly), (win.right - 24 - (i % 3) * 20, ly), 3)
+            pygame.draw.rect(surf, (200, 204, 214), (win.right - 10, win.y + 16, 6, win.h - 20), border_radius=3)
+            pygame.draw.rect(surf, (110, 116, 130), (win.right - 10, win.y + 16 + max(0, scroll) % 60, 6, 20),
+                             border_radius=3)
+        if symptom == "double":
+            draw_text(surf, fonts["small"], "Opened twice!", (screen.centerx, screen.bottom - 12), GOLD)
+    elif t > 1.0 and symptom != "upside":
+        draw_text(surf, fonts["small"], "Click... nothing", (screen.centerx, screen.bottom - 12), GOLD)
+    if frozen:
+        bar = pygame.Rect(screen.x + 20, screen.bottom - 30, screen.w - 40, 22)
+        pygame.draw.rect(surf, (200, 60, 50), bar, border_radius=5)
+        draw_text(surf, fonts["tiny"], "USB device disconnected", bar.center, WHITE)
+    pointer_arrow(surf, round(px), round(py))
+    surf.set_clip(None)
+
+
+def draw_wick(surf, x, y):
+    """A spool of desoldering wick: copper braid on a little plastic reel."""
+    pygame.draw.line(surf, COPPER, (x + 8, y - 6), (x + 22, y - 18), 5)
+    pygame.draw.circle(surf, (60, 150, 90), (x, y), 14)
+    pygame.draw.circle(surf, (40, 110, 64), (x, y), 14, 2)
+    pygame.draw.circle(surf, (24, 26, 30), (x, y), 4)
+
+
+def draw_new_microswitch(surf, x, y):
+    for dx in (-10, 0, 10):
+        pygame.draw.line(surf, METAL, (x + dx, y + 8), (x + dx, y + 16), 2)
+    draw_micro_switch(surf, x, y)
+
+
+def draw_feet_sheet(surf, x, y):
+    """New mouse feet on their backing paper."""
+    pygame.draw.rect(surf, (250, 220, 120), (x - 18, y - 14, 36, 28), border_radius=3)
+    for rect in ((x - 14, y - 10, 28, 7), (x - 14, y + 1, 12, 9), (x + 2, y + 1, 12, 9)):
+        pygame.draw.rect(surf, (246, 246, 240), rect, border_radius=3)
+
+
+def draw_old_foot(surf, x, y):
+    draw_foot(surf, pygame.Rect(x - 14, y - 6, 28, 12), True)
+
+
+def draw_hair(surf, x, y):
+    pygame.draw.lines(surf, (56, 42, 32), False, [(x - 16 + k * 4, y + 6 * math.sin(k * 0.9)) for k in range(9)], 2)
+
+
+def draw_mouse_icon(surf, x, y, model):
+    """A whole mouse from above, its cable curling away, for the pictures on the cards."""
+    hw, hh = model["w"] // 2, model["h"] // 2
+    pygame.draw.lines(surf, model["cable"], False, [(x, y - hh), (x, y - hh - 40), (x + 50, y - hh - 80),
+                                                    (x + 110, y - hh - 70)], 7)
+    pygame.draw.polygon(surf, (20, 20, 24), mouse_outline(x + 6, y + 8, hw, hh))
+    draw_mouse_top(surf, pygame.Rect(x - hw, y - hh, 2 * hw, 2 * hh), model)
+
+
+def draw_mice_icon(surf, x, y):
+    """The mouse's card on the first screen: a gaming mouse, an office mouse and a travel mouse side by side."""
+    for model, dx, height in ((MOUSE_MODELS[1], -170, 330), (MOUSE_MODELS[2], 170, 260), (MOUSE_MODELS[0], 0, 300)):
+        icon = make_model_icon(model, (300, height))
+        surf.blit(icon, icon.get_rect(midbottom=(x + dx, y + 200)))
+
+
+# ---- build mode: what each thing is made of ----
+# Each part draws itself where it sits on the bench, in a palette: the type's colours with a style laid over them.
+
+def fan_parts(model):
+    """A fan's parts, in the order you build it: the base and what's inside it, then the stand, then the head from
+    the back grille to the front one."""
+    hx, hy = HEAD
+    bx, by = BASE.topleft
+    stand = {"desk": "neck", "stand": "pole", "wall": "wall bracket"}[model["key"]]
+    parts = [
+        Part("base", model["box_name"], draw_fan_base_part, layer=1),
+        Part("switch", "speed switch", draw_fan_switch_part, ["base"], layer=2),
+        Part("cap", "capacitor", draw_fan_cap_part, ["base"], layer=2),
+        Part("cord", "power cord", draw_fan_cord_part, ["base"], layer=2),
+        Part("clamp", "cord clamp", lambda s, m, f: draw_clamp(s, pygame.Rect(bx + 336, by + 28, 22, 52)), ["cord"],
+             layer=3),
+    ]
+    parts += [BuildScrew(f"clamp_screw{i}", bx + 347, y, ["clamp"], layer=4) for i, y in enumerate((by + 36, by + 72))]
+    parts.append(Part("base_cover", f"{model['box']} cover", draw_fan_cover_part,
+                      ["switch", "cap", "clamp_screw0", "clamp_screw1"], layer=5))
+    parts += [BuildScrew(f"cover_screw{i}", x, y, ["base_cover"], layer=6)
+              for i, (x, y) in enumerate((x, y) for y in (by + 16, BASE.bottom - 16) for x in (bx + 16,
+                                                                                               BASE.right - 16))]
+    parts += [
+        Part("neck", stand, lambda s, m, f: draw_fan_stand(s, m), ["base"], layer=0),
+        Part("rear_grille", "back grille", draw_rear_grille_part, ["neck"], layer=1),
+        Part("motor", "motor", draw_motor_part, ["rear_grille"], layer=2),
+        Part("fuse", "thermal fuse", draw_fuse_part, ["motor"], layer=3),
+        Part("tape", "tape", lambda s, m, f: draw_tape(s, pygame.Rect(hx - 56, hy - 37, 56, 18)), ["fuse"], layer=4),
+        Part("motor_cover", "motor cover", draw_motor_cover_part, ["tape"], layer=5),
+    ]
+    parts += [BuildScrew(f"motor_screw{i}", *ring_point(math.radians(a), 55), ["motor_cover"], layer=5.5)
+              for i, a in enumerate((-90, 30, 150))]
+    parts += [
+        Part("blade", "blade", lambda s, m, f: draw_blade(s, hx, hy, BLADE_REST, m),
+             [f"motor_screw{i}" for i in range(3)], layer=6, pivot=HEAD),
+        Part("spinner", "spinner", lambda s, m, f: draw_spinner(s, hx, hy, 0, m), ["blade"], layer=7, pivot=HEAD),
+        Part("grille", "front grille", draw_front_grille_part, ["spinner"], layer=8),
+    ]
+    return parts
+
+
+def draw_fan_base_part(s, m, f):
+    """The base (or control box) with nothing in it: the posts its screws go into, and the hole from the neck."""
+    bx, by = BASE.topleft
+    body = m["body"]
+    pygame.draw.rect(s, shade(body, 0.8), BASE, border_radius=16)
+    pygame.draw.rect(s, INSIDE, BASE.inflate(-12, -12), border_radius=12)
+    for x, y in [(x, y) for y in (by + 16, BASE.bottom - 16) for x in (bx + 16, BASE.right - 16)] + [
+            (bx + 347, by + 36), (bx + 347, by + 72)]:
+        pygame.draw.circle(s, shade(body, 0.6), (x, y), 10)
+        pygame.draw.circle(s, HOLE, (x, y), 4)
+    pygame.draw.circle(s, (24, 24, 28), (HEAD[0], by + 12), 9)
+    pygame.draw.circle(s, (70, 70, 80), (HEAD[0], by + 12), 9, 2)
+
+
+def draw_fan_switch_part(s, m, f):
+    """The speed switch, and the motor's wires that come down the neck to it."""
+    bx, by = BASE.topleft
+    sw = pygame.Rect(bx + 28, by + 20, 92, 56)
+    grommet = (HEAD[0], by + 12)
+    for i, color in enumerate((WIRE_BLACK, WIRE_RED, WIRE_YELLOW)):
+        x = sw.x + 20 + i * 22
+        pygame.draw.lines(s, color, False, [grommet, (grommet[0] - 20 - i * 4, by + 16 + i * 2), (x, by + 16 + i * 2),
+                                            (x, sw.top)], 3)
+    pygame.draw.rect(s, SWITCH, sw, border_radius=6)
+    pygame.draw.rect(s, shade(SWITCH, 1.4), sw, 2, border_radius=6)
+    if m["controls"] == "keys":
+        for i in range(4):
+            pygame.draw.rect(s, (226, 226, 220), (sw.x + 10 + i * 20, sw.y + 10, 14, 20), border_radius=3)
+    elif m["controls"] == "knobs":
+        pygame.draw.circle(s, (36, 36, 40), (sw.x + 26, sw.y + 22), 17)
+        pygame.draw.circle(s, (190, 192, 200), (sw.x + 68, sw.y + 22), 15)
+        pygame.draw.line(s, (90, 92, 100), (sw.x + 68, sw.y + 22), (sw.x + 68, sw.y + 11), 2)
+    else:
+        for x, r in ((sw.x + 28, 17), (sw.x + 70, 12)):
+            pygame.draw.circle(s, (226, 226, 220), (x, sw.y + 22), r)
+            pygame.draw.circle(s, (160, 160, 152), (x, sw.y + 22), r - 6, 2)
+    for i in range(4):
+        pygame.draw.circle(s, BRASS, (sw.x + 17 + i * 20, sw.bottom - 10), 4)
+
+
+def draw_fan_cap_part(s, m, f):
+    """The run capacitor, with its two wires up to the motor."""
+    bx, by = BASE.topleft
+    x, y = bx + 190, by + 60
+    for i, (color, cx) in enumerate(((WIRE_RED, bx + 166), (WIRE_YELLOW, bx + 214))):
+        pygame.draw.lines(s, color, False, [(HEAD[0] - 4 + 8 * i, by + 12), (cx, by + 18), (cx, by + 23)], 3)
+        pygame.draw.line(s, (226, 226, 220), (x - 18 + 36 * i, y - 20), (cx, by + 31), 3)
+        pygame.draw.rect(s, (60, 110, 200), (cx - 7, by + 21, 14, 11), border_radius=3)
+    draw_cap(s, x, y, m["caps"][0], False, f["tiny"])
+
+
+def draw_fan_cord_part(s, m, f):
+    """The power cord: its terminal block inside the base, and the cord out across the bench to its plug."""
+    bx, by = BASE.topleft
+    pygame.draw.lines(s, WIRE_BLUE, False, [(bx + 284, by + 40), (bx + 270, by + 40), (bx + 270, by + 9),
+                                            (HEAD[0] + 6, by + 9)], 3)
+    pygame.draw.lines(s, WIRE_BROWN, False, [(bx + 284, by + 70), (bx + 270, by + 70), (bx + 270, by + 92),
+                                             (bx + 106, by + 92), (bx + 106, by + 76)], 3)
+    block = pygame.Rect(bx + 282, by + 24, 34, 62)
+    pygame.draw.rect(s, TERMINAL, block, border_radius=4)
+    pygame.draw.rect(s, shade(TERMINAL, 0.7), block, 1, border_radius=4)
+    for y, color, dy in ((by + 40, WIRE_BLUE, -4), (by + 70, WIRE_BROWN, 4)):
+        pygame.draw.line(s, shade(color, 0.7), (bx + 332, by + 55 + dy), (bx + 315, y), 7)
+        pygame.draw.line(s, color, (bx + 332, by + 55 + dy), (bx + 315, y), 5)
+        pygame.draw.line(s, COPPER, (bx + 315, y), (bx + 299, y), 3)
+        draw_screw(s, bx + 299, y, 20)
+    points = [(bx + 332, by + 55), (BASE.right + 26, by + 55), (562, 516)]
+    pygame.draw.lines(s, shade(CORD, 0.6), False, points, 12)
+    pygame.draw.lines(s, CORD, False, points, 8)
+    plug = pygame.Rect(549, 504, 26, 32)
+    pygame.draw.rect(s, (40, 40, 44), plug.move(2, 3), border_radius=5)
+    pygame.draw.rect(s, PLUG, plug, border_radius=5)
+    pygame.draw.rect(s, shade(PLUG, 0.7), plug, 1, border_radius=5)
+    for dx in (7, 17):
+        pygame.draw.rect(s, METAL, (plug.x + dx, plug.bottom, 3, 9))  # its pins
+
+
+def draw_fan_cover_part(s, m, f):
+    draw_base_cover(s, BASE, f["tiny"], m)
+    if m["controls"] == "cords":
+        draw_pull_cords(s, m)
+
+
+def draw_rear_grille_part(s, m, f):
+    """The back grille, behind the motor and the blade."""
+    disc = pygame.Surface((2 * GRILLE_R, 2 * GRILLE_R), pygame.SRCALPHA)
+    pygame.draw.circle(disc, (20, 30, 28, 70), (GRILLE_R, GRILLE_R), GRILLE_R)  # the shade inside it
+    s.blit(disc, (HEAD[0] - GRILLE_R, HEAD[1] - GRILLE_R))
+    wire = shade(m["grille"], 0.55)
+    pygame.draw.circle(s, shade(m["body"], 0.6), HEAD, GRILLE_R, 5)
+    for r in (60, 90, 118):
+        pygame.draw.circle(s, wire, HEAD, r, 2)
+    for k in range(20):
+        a = k * math.pi / 10
+        pygame.draw.line(s, wire, ring_point(a, 60), ring_point(a, GRILLE_R - 2), 2)
+
+
+def draw_motor_part(s, m, f):
+    """The motor: its steel ring, the copper windings, the rotor and its shaft."""
+    hx, hy = HEAD
+    pygame.draw.circle(s, shade(MOTOR, 0.6), HEAD, MOTOR_R + 8)
+    pygame.draw.circle(s, INSIDE, HEAD, MOTOR_R - 2)
+    pygame.draw.circle(s, LAMINATION, HEAD, 60, 12)
+    for k in range(24):
+        a = k * math.pi / 12
+        pygame.draw.line(s, shade(LAMINATION, 0.7), ring_point(a, 49), ring_point(a, 59), 2)
+    for k in range(4):
+        x, y = ring_point(math.radians(45 + 90 * k), 34)
+        coil = pygame.Rect(0, 0, 30, 24)
+        coil.center = (x, y)
+        pygame.draw.ellipse(s, shade(COIL, 0.7), coil.inflate(2, 2))
+        pygame.draw.ellipse(s, COIL, coil)
+        for i in range(-2, 3):
+            pygame.draw.line(s, shade(COIL, 0.8), (x + i * 5, y - 9), (x + i * 5 + 2, y + 9), 1)
+    pygame.draw.circle(s, (70, 72, 80), HEAD, 20)
+    for k in range(6):
+        a = k * math.pi / 3
+        pygame.draw.line(s, (96, 98, 108), ring_point(a, 8), ring_point(a, 19), 2)
+    for i, color in enumerate((WIRE_RED, WIRE_YELLOW, WIRE_BLACK)):
+        pygame.draw.line(s, color, (hx - 6 + i * 6, hy + 44), (hx - 6 + i * 6, hy + MOTOR_R), 3)
+    for a in (-90, 30, 150):  # the posts the cover's screws go into
+        x, y = ring_point(math.radians(a), 55)
+        pygame.draw.circle(s, shade(MOTOR, 0.9), (x, y), 10)
+        pygame.draw.circle(s, HOLE, (x, y), 5)
+    pygame.draw.circle(s, METAL, HEAD, 6)
+
+
+def draw_fuse_part(s, m, f):
+    """The thermal fuse, crimped into the winding's wire at both ends."""
+    hx, hy = HEAD
+    for lx, end in ((hx - 48, (hx - 40, hy - 14)), (hx - 8, (hx - 16, hy - 14))):
+        pygame.draw.line(s, COPPER, (lx, hy - 28), end, 2)
+        draw_joint(s, SimpleNamespace(x=lx, y=hy - 28, wiggle=0, state="crimped"), True)
+    body = pygame.Rect(hx - 42, hy - 35, 28, 14).inflate(-4, -4)
+    pygame.draw.line(s, METAL, (hx - 44, body.centery), (hx - 12, body.centery), 2)
+    pygame.draw.rect(s, FUSE_SLEEVE, body, border_radius=4)
+    pygame.draw.rect(s, shade(FUSE_SLEEVE, 0.7), body, 1, border_radius=4)
+    pygame.draw.rect(s, (60, 60, 70), (body.x + 6, body.y, 3, body.h))
+
+
+def draw_motor_cover_part(s, m, f):
+    """The motor's front cover, with the bearing the shaft turns in."""
+    draw_motor_cover(s, *HEAD)
+    draw_bearing(s, Bearing(False))
+    pygame.draw.circle(s, METAL, HEAD, 6)
+
+
+def draw_front_grille_part(s, m, f):
+    draw_grille(s, *HEAD, m)
+    first, count = m["clips"]
+    for k in range(count):
+        draw_clip(s, Clip(math.radians(first + k * 360 / count)), m)
+
+
+def radio_parts(model):
+    """A radio's parts, in the order you build it: everything into the front case, then the back, its screws, the
+    batteries and the battery door."""
+    by = BATTERY_BOX.y
+    parts = [
+        Part("case", "front case", lambda s, m, f: draw_radio_case(s, m), layer=0),
+        Part("rod", "AM antenna rod", draw_rod_part, ["case"], layer=1),
+        Part("speaker", "speaker", lambda s, m, f: draw_speaker(s, Speaker(False, m["ohms"], m["watts"]), f["tiny"]),
+             ["case"], layer=1),
+        Part("board", "circuit board", draw_radio_board_part, ["case"], layer=3),
+        Part("pot", "volume control", lambda s, m, f: draw_pot(s, Pot(False)), ["board"], layer=2),
+        Part("battery_box", "battery box", draw_battery_box_part, ["case"], layer=2),
+        Part("wires", "wires", draw_radio_wires_part, ["board", "speaker", "battery_box", "rod"], layer=4),
+        Part("antenna", "telescopic antenna", lambda s, m, f: draw_antenna(s, Antenna(False)), ["case"], layer=8),
+        BuildScrew("antenna_screw", 110, 222, ["antenna", "wires"], layer=4.5),
+        Part("back", "back cover", lambda s, m, f: draw_radio_back(s, RADIO, f["tiny"], m),
+             ["wires", "pot", "antenna_screw"], layer=5),
+    ]
+    parts += [BuildScrew(f"back_screw{i}", x, y, ["back"], layer=6) for i, (x, y) in enumerate(model["screws"])]
+    parts.append(BuildScrew("hidden_screw", BATTERY_BOX.centerx, by + 64, ["back"], layer=6))
+    parts += [
+        Part("batteries", "batteries", draw_batteries_part, ["battery_box", "hidden_screw"], layer=7),
+        Part("door", "battery door", lambda s, m, f: draw_battery_door(s, BATTERY_BOX.inflate(8, 8), f["tiny"], m),
+             ["batteries", "back"], layer=8),
+    ]
+    return parts
+
+
+def draw_rod_part(s, m, f):
+    """The AM antenna: a coil of copper wire on a ferrite rod, in two clips."""
+    pygame.draw.rect(s, (44, 44, 50), (84, 482, 222, 16), border_radius=7)
+    for x in range(150, 216, 3):
+        pygame.draw.line(s, COPPER, (x, 481), (x + 1, 498), 2)
+    for x in (108, 280):
+        pygame.draw.rect(s, (90, 92, 100), (x, 478, 10, 24), border_radius=3)
+
+
+def draw_radio_board_part(s, m, f):
+    """The circuit board, with the tuning capacitor and headphone socket on it."""
+    pygame.draw.circle(s, (58, 60, 68), (520, 228), 28)
+    pygame.draw.rect(s, (226, 226, 218), (498, 212, 44, 40), border_radius=4)
+    pygame.draw.circle(s, (170, 170, 164), (520, 228), 8)
+    draw_board(s, SimpleNamespace(joints=[Joint(x, y) for x, y in CRACKABLE + OTHER_JOINTS]), f["tiny"])
+    pygame.draw.rect(s, (22, 22, 26), (620, 290, 22, 50), border_radius=4)
+    pygame.draw.circle(s, (60, 60, 66), (636, 315), 6)
+
+
+def draw_battery_box_part(s, m, f):
+    """The empty battery compartment: a spring and a flat contact for each battery, and the marks for which way
+    round it goes."""
+    box = BATTERY_BOX
+    pygame.draw.rect(s, (24, 24, 28), box, border_radius=8)
+    pygame.draw.rect(s, shade(m["case"], 0.8), box, 2, border_radius=8)
+    for i in range(2):
+        cell, plus_right = pygame.Rect(box.x + 16, box.y + 10 + i * 38, 140, 32), i == 0
+        pygame.draw.rect(s, (34, 34, 40), cell.inflate(4, 4), 1, border_radius=8)
+        minus_x = cell.left - 3 if plus_right else cell.right + 3
+        plus_x = cell.right + 3 if plus_right else cell.left - 3
+        pygame.draw.lines(s, METAL, False, [(minus_x + (3 if k % 2 else -3), cell.top + 4 + k * 4) for k in range(7)],
+                          2)
+        pygame.draw.rect(s, METAL, (plus_x - 2, cell.centery - 8, 4, 16))
+        for text, x in (("+", plus_x + (-12 if plus_right else 12)), ("-", minus_x + (12 if plus_right else -12))):
+            draw_text(s, f["small"], text, (x, cell.centery), (90, 92, 102))
+    pygame.draw.circle(s, (60, 62, 70), (box.centerx, box.y + 64), 10)  # the post for the hidden screw
+    pygame.draw.circle(s, HOLE, (box.centerx, box.y + 64), 5)
+
+
+def draw_radio_wires_part(s, m, f):
+    """The wires: the speaker's two, the antennas', and the battery leads, all soldered to the board."""
+    tabs = [(277, 326), (277, 398)]
+    pygame.draw.lines(s, WIRE_RED, False, [PADS["SP+"], (300, 300), tabs[0]], 3)
+    pygame.draw.lines(s, WIRE_BLACK, False, [PADS["SP-"], (300, 340), (284, 392), tabs[1]], 3)
+    for tab in tabs:
+        pygame.draw.circle(s, SOLDER, tab, 6)
+        pygame.draw.circle(s, WHITE, (tab[0] - 2, tab[1] - 2), 1)
+    pygame.draw.lines(s, WIRE_YELLOW, False, [(116, 228), (150, 234), (300, 234), PADS["ANT"]], 2)
+    pygame.draw.lines(s, COPPER, False, [(182, 482), (182, 474), (318, 474), PADS["ROD"]], 2)
+    pygame.draw.line(s, WIRE_RED, PADS["BAT+"], (PADS["BAT+"][0], BATTERY_BOX.top + 2), 3)
+    pygame.draw.line(s, WIRE_BLACK, PADS["BAT-"], (PADS["BAT-"][0], BATTERY_BOX.top + 2), 3)
+
+
+def draw_batteries_part(s, m, f):
+    for i in range(2):
+        draw_cell(s, pygame.Rect(BATTERY_BOX.x + 16, BATTERY_BOX.y + 10 + i * 38, 140, 32), i == 0, False, f["tiny"],
+                  m["cell"])
+
+
+def keyboard_parts(model):
+    """A keyboard's parts, from the case up: the board, the steel plate and the screws that hold it, the
+    stabilisers and switches, then the keycaps a row at a time."""
+    case, u, keys = keyboard_geometry(model)
+    well = case.inflate(-16, -16)
+    rects = {label: rect for label, rect in keys}
+    size = round(u * 0.74)
+    rows = {}
+    for label, rect in keys:
+        rows.setdefault(rect.y, []).append((label, rect))
+    names = (["F keys"] if model["size"] != "60" else []) + ["number keys", "top row keys", "home row keys",
+                                                            "bottom row keys", "space bar row"]
+    screws = [rects["E"].topleft, rects["O"].topright, rects["C"].bottomleft, rects["M"].bottomright]  # between keys
+    parts = [
+        Part("case", "case", lambda s, m, f: draw_kb_case_part(s, m, case), layer=0),
+        Part("cable", "USB-C cable", lambda s, m, f: draw_kb_cable_part(s, m, case), ["case"], layer=1),
+        Part("pcb", "circuit board", lambda s, m, f: draw_kb_pcb_part(s, well, keys, size), ["case"], layer=1),
+        Part("plate", "steel plate", lambda s, m, f: draw_kb_plate_part(s, well, keys, size), ["pcb"], layer=2),
+        Part("stabs", "stabilisers", lambda s, m, f: draw_kb_stabs_part(s, keys, u), ["plate"], layer=4),
+        Part("switches", "key switches", lambda s, m, f: draw_kb_switches_part(s, m, keys, size), ["plate"],
+             layer=4),
+    ]
+    parts += [BuildScrew(f"screw{i}", x, y, ["plate"], layer=4.5) for i, (x, y) in enumerate(screws)]
+    below = ["stabs", "switches"] + [f"screw{i}" for i in range(len(screws))]
+    for i, (_, row) in enumerate(sorted(rows.items())):
+        parts.append(Part(f"row{i}", names[i], lambda s, m, f, row=row: draw_kb_row_part(s, m, row, u), below,
+                          layer=6))
+    return parts
+
+
+def draw_kb_case_part(s, m, case):
+    pygame.draw.rect(s, (20, 30, 28), case.move(5, 7), border_radius=14)
+    pygame.draw.rect(s, m["case"], case, border_radius=14)
+    pygame.draw.rect(s, shade(m["case"], 0.7 if sum(m["case"]) > 300 else 1.4), case, 2, border_radius=14)
+    pygame.draw.rect(s, shade(m["case"], 0.4), case.inflate(-16, -16), border_radius=6)  # the empty tray inside
+    pygame.draw.rect(s, (18, 18, 22), (case.right - 79, case.top - 2, 18, 6), border_radius=3)  # the USB-C socket
+    for k in range(3):
+        pygame.draw.circle(s, (40, 46, 40), (case.right - 22 - k * 14, case.y + 7), 3)
+
+
+def draw_kb_cable_part(s, m, case):
+    """The USB-C cable, plugged into the back of the case and running off down the bench."""
+    color = m["cable"]
+    edge = shade(color, 0.6) if sum(color) > 200 else shade(color, 1.8)
+    x, top = case.right - 70, case.top
+    points = [(x, top - 14), (x, top - 18), (KB_CABLE_X, top - 18), (KB_CABLE_X, 480), (KB_CABLE_X - 20, 500)]
+    pygame.draw.lines(s, edge, False, points, 9)
+    pygame.draw.lines(s, color, False, points, 6)
+    head = pygame.Rect(x - 8, top - 16, 16, 15)
+    pygame.draw.rect(s, color, head, border_radius=4)
+    pygame.draw.rect(s, edge, head, 1, border_radius=4)
+    plug = pygame.Rect(KB_CABLE_X - 62, 490, 42, 22)  # its other end, lying on the bench
+    pygame.draw.rect(s, color, (plug.x + 12, plug.y, 30, plug.h), border_radius=5)
+    pygame.draw.rect(s, edge, (plug.x + 12, plug.y, 30, plug.h), 1, border_radius=5)
+    pygame.draw.rect(s, METAL, (plug.x, plug.y + 5, 13, 12), border_radius=1)
+
+
+def draw_kb_pcb_part(s, well, keys, size):
+    """The circuit board: green, with a hot-swap socket for every switch."""
+    pygame.draw.rect(s, BOARD_GREEN, well, border_radius=6)
+    for _, rect in keys:
+        x, y = rect.center
+        for dx, dy in ((-0.22, -0.2), (0.18, -0.3)):
+            pygame.draw.circle(s, BRASS, (x + dx * size, y + dy * size), max(2, size // 9))
+        pygame.draw.circle(s, (24, 26, 30), (x, y), max(2, size // 8))
+
+
+def draw_kb_plate_part(s, well, keys, size):
+    """The steel plate the switches clip into: a square hole for each one."""
+    pygame.draw.rect(s, PLATE, well, border_radius=6)
+    pygame.draw.rect(s, shade(PLATE, 0.8), well, 2, border_radius=6)
+    for _, rect in keys:
+        hole = pygame.Rect(0, 0, size, size)
+        hole.center = rect.center
+        s.fill((0, 0, 0, 0), hole)
+
+
+def draw_kb_stabs_part(s, keys, u):
+    """The stabilisers under every long key: a housing at each end, and the wire that keeps both ends level."""
+    for _, rect in keys:
+        if rect.w < 1.9 * u and rect.h < 1.9 * u:
+            continue
+        wide = rect.w >= rect.h
+        reach = min((rect.w if wide else rect.h) / 2 - u * 0.4, 2.7 * u)
+        ends = [(rect.centerx + d * reach, rect.centery) if wide else (rect.centerx, rect.centery + d * reach)
+                for d in (-1, 1)]
+        a, b = ends
+        wire = [(a[0], a[1] + u * 0.3), (b[0], b[1] + u * 0.3)] if wide else [(a[0] + u * 0.3, a[1]),
+                                                                              (b[0] + u * 0.3, b[1])]
+        pygame.draw.line(s, METAL, wire[0], wire[1], 2)
+        for x, y in ends:
+            house = pygame.Rect(0, 0, round(u * 0.36), round(u * 0.55))
+            house.center = (x, y)
+            pygame.draw.rect(s, (240, 240, 236), house, border_radius=2)
+            pygame.draw.rect(s, (176, 176, 172), house, 1, border_radius=2)
+
+
+def draw_kb_switches_part(s, m, keys, size):
+    for _, rect in keys:
+        draw_switch_body(s, *rect.center, size, m["switch"])
+
+
+def draw_kb_row_part(s, m, row, u):
+    font = legend_font(u)
+    for label, rect in row:
+        draw_keycap(s, rect, label, m, font)
+
+
+def mouse_parts(model):
+    """A mouse's parts, in the order you build it: into the bottom shell, then the top shell, then (turned over) the
+    screws and the feet that hide them."""
+    cx, cy = MOUSE_C
+    hw, hh = model["w"] // 2, model["h"] // 2
+    sy = cy - round(hh * 0.5)
+    bottom = Part("bottom", "bottom shell", draw_mouse_bottom_part, layer=0)
+    bottom.under_draw = draw_mouse_underside_part
+    parts = [
+        bottom,
+        Part("board", "circuit board", draw_mouse_board_part, ["bottom"], layer=1),
+        Part("left_switch", "left click switch", lambda s, m, f: draw_mouse_switch_part(s, cx - round(hw * 0.46), sy),
+             ["board"], layer=2),
+        Part("right_switch", "right click switch", lambda s, m, f: draw_mouse_switch_part(s, cx + round(hw * 0.46),
+                                                                                           sy), ["board"], layer=2),
+        Part("encoder", "scroll encoder", draw_mouse_encoder_part, ["board"], layer=2),
+        Part("wheel", "scroll wheel", draw_mouse_wheel_part, ["encoder"], layer=3),
+        Part("cable", "cable", draw_mouse_cable_part, ["board"], layer=2),
+        Part("top_shell", "top shell", lambda s, m, f: draw_mouse_top(s, pygame.Rect(cx - hw, cy - hh, 2 * hw, 2 * hh),
+                                                                       m, f["tiny"]),
+             ["left_switch", "right_switch", "wheel", "cable"], layer=5),
+    ]
+    parts += [BuildScrew(f"screw{i}", cx + x, cy + y, ["top_shell"], layer=6, side="under")
+              for i, (_, x, y) in enumerate(model["screws"])]
+    for i, (x, y, w, h) in enumerate(model["feet"]):
+        below = [f"screw{j}" for j, (foot, _, _) in enumerate(model["screws"]) if foot == i] or ["bottom"]
+        parts.append(Part(f"foot{i}", "foot", lambda s, m, f, r=pygame.Rect(cx + x, cy + y, w, h): draw_foot(s, r, False),
+                          below, layer=7, side="under"))
+    return parts
+
+
+def draw_mouse_bottom_part(s, m, f):
+    """The bottom shell, seen from above with nothing in it: the posts the screws come up into."""
+    cx, cy = MOUSE_C
+    hw, hh = m["w"] // 2, m["h"] // 2
+    pygame.draw.polygon(s, (20, 30, 28), mouse_outline(cx + 5, cy + 7, hw, hh))
+    pygame.draw.polygon(s, shade(m["bottom"], 1.3), mouse_outline(cx, cy, hw, hh))
+    pygame.draw.polygon(s, (34, 35, 40), mouse_outline(cx, cy, hw - 8, hh - 8))
+    for _, x, y in m["screws"]:
+        pygame.draw.circle(s, shade(m["bottom"], 1.6), (cx + x, cy + y), 9)
+        pygame.draw.circle(s, HOLE, (cx + x, cy + y), 3)
+    pygame.draw.circle(s, (20, 20, 24), (cx, cy + round(hh * 0.12)), 18)  # the sensor's window
+
+
+def draw_mouse_underside_part(s, m, f):
+    """The bottom shell from underneath: the label, the sensor window, and the shallow spots the feet sit in."""
+    cx, cy = MOUSE_C
+    hw, hh = m["w"] // 2, m["h"] // 2
+    pygame.draw.polygon(s, (20, 30, 28), mouse_outline(cx + 5, cy + 7, hw, hh))
+    outline = mouse_outline(cx, cy, hw, hh)
+    pygame.draw.polygon(s, m["bottom"], outline)
+    pygame.draw.polygon(s, shade(m["bottom"], 1.7), outline, 2)
+    label = pygame.Rect(0, 0, hw, 34)
+    label.center = (cx, cy + hh * 0.45)
+    pygame.draw.rect(s, (236, 234, 226), label, border_radius=4)
+    draw_text(s, f["tiny"], f"MODEL {m['label']}", (label.centerx, label.y + 10), (60, 60, 70))
+    draw_text(s, f["tiny"], "5V  100mA  USB", (label.centerx, label.y + 24), MUTED)
+    lens = (cx, cy + round(hh * 0.12))
+    pygame.draw.circle(s, (20, 20, 24), lens, 22)
+    pygame.draw.circle(s, (110, 30, 30), lens, 15)
+    pygame.draw.circle(s, (200, 210, 230), (lens[0] - 5, lens[1] - 5), 4)
+    for x, y, w, h in m["feet"]:
+        pygame.draw.rect(s, shade(m["bottom"], 0.75), (cx + x, cy + y, w, h), border_radius=min(w, h) // 2)
+    for _, x, y in m["screws"]:
+        pygame.draw.circle(s, shade(m["bottom"], 1.4), (cx + x, cy + y), 10)
+        pygame.draw.circle(s, HOLE, (cx + x, cy + y), 5)
+
+
+def draw_mouse_board_part(s, m, f):
+    """The board: the sensor in the middle, pads for the two switches, the socket for the cable's plug."""
+    cx, cy = MOUSE_C
+    hw, hh = m["w"] // 2, m["h"] // 2
+    board = mouse_outline(cx, cy - hh * 0.12, hw * 0.8, hh * 0.74)
+    pygame.draw.polygon(s, BOARD_GREEN, board)
+    pygame.draw.polygon(s, (24, 70, 44), board, 2)
+    for dx in (-0.3, 0.1, 0.4):
+        pygame.draw.line(s, TRACE, (cx + dx * hw, cy - hh * 0.3), (cx + dx * hw * 0.6, cy + hh * 0.4), 3)
+    lx, ly = cx, cy + round(hh * 0.12)
+    for i in range(4):
+        for side in (-1, 1):
+            pygame.draw.line(s, METAL, (lx + side * 16, ly - 9 + i * 6), (lx + side * 21, ly - 9 + i * 6), 2)
+    pygame.draw.rect(s, (24, 24, 28), (lx - 16, ly - 14, 32, 28), border_radius=3)
+    pygame.draw.circle(s, (70, 72, 80), (lx, ly), 7)
+    pygame.draw.rect(s, (200, 40, 40), (lx + 24, ly - 4, 6, 8), border_radius=1)
+    sy = cy - round(hh * 0.5)
+    for x in (cx - round(hw * 0.46), cx + round(hw * 0.46)):
+        for i in range(3):
+            draw_pin(s, x - 10 + i * 10, sy + 19, "clear")
+    conn = (cx - round(hw * 0.34), cy - round(hh * 0.76))
+    pygame.draw.rect(s, (226, 222, 206), (conn[0] - 14, conn[1] - 3, 28, 11), border_radius=2)
+
+
+def draw_mouse_switch_part(s, x, y):
+    for i in range(3):
+        draw_pin(s, x - 10 + i * 10, y + 19, "soldered")
+    draw_micro_switch(s, x, y)
+
+
+def draw_mouse_encoder_part(s, m, f):
+    """The encoder that counts the wheel's clicks, and the holder for the other end of the axle."""
+    cx, cy = MOUSE_C
+    wy = cy - round(m["h"] // 2 * 0.55)
+    pygame.draw.rect(s, (120, 122, 132), (cx - 32, wy - 8, 8, 16), border_radius=2)
+    box = pygame.Rect(cx + 25 - 8, wy - 11, 16, 22)
+    for i in range(3):
+        pygame.draw.line(s, METAL, (box.right, box.y + 4 + i * 7), (box.right + 5, box.y + 4 + i * 7), 2)
+    pygame.draw.rect(s, (176, 178, 186), box, border_radius=2)
+    pygame.draw.rect(s, (120, 122, 132), box, 1, border_radius=2)
+
+
+def draw_mouse_wheel_part(s, m, f):
+    """The rubber scroll wheel on its axle."""
+    cx, cy = MOUSE_C
+    wy = cy - round(m["h"] // 2 * 0.55)
+    pygame.draw.line(s, METAL, (cx - 26, wy), (cx + 25, wy), 3)
+    rim = pygame.Rect(cx - 9, wy - 26, 18, 52)
+    pygame.draw.rect(s, (40, 42, 48), rim, border_radius=7)
+    for k in range(-3, 4):
+        pygame.draw.line(s, (80, 82, 92), (rim.x + 2, wy + k * 7), (rim.right - 3, wy + k * 7), 2)
+
+
+def draw_mouse_cable_part(s, m, f):
+    """The cable: in through its rubber sleeve, four wires to the plug on the board, and out to its USB plug."""
+    cx, cy = MOUSE_C
+    hw, hh = m["w"] // 2, m["h"] // 2
+    color = m["cable"]
+    edge = shade(color, 0.6) if sum(color) > 200 else shade(color, 1.8)
+    points = [(cx, cy - hh), (cx, 70), (MOUSE_CABLE_X, 70), (MOUSE_CABLE_X, 470)]
+    pygame.draw.lines(s, edge, False, points, 9)
+    pygame.draw.lines(s, color, False, points, 6)
+    plug = pygame.Rect(MOUSE_CABLE_X - 13, 470, 26, 32)  # its USB plug, lying on the bench
+    pygame.draw.rect(s, color, (plug.x, plug.y, plug.w, plug.h - 10), border_radius=5)
+    pygame.draw.rect(s, edge, (plug.x, plug.y, plug.w, plug.h - 10), 1, border_radius=5)
+    pygame.draw.rect(s, METAL, (plug.x + 5, plug.bottom - 11, plug.w - 10, 11), border_radius=1)
+    pygame.draw.rect(s, shade(color, 0.8), (cx - 7, cy - hh - 4, 14, 22), border_radius=4)  # the sleeve
+    conn = (cx - round(hw * 0.34), cy - round(hh * 0.76))
+    for i, wire in enumerate((WIRE_RED, WHITE, (60, 170, 80), WIRE_BLACK)):
+        pygame.draw.lines(s, wire, False, [(cx - 3 + i * 2, cy - hh + 16), (cx - 3 + i * 2, conn[1] - 22),
+                                           (conn[0] - 6 + i * 4, conn[1] - 10)], 2)
+    head = pygame.Rect(conn[0] - 12, conn[1] - 10, 24, 10)
+    pygame.draw.rect(s, (248, 246, 238), head, border_radius=2)
+    pygame.draw.rect(s, (180, 176, 164), head, 1, border_radius=2)
+
+
+BUILD_PARTS = {"fan": fan_parts, "radio": radio_parts, "keyboard": keyboard_parts, "mouse": mouse_parts}
+
+
+def draw_build_device(surf, game, fonts, mouse):
+    """Every part that's in place, from the bottom layer up; the screws and their empty holes; the TURN OVER
+    button."""
+    dev = game.device
+    dev.fonts = fonts
+    side = dev.side()
+    turning = game.hold[0] if game.hold else None
+    spinning = game.state == "test" and dev.product["key"] == "fan"
+    if dev.flipped:
+        bottom = dev.by_key["bottom"]
+        image, topleft, _ = dev.render(bottom, bottom.style, under=True)
+        surf.blit(image, topleft)
+    for p in sorted(dev.parts, key=lambda p: p.layer):
+        if p.side != side:
+            continue
+        if isinstance(p, BuildScrew):
+            if p.placed or p is turning:
+                draw_screw(surf, p.x + jiggle(p.wiggle), p.y, p.angle, p.turned)
+            elif dev.ready(p):
+                pygame.draw.circle(surf, HOLE, (p.x, p.y), 5)
+            continue
+        if not p.placed or p.t > 0:
+            continue
+        image, (x, y), _ = dev.render(p, p.style)
+        if spinning and p.pivot:
+            turned = pygame.transform.rotate(image, -(game.state_time ** 1.6) * 500)
+            surf.blit(turned, turned.get_rect(center=p.pivot))
+        else:
+            surf.blit(image, (x + jiggle(p.wiggle), y))
+    if dev.flipper:
+        draw_flipper(surf, dev, fonts["small"], mouse)
+
+
+def draw_build_moving(surf, dev):
+    """Parts on their way between the bench and the parts box, shrinking as they go."""
+    for p, slot in zip(dev.boxed, BOX_RECTS):
+        if 0 < p.t < 1:
+            image, (x, y), _ = dev.render(p, p.style)
+            thumb, k = dev.thumb(p, p.style), p.t
+            w = round(image.get_width() + (thumb.get_width() - image.get_width()) * k)
+            h = round(image.get_height() + (thumb.get_height() - image.get_height()) * k)
+            center = lerp((x + image.get_width() / 2, y + image.get_height() / 2), box_thumb_center(slot), k)
+            scaled = pygame.transform.smoothscale(image, (max(1, w), max(1, h)))
+            surf.blit(scaled, scaled.get_rect(center=(round(center[0]), round(center[1]))))
+
+
+def box_thumb_center(cell):
+    """Where a part's picture sits in its cell of the parts box, above its name."""
+    return cell.centerx, cell.y + 26
+
+
+def build_hint(game, mouse):
+    """The line under the bench in build mode: a message, or the name of whatever's under the mouse."""
+    if game.message_time > 0:
+        return game.message, game.message_color
+    dev = game.device
+    p = dev.box_part_at(mouse)
+    if p:
+        return f"{p.name.capitalize()}: " + (f"on the {dev.product['noun']}" if p.placed else "in the box"), DIM
+    for (name, _), rect in zip(dev.styles, STYLE_RECTS):
+        if rect.collidepoint(mouse):
+            return f"{name} style: the parts you put on next come out in it.", DIM
+    p = dev.part_at(mouse) if BENCH.collidepoint(mouse) else None
+    if p:
+        return p.name.capitalize(), DIM
+    return "1: hand  ·  2: screwdriver  ·  Esc: back to the levels", DIM
+
+
+def draw_build_panel(surf, game, fonts, tool_icons, mouse):
+    """The panel in build mode: how far you've got, the styles, the parts box and the tools."""
+    dev = game.device
+    pygame.draw.rect(surf, PANEL, (PANEL_X, HUD_H, WIDTH - PANEL_X, HEIGHT - HUD_H))
+    card, apart = BUILD_CARD, dev.phase == "apart"
+    x = card.x + 12
+    pygame.draw.rect(surf, (240, 236, 222), card, border_radius=8)
+    pygame.draw.rect(surf, (206, 196, 176), card, 2, border_radius=8)
+    draw_text(surf, fonts["tiny"], "BUILD MODE  ·  " + ("PART 1: TAKE IT APART" if apart else "PART 2: BUILD IT"),
+              (x, card.y + 8), (130, 120, 108), "topleft")
+    draw_text(surf, fonts["font"], "Take it all apart" if apart else "Build it your way", (x, card.y + 22),
+              (40, 40, 52), "topleft")
+    text = "Get every part off, into the box." if apart else "Put it all back together, in any styles you like."
+    for i, line in enumerate(wrap(fonts["small"], text, card.w - 24)[:2]):
+        draw_text(surf, fonts["small"], line, (x, card.y + 46 + i * 17), (70, 66, 62), "topleft")
+    total, on = len(dev.parts), sum(p.placed for p in dev.parts)
+    done = total - on if apart else on
+    bar = pygame.Rect(x, card.bottom - 20, card.w - 120, 8)
+    pygame.draw.rect(surf, (214, 206, 190), bar, border_radius=4)
+    pygame.draw.rect(surf, (236, 150, 70) if apart else GREEN, (bar.x, bar.y, bar.w * done / total, bar.h),
+                     border_radius=4)
+    draw_text(surf, fonts["small"], f"{done}/{total}", (bar.right + 8, bar.centery), (70, 66, 62), "midleft")
+    draw_text(surf, fonts["small"], clock_text(dev.time), (card.right - 12, bar.centery), (40, 130, 70), "midright")
+
+    # The styles
+    a, b = SWATCH_KEYS[dev.product["key"]]
+    draw_text(surf, fonts["tiny"], f"STYLE   {dev.styles[game.build_style][0].upper()}", (x - 12, STYLE_RECTS[0].y - 15),
+              DIM, "topleft")
+    for k, rect in enumerate(STYLE_RECTS[:len(dev.styles)]):
+        pal = dev.palette(k)
+        pygame.draw.rect(surf, pal[a], rect, border_radius=6)
+        pygame.draw.rect(surf, pal[b], (rect.centerx, rect.y, rect.w - rect.w // 2, rect.h),
+                         border_top_right_radius=6, border_bottom_right_radius=6)
+        chosen = k == game.build_style
+        pygame.draw.rect(surf, GOLD if chosen else CARD_HOT if rect.collidepoint(mouse) else (24, 26, 34), rect,
+                         3 if chosen else 2, border_radius=6)
+
+    # The parts box: a cell for every part with its name, empty (with a tick) while it's on
+    in_box = sum(not p.placed for p in dev.boxed)
+    draw_text(surf, fonts["tiny"], f"PARTS BOX   {in_box} of {len(dev.boxed)}", (x - 12, BOX_RECTS[0].y - 15), DIM,
+              "topleft")
+    for p, rect in zip(dev.boxed, BOX_RECTS):
+        live = not p.placed and p.t >= 1
+        pygame.draw.rect(surf, CARD_HOT if live and rect.collidepoint(mouse) else CARD, rect, border_radius=7)
+        c = box_thumb_center(rect)
+        if live:
+            thumb = dev.thumb(p, p.style if apart else game.build_style)
+            surf.blit(thumb, thumb.get_rect(center=c))
+        elif p.placed:
+            pygame.draw.lines(surf, (80, 150, 96), False, [(c[0] - 8, c[1]), (c[0] - 2, c[1] + 6), (c[0] + 9, c[1] - 7)],
+                              3)
+        for k, line in enumerate(wrap(fonts["tiny"], p.name, rect.w - 4)[:2]):
+            draw_text(surf, fonts["tiny"], line, (rect.centerx, rect.y + 56 + k * 12), TEXT if live else MUTED)
+
+    # The tools
+    for k, (tool, rect) in enumerate(zip(dev.TOOLS, BUILD_TOOL_RECTS)):
+        active = tool == game.tool
+        pygame.draw.rect(surf, CARD_HOT if active or rect.collidepoint(mouse) else CARD, rect, border_radius=7)
+        if active:
+            pygame.draw.rect(surf, GOLD, rect, 2, border_radius=7)
+        surf.blit(tool_icons[tool], tool_icons[tool].get_rect(center=rect.center))
+        draw_text(surf, fonts["tiny"], str(k + 1), (rect.right - 4, rect.y + 2), DIM, "topright")
+    draw_text(surf, fonts["tiny"], "1 hand  2 driver  Esc back", (BUILD_TOOL_RECTS[-1].right + 12,
+                                                                          BUILD_TOOL_RECTS[0].centery), DIM, "midleft")
+
+
+def draw_build_bench(surf, game, fonts, art, mouse):
+    """Build mode: the bench, the parts, the panel, and whatever you're holding."""
+    dev = game.device
+    surf.blit(art["bench"], BENCH.topleft)
+    pygame.draw.rect(surf, (88, 92, 104), TRAY, border_radius=14)  # the screw tray
+    pygame.draw.rect(surf, (120, 124, 136), TRAY.inflate(-10, -10), border_radius=10)
+    loose = dev.loose_screws()
+    if not loose:
+        draw_text(surf, fonts["small"], "SCREWS", TRAY.center, (100, 104, 116))
+    for i, screw in enumerate(loose):
+        draw_screw(surf, TRAY.x + 18 + (i % 7) * 24, TRAY.y + 18 + (i // 7) * 23, 25 * i + 10)
+    dev.draw(surf, game, fonts, mouse)
+    for p in game.particles:
+        p.draw(surf)
+    draw_build_panel(surf, game, fonts, art["tool_icons"], mouse)
+    draw_build_moving(surf, dev)
+    for f in game.floats:
+        f.draw(surf, fonts["small"])
+    pygame.draw.rect(surf, HUD_BG, (0, 0, WIDTH, HUD_H))
+    draw_text(surf, fonts["big"], "FIXER", (16, HUD_H // 2), GOLD, "midleft")
+    draw_text(surf, fonts["font"], dev.model["name"], (130, HUD_H // 2), DIM, "midleft")
+    draw_text(surf, fonts["font"], "Build mode: take it apart, build it your way", (360, HUD_H // 2), TEXT, "midleft")
+    rect = pygame.Rect(0, HEIGHT - HINT_H, PANEL_X, HINT_H)
+    pygame.draw.rect(surf, HUD_BG, rect)
+    text, color = build_hint(game, mouse)
+    lines = wrap(fonts["small"], text, PANEL_X - 32)[:2]
+    for i, line in enumerate(lines):
+        draw_text(surf, fonts["small"], line, (16, rect.centery + (i - (len(lines) - 1) / 2) * 17), color, "midleft")
+    if game.state == "test":
+        draw_test(surf, game, fonts)
+    on_bench = game.state == "bench" and BENCH.collidepoint(mouse)
+    pygame.mouse.set_visible(not on_bench and not game.drag)
+    if game.drag:
+        image = dev.render(game.drag[1], game.build_style)[0].copy()
+        image.set_alpha(220)
+        surf.blit(image, image.get_rect(center=mouse))
+    elif on_bench:
+        draw_tool(surf, game.tool, *mouse, busy=pygame.mouse.get_pressed()[0])
+        if game.hold:
+            ring = pygame.Rect(0, 0, 50, 50)
+            ring.center = mouse
+            pygame.draw.arc(surf, GOLD, ring, math.pi / 2 - 2 * math.pi * min(1, game.hold[1]), math.pi / 2, 4)
+
+
+def draw_build_show(surf, game, fonts):
+    """It comes to life: the fan spins and blows, the radio plays, the keyboard's lights ripple, the mouse glows."""
+    dev, t = game.device, game.state_time
+    key = dev.product["key"]
+    ox, oy = BENCH.topleft
+    layer = pygame.Surface(BENCH.size, pygame.SRCALPHA)
+    if key == "fan":
+        strength = min(1.0, t / 1.2)
+        for k in range(14):
+            a = math.radians(-200 + k * 16) + 0.15 * math.sin(t * 2 + k)
+            phase = (t * 1.6 + k * 0.37) % 1
+            r1 = GRILLE_R + 8 + phase * 70
+            p1, p2 = ring_point(a, r1), ring_point(a, r1 + 24)
+            pygame.draw.line(layer, (255, 255, 255, round(150 * (1 - phase) * strength)), (p1[0] - ox, p1[1] - oy),
+                             (p2[0] - ox, p2[1] - oy), 3)
+    elif key == "radio":
+        x, y = SPEAKER[0] - ox, SPEAKER[1] - oy
+        for k in range(3):
+            phase = (t * 1.2 + k / 3) % 1
+            pygame.draw.circle(layer, (255, 255, 255, round(120 * (1 - phase))), (x, y),
+                               round(SPEAKER_R * 0.5 + phase * 90), 3)
+        for k in range(4):
+            phase = (t * 0.5 + k / 4) % 1
+            draw_note(layer, x - 60 + k * 40 + 10 * math.sin(t * 3 + k), RADIO.top - oy - 10 - phase * 110,
+                      round(230 * (1 - phase)))
+    elif key == "keyboard":  # a rainbow ripples across the key lights
+        for _, rect in dev.keys:
+            color = RGB[int(rect.centerx / 70 + t * 5) % len(RGB)]
+            pygame.draw.rect(layer, (*color, 110), rect.move(-ox, -oy), border_radius=4)
+    else:
+        cx, cy = MOUSE_C[0] - ox, MOUSE_C[1] - oy
+        hw, hh = dev.model["w"] // 2, dev.model["h"] // 2
+        accent = dev.palette(dev.by_key["top_shell"].style)["accent"]
+        pulse = 0.5 + 0.5 * math.sin(t * 6)
+        for i in range(4):
+            pygame.draw.polygon(layer, (*accent, round((100 - i * 22) * pulse)),
+                                mouse_outline(cx, cy, hw + 6 + i * 5, hh + 6 + i * 5), 3)
+        if t % 0.8 < 0.35:
+            draw_text(layer, fonts["small"], "click!", (cx - hw * 0.5, cy - hh * 0.75), WHITE)
+    surf.blit(layer, BENCH.topleft)
+
+
+def draw_build_result(surf, game, fonts, mouse):
+    """You built it: a photo of what you made, and how it went."""
+    if game.build_photo is None:  # snapped once, before the screen dims
+        photo = surf.subsurface(BENCH).copy()
+        k = min(500 / photo.get_width(), 390 / photo.get_height())
+        game.build_photo = pygame.transform.smoothscale(photo, (round(photo.get_width() * k),
+                                                                round(photo.get_height() * k)))
+    dim(surf, alpha=225)
+    r, box, dev = game.result, RESULT_BOX, game.device
+    pygame.draw.rect(surf, PANEL, box, border_radius=16)
+    pygame.draw.rect(surf, GREEN, box, 2, border_radius=16)
+    draw_text(surf, fonts["big"], "BUILT!", (box.centerx, box.y + 34), GREEN)
+    draw_text(surf, fonts["small"], f"{dev.model['name']}  ·  taken all apart and built your way",
+              (box.centerx, box.y + 66), DIM)
+    frame = game.build_photo.get_rect(topleft=(box.x + 38, box.y + 100))
+    pygame.draw.rect(surf, (240, 236, 222), frame.inflate(16, 16), border_radius=6)  # a photo with a white border
+    surf.blit(game.build_photo, frame)
+    x, y = frame.right + 44, box.y + 104
+    draw_text(surf, fonts["small"], "YOUR BUILD", (x, y), DIM, "topleft")
+    draw_text(surf, fonts["font"], f"Time {clock_text(r['time'])}", (x, y + 26), TEXT, "topleft")
+    draw_text(surf, fonts["small"], f"{r['parts']} parts and {r['screws']} screws", (x, y + 54), TEXT, "topleft")
+    draw_text(surf, fonts["small"], "STYLES", (x, y + 90), DIM, "topleft")
+    for i, (name, n) in enumerate(r["styles"]):
+        draw_text(surf, fonts["small"], f"{n} part{'s' if n > 1 else ''} in {name}", (x + 12, y + 112 + i * 20), GOLD,
+                  "topleft")
+    tip = pygame.Rect(box.x + 30, box.bottom - 126, box.w - 60, 60)
+    pygame.draw.rect(surf, (44, 50, 68), tip, border_radius=10)
+    draw_text(surf, fonts["tiny"], "REAL REPAIR TIP", (tip.x + 14, tip.y + 8), GOLD, "topleft")
+    for i, line in enumerate(wrap(fonts["small"], BUILD_TIPS[dev.product["key"]], tip.w - 28)[:2]):
+        draw_text(surf, fonts["small"], line, (tip.x + 14, tip.y + 24 + i * 17), TEXT, "topleft")
+    live = game.state_time > RESULT_DELAY
+    draw_button(surf, fonts["font"], RETRY_BUTTON, "BUILD AGAIN (R)", (70, 90, 150), mouse, live)
+    draw_button(surf, fonts["font"], LEVELS_BUTTON, "LEVELS (Enter)", (56, 150, 90), mouse, live)
+
+
+SUPPLY_BODIES.update({"ipa": draw_ipa, "grease": draw_grease, "cable": draw_cable_coil, "wick": draw_wick,
+                      "microswitch": draw_new_microswitch, "feet": draw_feet_sheet})
+FLYER_BODIES.update({"cable": draw_cable_coil, "foot": draw_old_foot, "hair": draw_hair,
+                     "microswitch": draw_new_microswitch})
+FLYER_BODIES.update({f"kbswitch_{c}": (lambda s, x, y, c=c: draw_kb_switch(s, x, y, c)) for c in SWITCH_COLORS})
+
 MODEL_ICONS = {"desk": draw_desk_icon, "stand": draw_stand_icon, "wall": draw_wall_icon,
                "pocket": draw_pocket_icon, "outdoor": draw_outdoor_icon, "retro": draw_retro_icon}
+MODEL_ICONS.update({m["key"]: draw_keyboard_icon for m in KEYBOARD_MODELS})
+MODEL_ICONS.update({m["key"]: draw_mouse_icon for m in MOUSE_MODELS})
 
 
 def make_model_icon(model, size=(240, 158)):
@@ -4124,7 +7351,8 @@ def draw_radio_icon(surf, x, y):
         surf.blit(icon, icon.get_rect(midbottom=(x + dx, y + 200)))
 
 
-PRODUCT_ICONS = {"fan": draw_fan_icon, "radio": draw_radio_icon}  # each product's picture: a new one needs one here
+PRODUCT_ICONS = {"fan": draw_fan_icon, "radio": draw_radio_icon, "keyboard": draw_keyboards_icon,
+                 "mouse": draw_mice_icon}  # each product's picture: a new one needs one here
 
 
 def make_product_icon(key):
@@ -4217,8 +7445,9 @@ def step_source(game, step):
     kind, thing = step.source
     if kind == "supply":
         return "rect", SUPPLY_RECTS[game.device.SUPPLIES.index(thing)]
-    if kind == "tray":
-        return "rect", game.device.tray_slot(thing)
+    if kind == "tray":  # the first piece still in the tray, when a step puts several back
+        left = [t for t in step.left() if t in game.device.tray_pieces]
+        return "rect", game.device.tray_slot(left[0] if left else thing)
     return "rect", plug_rect(thing)
 
 
@@ -4325,7 +7554,7 @@ def draw_panel(surf, game, fonts, icons, tool_icons, mouse):
     else:
         draw_steps(surf, game, fonts)
 
-    draw_text(surf, fonts["tiny"], "TOOLS   1-6", (x - 12, TOOL_RECTS[0].y - 15), DIM, "topleft")
+    draw_text(surf, fonts["tiny"], f"TOOLS   1-{len(dev.TOOLS)}", (x - 12, TOOL_RECTS[0].y - 15), DIM, "topleft")
     for i, (tool, rect) in enumerate(zip(dev.TOOLS, TOOL_RECTS)):
         active = tool == game.tool
         pygame.draw.rect(surf, CARD_HOT if active or rect.collidepoint(mouse) else CARD, rect, border_radius=7)
@@ -4404,7 +7633,7 @@ def draw_fan_test(surf, game):
 def draw_test(surf, game, fonts):
     """A power test: the device works (or doesn't) on the bench, and a banner says what it does."""
     dev, symptom, t = game.device, game.test_symptom, game.state_time
-    dev.draw_test(surf, game)
+    dev.draw_test(surf, game, fonts)
     banner = pygame.Rect(14, PIECE_TRAY.y - 6, PANEL_X - 28, 92)
     pygame.draw.rect(surf, (20, 22, 30), banner, border_radius=14)
     pygame.draw.rect(surf, (60, 64, 84), banner, 2, border_radius=14)
@@ -4513,6 +7742,12 @@ def draw_tool(surf, tool, x, y, busy=False):
         pygame.draw.line(surf, METAL, (x + 10, y - 10), (x + 22, y - 22), 6)
         pygame.draw.line(surf, (60, 110, 200), (x + 22, y - 22), (x + 40, y - 40), 10)
         pygame.draw.lines(surf, (40, 40, 44), False, [(x + 40, y - 40), (x + 46, y - 46), (x + 52, y - 44)], 3)
+    elif tool == "puller":  # a wire keycap puller: two hooked wire prongs on a handle
+        for end in ((x - 7, y - 1), (x + 1, y + 7)):
+            pygame.draw.line(surf, METAL, (x + 14, y - 14), end, 2)
+            pygame.draw.circle(surf, METAL, end, 2)
+        pygame.draw.line(surf, (60, 160, 140), (x + 14, y - 14), (x + 34, y - 34), 9)
+        pygame.draw.circle(surf, (60, 160, 140), (x + 34, y - 34), 4)
     elif tool == "magnifier":  # a lens on a handle (over the bench it's drawn as a working lens instead)
         pygame.draw.circle(surf, (170, 210, 240), (x + 12, y - 12), 11)
         pygame.draw.circle(surf, (40, 40, 46), (x + 12, y - 12), 12, 3)
@@ -4631,7 +7866,10 @@ def draw_levels(surf, game, fonts, mouse):
             draw_button(surf, fonts["small"], guided, "GUIDED", (70, 90, 150), mouse)
         draw_button(surf, fonts["small"], solo, "ON MY OWN", (56, 150, 90), mouse)
     draw_button(surf, fonts["font"], BACK_BUTTON, "BACK (Esc)", (70, 90, 150), mouse)
-    for k, line in enumerate(wrap(fonts["small"], product["safety"], WIDTH - 300)):
+    draw_button(surf, fonts["font"], BUILD_BUTTON, "BUILD MODE (B)", (190, 110, 50), mouse)
+    draw_text(surf, fonts["tiny"], "Take every part off, then build it your way", (BUILD_BUTTON.centerx,
+                                                                                 BUILD_BUTTON.y - 10), DIM)
+    for k, line in enumerate(wrap(fonts["small"], product["safety"], BUILD_BUTTON.x - 290)):
         draw_text(surf, fonts["small"], line, (270, 604 + k * 17), DIM, "topleft")
 
 
@@ -4721,6 +7959,11 @@ def draw(surf, game, fonts, art, mouse):
     elif game.state == "levels":
         pygame.mouse.set_visible(True)
         draw_levels(surf, game, fonts, mouse)
+    elif game.mode == "build":
+        draw_build_bench(surf, game, fonts, art, mouse)
+        if game.state == "result":
+            pygame.mouse.set_visible(True)
+            draw_build_result(surf, game, fonts, mouse)
     else:
         draw_bench(surf, game, fonts, art, mouse)
         if game.state == "result":
@@ -4732,6 +7975,7 @@ def make_art():
     """Everything drawn once at the start: the bench, and the icons for tools, supplies and products."""
     icons = {key: make_icon(body) for key, body in SUPPLY_BODIES.items()}
     icons["cap"] = make_icon(lambda s, x, y: draw_cap(s, x, y, 0, False))
+    icons.update({f"kbswitch_{c}": make_icon(lambda s, x, y, c=c: draw_kb_switch(s, x, y, c)) for c in SWITCH_COLORS})
     return dict(bench=make_bench(), tool_icons={tool: make_tool_icon(tool) for tool in TOOL_NAMES}, icons=icons,
                 products={product["key"]: make_product_icon(product["key"]) for product in PRODUCTS},
                 models={model["key"]: make_model_icon(model) for product in PRODUCTS
@@ -4744,13 +7988,7 @@ def main():
     pygame.display.set_caption("Fixer: repair school")
     canvas = pygame.Surface((WIDTH, HEIGHT))  # drawn here, then shown shifted by the screen shake
     clock = pygame.time.Clock()
-    fonts = {
-        "tiny": pygame.font.SysFont("consolas", 12, bold=True),
-        "small": pygame.font.SysFont("consolas", 15, bold=True),
-        "font": pygame.font.SysFont("consolas", 18, bold=True),
-        "big": pygame.font.SysFont("consolas", 30, bold=True),
-        "huge": pygame.font.SysFont("consolas", 64, bold=True),
-    }
+    fonts = ui_fonts()
     art = make_art()
     game = Game()
 
