@@ -96,7 +96,7 @@ SWITCH_KINDS = [("red", "Linear", "smooth and quiet", (214, 60, 56)),
                 ("blue", "Clicky", "a crisp click with every press", (64, 120, 220)),
                 ("pink", "Silent", "dampened: hardly a sound", (232, 150, 176))]
 TOOLS = [("hand", "Hand"), ("driver", "Screwdriver"), ("puller", "Keycap puller"), ("switcher", "Switch puller"),
-         ("brush", "Brush")]
+         ("brush", "Brush"), ("lube", "Lube")]
 TRINKETS = ["lucky coin", "paperclip", "guitar pick", "tiny die", "star sticker", "toy brick"]
 KEY_NAMES = {"Back": "Backspace", "Caps": "Caps Lock", "Ent": "numpad Enter", "Num": "Num Lock",
              "PrtSc": "Print Screen", "ScrLk": "Scroll Lock", "PgUp": "Page Up", "PgDn": "Page Down",
@@ -117,6 +117,60 @@ COCOA, MUTED, HONEY, HONEY_DARK = (74, 54, 44), (150, 128, 112), (238, 172, 84),
 SAGE, ROSE, INK_LIGHT = (126, 170, 120), (222, 118, 108), (255, 252, 246)
 SUN = (206, 186, 160)  # the lamp's light
 GLOW = (255, 214, 120)  # a tested key's legend
+GRIME = (150, 124, 78)  # years of fingers: keycaps go yellow and a little greasy
+WASH_TIME = 1.4  # seconds the keycaps spend in the bowl
+
+# More keyboards, here in 3D (the first three are the 2D game's too). Each is a real kind, with something of its own:
+# grime is how many of its keycaps are grubby (1 for all of them), dirt how much more crumbs and dust it has.
+MORE_KEYBOARDS = [
+    dict(key="numpad", name="Number pad", size="numpad", switch="pink", grime=0.25,
+         case=(206, 222, 212), cap=(250, 248, 240), mod=(168, 198, 182), legend=(60, 80, 70), accent=(236, 146, 116),
+         cable=(206, 222, 212),
+         intro="A little number pad, for sums and spreadsheets: a quick, cozy job."),
+    dict(key="knob75", name="75% keyboard", size="75", switch="red", knob=(15.5, 0.5), grime=0.15,
+         case=(192, 182, 218), cap=(248, 244, 236), mod=(146, 132, 190), legend=(66, 58, 92), accent=(246, 192, 116),
+         cable=(146, 132, 190),
+         intro="A 75% with a volume knob: lift the knob off by hand, and turn it to test it at the end."),
+    dict(key="wireless65", name="Wireless 65% keyboard", size="65", switch="brown", wireless=True, grime=0.15,
+         case=(146, 174, 148), cap=(244, 240, 228), mod=(106, 138, 110), legend=(50, 66, 52), accent=(236, 174, 94),
+         cable=(244, 240, 228),
+         intro="A wireless one, with a battery inside: unplug its lead before you lift the circuit board out."),
+    dict(key="gasket96", name="Gasket 96% keyboard", size="96", switch="red", gaskets=True, weight=True, grime=0.1,
+         case=(64, 70, 88), cap=(230, 222, 204), mod=(94, 108, 140), legend=(46, 50, 62), accent=(222, 120, 96),
+         cable=(222, 120, 96),
+         intro="A hobbyist's board: its plate floats on rubber gaskets, and a brass weight sits inside."),
+    dict(key="vintage", name="Vintage keyboard", size="full", switch="blue", grime=1.0, dirt=2.0,
+         case=(214, 204, 178), cap=(234, 226, 204), mod=(190, 178, 152), legend=(74, 64, 54), accent=(196, 98, 70),
+         cable=(214, 204, 178),
+         intro="An old office keyboard, yellowed and dusty: wash its keycaps in the bowl before they go back on."),
+]
+# Computer mice: the 2D game's three kinds, with their insides. size is (width, length, height) in key widths (an
+# office mouse is about 65 x 120 x 38 mm); feet is how many skates are on the bottom, each over a screw.
+MICE = [
+    dict(kind="mouse", key="mouse_office", name="Office mouse", size=(3.4, 6.3, 1.95), feet=2,
+         case=(198, 200, 208), bottom=(70, 72, 80), accent=(80, 140, 200), cable=(40, 40, 44), skate=(236, 236, 232),
+         intro="A plain wired office mouse. Its screws hide under the feet: flip it over (F) and peel them off."),
+    dict(kind="mouse", key="mouse_gaming", name="Gaming mouse", size=(3.6, 6.6, 2.1), feet=4, side=True, rgb=True,
+         weight=True, case=(38, 40, 48), bottom=(28, 30, 34), accent=(90, 220, 160), cable=(30, 30, 34),
+         skate=(226, 226, 222),
+         intro="A gaming mouse: side buttons, a light-up logo, and a weight inside. Four screws, under four feet."),
+    dict(kind="mouse", key="mouse_travel", name="Travel mouse", size=(3.05, 5.4, 1.75), feet=3, wireless=True,
+         case=(214, 92, 84), bottom=(64, 60, 66), accent=(250, 236, 220), cable=(230, 230, 226),
+         skate=(236, 236, 232),
+         intro="A wireless travel mouse, with a battery under a cover underneath: take that out before you open it."),
+]
+for _m in MICE:  # (what the screen's colour picker and the switch card expect of any product)
+    _m.setdefault("cap", _m["case"])
+    _m.setdefault("switch", "blue")
+_BY_KEY = {m["key"]: m for m in KEYBOARD_MODELS + MORE_KEYBOARDS + MICE}
+# On the menu, smallest first
+MODELS = [_BY_KEY[k] for k in ("numpad", "compact", "wireless65", "knob75", "tkl", "gasket96", "full", "vintage")]
+ALL_MODELS = MODELS + MICE
+KINDS = [("keyboard", "Keyboards"), ("mouse", "Mice")]
+
+
+def kind_of(spec):
+    return spec.get("kind", "keyboard")
 
 
 def rgb(c, a=255):
@@ -163,8 +217,19 @@ def keycap_tint(label):
 def part_colours(spec, paint):
     """The colours of a keyboard's case parts, in its own colours or in a paint."""
     case = paint or spec["case"]
+    inside = shade(case, 0.82)
+    if "bottom" in spec:  # a mouse's base is its own colour
+        inside = spec["bottom"] if paint is None else shade(paint, 0.62)
     return {"case": case, "frame": shade(case, 1.12 if sum(case) < 300 else 0.94), "legs": shade(case, 0.8),
-            "inside": shade(case, 0.82), "cable": paint or spec["cable"]}
+            "inside": inside, "cable": paint or spec["cable"]}
+
+
+def footprint(spec):
+    """How much room a product takes on the desk: its width and depth."""
+    if kind_of(spec) == "mouse":
+        return spec["size"][0], spec["size"][1]
+    _, wu, hu = layout_for(spec["size"])
+    return wu + 2 * MARGIN, hu + 2 * MARGIN
 
 
 def cap_colours(spec, label, paint):
@@ -172,6 +237,63 @@ def cap_colours(spec, label, paint):
     if paint is None:
         return spec[keycap_tint(label)], spec["legend"]
     return paint, legend_for(paint)
+
+
+def grubby(body, legend):
+    """A keycap that's been typed on for years: yellowed, and its legend a little worn."""
+    return mix(body, GRIME, 0.34), mix(legend, body, 0.35)
+
+
+def layout_for(size):
+    """Every key on a keyboard of this size, in key widths: (label, x, y, w, h), and the layout's width and height.
+    The full-size, tenkeyless and 60% layouts are the 2D game's; these are the rest:
+    "numpad", the number pad on its own; "65", a 60% with a column of keys down the right and the arrows tucked in
+    under it; "75", the same with a tight row of F keys on top; "96", the 75% with a number pad beside it."""
+    if size in ("full", "tkl", "60"):
+        return keyboard_layout(size)
+    keys = []
+    pad = [("Num", 0, 0), ("/", 1, 0), ("*", 2, 0), ("-", 3, 0), ("7", 0, 1), ("8", 1, 1), ("9", 2, 1), ("4", 0, 2),
+           ("5", 1, 2), ("6", 2, 2), ("1", 0, 3), ("2", 1, 3), ("3", 2, 3), (".", 2, 4)]
+    tall = [("+", 3, 1, 1, 2), ("Ent", 3, 3, 1, 2), ("0", 0, 4, 2, 1)]
+
+    def number_pad(x0, y0):
+        keys.extend((label, x0 + x, y0 + y, 1, 1) for label, x, y in pad)
+        keys.extend((label, x0 + x, y0 + y, w, h) for label, x, y, w, h in tall)
+
+    if size == "numpad":
+        number_pad(0, 0)
+        return keys, 4.0, 5.0
+    top = 1.25 if size in ("75", "96") else 0.0
+    if top:  # the F row, packed tight
+        keys.append(("Esc", 0, 0, 1, 1))
+        for i in range(12):
+            keys.append((f"F{i + 1}", 1.25 + i + (i // 4) * 0.25, 0, 1, 1))
+        keys.append(("Del", 14.0, 0, 1, 1))
+        if size == "96":
+            keys.append(("Ins", 15.0, 0, 1, 1))
+    rows = [[("Esc" if not top else "`", 1)] + [(c, 1) for c in "1234567890-="] + [("Back", 2), ("Home", 1)],
+            [("Tab", 1.5)] + [(c, 1) for c in "QWERTYUIOP[]"] + [("\\", 1.5), ("PgUp", 1)],
+            [("Caps", 1.75)] + [(c, 1) for c in "ASDFGHJKL;'"] + [("Enter", 2.25), ("PgDn", 1)],
+            [("Shift", 2.25)] + [(c, 1) for c in "ZXCVBNM,./"] + [("Shift", 1.75), ("Up", 1), ("End", 1)],
+            [("Ctrl", 1.25), ("Win", 1.25), ("Alt", 1.25), ("Space", 6.25), ("Alt", 1), ("Fn", 1), ("Ctrl", 1),
+             ("Left", 1), ("Down", 1), ("Right", 1)]]
+    for r, row in enumerate(rows):
+        x = 0.0
+        for label, w in row:
+            keys.append((label, x, top + r, w, 1))
+            x += w
+    width = 16.0
+    if size == "96":  # and the number pad, just beside it
+        for i, label in enumerate(("PrtSc", "ScrLk", "Pause", "Menu")):
+            keys.append((label, 16.25 + i, 0, 1, 1))
+        number_pad(16.25, top)
+        width = 20.25
+    return keys, width, top + 5
+
+
+def look(cap):
+    """How a keycap looks now: its colours, under any grime."""
+    return grubby(cap.body, cap.legend) if cap.grimy else (cap.body, cap.legend)
 
 
 def rects_minus_holes(x0, x1, z0, z1, holes):
@@ -313,6 +435,68 @@ class Shapes:
             if nx * ((x0 + x1) / 2 - cx) + nz * ((z0 + z1) / 2 - cz) < 0:
                 nx, nz = -nx, -nz
             self.quad((x0, y0, z0), (x1, y0, z1), (x1, y1, z1), (x0, y1, z0), (nx, 0, nz))
+
+    def surface(self, f, u0, u1, nu, v0, v1, nv, inside):
+        """A smooth curved surface: f(u, v) gives a point, for u from u0 to u1 and v from v0 to v1, in nu by nv
+        steps. Each corner is shaded smooth (its normal worked out from f round it), facing away from inside(p)."""
+        def normal(u, v):
+            e = 1e-3
+            p = Vec3(*f(u, v))
+            du = Vec3(*f(min(u + e, 1), v)) - Vec3(*f(max(u - e, 0), v))
+            dv = Vec3(*f(u, v + e)) - Vec3(*f(u, v - e))
+            n = du.cross(dv)
+            n = n.normalized() if n.length() > 1e-9 else Vec3(0, 1, 0)
+            return n if n.dot(p - Vec3(*inside(p))) >= 0 else -n
+        grid = [[(u0 + (u1 - u0) * i / nu, v0 + (v1 - v0) * j / nv) for j in range(nv + 1)] for i in range(nu + 1)]
+        pts = [[tuple(f(u, v)) for u, v in row] for row in grid]
+        nrm = [[tuple(normal(u, v)) for u, v in row] for row in grid]
+        start = len(self.v)
+        for i in range(nu):
+            for j in range(nv):
+                for a, b in ((i, j), (i + 1, j), (i + 1, j + 1), (i, j), (i + 1, j + 1), (i, j + 1)):
+                    self.v.append(pts[a][b])
+                    self.n.append(nrm[a][b])
+                    self.c.append(self.paint)
+                    self.uv.append((0.0, 0.0))
+        self._added(start)
+
+    def axle(self, center, radius, width, segments=18, along="x"):
+        """A cylinder lying down, along x (like a wheel on its axle) or along z (like a battery)."""
+        x, y, z = center
+
+        def at(u, s, c):  # u along the cylinder, (s, c) round it
+            return (x + u, y + s, z + c) if along == "x" else (x + c, y + s, z + u)
+
+        def way(u, s, c):
+            return (u, s, c) if along == "x" else (c, s, u)
+        ring = [(math.cos(2 * math.pi * k / segments), math.sin(2 * math.pi * k / segments)) for k in range(segments)]
+        h = width / 2
+        for (c0, s0), (c1, s1) in zip(ring, ring[1:] + ring[:1]):
+            a, b = (s0 * radius, c0 * radius), (s1 * radius, c1 * radius)
+            self.quad(at(-h, *a), at(-h, *b), at(h, *b), at(h, *a), way(0, (s0 + s1) / 2, (c0 + c1) / 2))
+            self.tri(at(h, 0, 0), at(h, *a), at(h, *b), way(1, 0, 0))
+            self.tri(at(-h, 0, 0), at(-h, *b), at(-h, *a), way(-1, 0, 0))
+
+    def wall(self, points, y0, y1, thick):
+        """A thin wall standing round an outline (points round it, in x and z), `thick` thick, inside it."""
+        cx = sum(p[0] for p in points) / len(points)
+        cz = sum(p[1] for p in points) / len(points)
+        inner = []
+        for x, z in points:
+            dx, dz = x - cx, z - cz
+            d = math.hypot(dx, dz) or 1
+            inner.append((x - dx / d * thick, z - dz / d * thick))
+        for k in range(len(points)):
+            (ax, az), (bx, bz) = points[k], points[(k + 1) % len(points)]
+            (ix, iz), (jx, jz) = inner[k], inner[(k + 1) % len(points)]
+            nx, nz = bz - az, -(bx - ax)
+            length = math.hypot(nx, nz) or 1
+            nx, nz = nx / length, nz / length
+            if nx * ((ax + bx) / 2 - cx) + nz * ((az + bz) / 2 - cz) < 0:
+                nx, nz = -nx, -nz
+            self.quad((ax, y0, az), (bx, y0, bz), (bx, y1, bz), (ax, y1, az), (nx, 0, nz))
+            self.quad((ix, y0, iz), (jx, y0, jz), (jx, y1, jz), (ix, y1, iz), (-nx, 0, -nz))
+            self.quad((ax, y1, az), (bx, y1, bz), (jx, y1, jz), (ix, y1, iz), (0, 1, 0))
 
     def arrays(self):
         if self.cached is None:
@@ -600,6 +784,14 @@ def draw_icon(name, size=128):
         for off in (-75, -25, 25, 75):
             ox, oy = off * 0.707, off * 0.707
             cap((640 + ox, 390 + oy), (850 + ox, 180 + oy), 12, CLEAR)
+    elif name == "lube":  # a little tube of grease, and a drop coming out of its nozzle
+        cap((230, 820), (560, 490), 230)
+        cap((180, 870), (300, 750), 250)
+        cap((560, 490), (690, 360), 90)
+        cap((690, 360), (740, 310), 56)
+        d.ellipse([P(760, 150), P(900, 290)], fill=W)
+        d.polygon([P(780, 175), P(860, 105), P(880, 200)], fill=W)
+        cap((330, 720), (470, 580), 40, CLEAR)
     elif name in ("sound", "mute"):
         d.polygon([P(170, 400), P(350, 400), P(560, 220), P(560, 804), P(350, 624), P(170, 624)], fill=W)
         if name == "sound":
@@ -815,7 +1007,7 @@ ART = {}
 def art():
     """Every icon and texture, drawn once."""
     if not ART:
-        for name in ("hand", "driver", "puller", "switcher", "brush", "sound", "mute", "music", "music_off",
+        for name in ("hand", "driver", "puller", "switcher", "brush", "lube", "sound", "mute", "music", "music_off",
                      "power", "home", "help", "star", "keycap", "switch", "again", "close", "dot"):
             ART[name] = Texture(draw_icon(name), filtering="mipmap")
         ART["game"] = Texture(draw_game_icon(256), filtering="mipmap")
@@ -845,6 +1037,7 @@ class Part3D:
         self.shapes = Shapes()
         self.extras = []  # (Shapes, texture): textured bits, drawn as meshes of their own
         self.mesh = None
+        self.more = []  # more meshes of its own that move by themselves (a mouse's buttons), painted with it
         self.tags = set()
         self.hit = self.clicker(f"part-{key}")
 
@@ -905,7 +1098,8 @@ class Part3D:
 
     def repaint(self, colours):
         for tag in self.tags:
-            self.mesh.paint(0, tag, colours[tag])
+            for mesh in [self.mesh] + self.more:
+                mesh.paint(0, tag, colours[tag])
 
     @property
     def paintable(self):
@@ -970,7 +1164,8 @@ class KeyItem:
         self.name = f"{nice_label(label)} {self.kind}"
         self.below = []
         self.placed, self.style, self.token = True, 0, 0
-        self.body = self.legend = None  # a keycap's colours now
+        self.body = self.legend = None  # a keycap's colours now (under any grime)
+        self.grimy = False  # a keycap that wants a wash
         if self.kind == "keycap":
             y0, y1, sx, sz = CAP_Y, CAP_Y + CAP_H, w - 0.1, h - 0.1
         else:
@@ -1079,14 +1274,21 @@ class Board:
         self.dirt, self.trinket = [], None
         self.size = self.inner = (0, 0)
         self.space_x = 0.0
+        self.stab_of = {}  # key number -> the stabiliser under it
+        self.knob = None
+        self.height = FRAME_Y[1]  # how tall it is, put together
+        self.mouse = {}  # a mouse's moving bits, for its test: its buttons, its wheel, its logo
 
     def in_order(self):
-        """Every part, in the order it's built."""
-        by_key = {p.key: p for p in self.parts}
-        first = [by_key[k] for k in ("bottom_case", "legs", "usb_board", "cable", "case_foam", "pcb", "inner_cable",
-                                     "plate_foam", "plate")]
+        """Every part, in the order it's built: they're made in that order, with the switches and keycaps going in
+        just after the stabilisers."""
+        if not self.caps.items:  # a mouse: just as they're made
+            return list(self.parts)
         stabs = [p for p in self.parts if p.key.startswith("stab")]
-        last = [p for p in self.parts if p not in first and p not in stabs]
+        cut = self.parts.index(stabs[0]) if stabs else next(
+            i for i, p in enumerate(self.parts) if p.key == "plate") + 1
+        first = [p for p in self.parts[:cut] if p not in stabs]
+        last = [p for p in self.parts[cut:] if p not in stabs]
         return first + stabs + self.switches.items + self.caps.items + last
 
 
@@ -1094,9 +1296,10 @@ def build_keyboard(kb, spec, extras=True, seed=None):
     """A keyboard of this type, in its own colours. The bottom case and the USB board in it; the case foam; the
     circuit board, with a socket, a diode and a light for every key; the internal cable; the plate foam; the steel
     plate with its cut-outs; the stabilisers; a switch and a keycap for every key; the top frame; then underneath,
-    the screws that hold it all together and the rubber feet that hide four of them. With extras, some dust and
-    crumbs inside, and something someone lost in there."""
-    layout, wu, hu = keyboard_layout(spec["size"])
+    the screws that hold it all together and the rubber feet that hide four of them. Some keyboards have more of
+    their own: a volume knob, a battery (and a receiver tucked underneath), gaskets and a brass weight. With extras,
+    some dust and crumbs inside, and something someone lost in there."""
+    layout, wu, hu = layout_for(spec["size"])
     cw, cd = wu + 2 * MARGIN, hu + 2 * MARGIN
     board = Board(spec)
     board.size, board.inner = (cw, cd), (wu, hu)
@@ -1112,6 +1315,17 @@ def build_keyboard(kb, spec, extras=True, seed=None):
     board.rows = [y for _, x, y, w, h in layout]
     long_keys = [i for i, k in enumerate(keys) if k[3] >= 2 or k[4] >= 2]
     board.space_x = next((k[1] for k in keys if k[0] == "Space"), 0.0)
+    knob_at = None
+    if spec.get("knob"):  # in the layout's units, like the keys
+        knob_at = (spec["knob"][0] - wu / 2, -(spec["knob"][1] - hu / 2))
+    # The keycaps that want a wash: the ones typed on most, mostly (or, on an old keyboard, every one)
+    grime = spec.get("grime", 0.12)
+    worn = {"Space", "Enter", "Back", "Shift", "E", "A", "S", "D", "W", "R", "T", "O", "N", "I", "0", "1", "5", "Ent",
+            "+"}
+    grimy = {i for i, k in enumerate(keys)
+             if grime >= 1 or rnd.random() < (grime * 3 if k[0] in worn else grime * 0.5)}
+    if grime > 0 and len(grimy) < 2:  # always a couple
+        grimy |= {i for i, k in enumerate(keys) if k[0] in worn} or set(rnd.sample(range(len(keys)), 2))
 
     def stab_ends(cx, cz, w, h):
         wide = w >= h
@@ -1139,17 +1353,25 @@ def build_keyboard(kb, spec, extras=True, seed=None):
     case.box((px, 0.45, cd / 2 + 0.006), (0.8, 0.34, 0.01), fixed=BLACK, hit=False)  # the opening for the socket
     for i, (x, z) in enumerate(spots):
         case.post((x, 0, z), 0.24, -0.02, fixed=(24, 26, 30), tag=("hole", i), segments=12)
+    if spec.get("wireless"):  # its power switch, on the back, and a slot underneath where its receiver lives
+        case.box((px + 1.5, 0.6, cd / 2 + 0.01), (0.6, 0.2, 0.03), fixed=BLACK, hit=False)
+        case.box((px + 1.38, 0.6, cd / 2 + 0.035), (0.22, 0.14, 0.05), fixed=spec["accent"], hit=False)
+        case.box((cw / 4, -0.006, 0.2), (1.5, 0.01, 0.75), fixed=(24, 26, 30), hit=False)
     label = Shapes().use((255, 255, 255))
-    lw, lh = 3.6, 3.6 * 168 / 512
+    lw, lh = min(3.6, cw - 1.6), min(3.6, cw - 1.6) * 168 / 512
     label.quad((-lw / 2, -0.008, -0.3 + lh / 2), (lw / 2, -0.008, -0.3 + lh / 2), (lw / 2, -0.008, -0.3 - lh / 2),
                (-lw / 2, -0.008, -0.3 - lh / 2), (0, -1, 0), [(0, 0), (1, 0), (1, 1), (0, 1)])  # reads turned over
     case.extras.append((label, Texture(draw_label(spec), filtering="mipmap")))
 
     legs = part("legs", "flip-out legs", ["bottom_case"], lift=(0, -1, 0))
-    for x in (-cw / 2 + 2.4, cw / 2 - 2.4):
-        legs.box((x, -0.04, cd / 2 - 0.45), (1.7, 0.08, 0.18), fixed=(60, 62, 70))  # the hinge
-        legs.box((x, -0.07, cd / 2 - 0.85), (1.6, 0.1, 0.7), "legs")
-        legs.box((x, -0.13, cd / 2 - 1.15), (1.4, 0.03, 0.12), fixed=RUBBER, hit=False)  # its rubber tip
+    if cw > 8:
+        leg, spread = 1.6, cw / 2 - 2.4
+    else:  # a number pad's are smaller, and closer in
+        leg, spread = min(1.6, cw / 4 - 0.3), cw / 4
+    for x in (-spread, spread):
+        legs.box((x, -0.04, cd / 2 - 0.45), (leg + 0.1, 0.08, 0.18), fixed=(60, 62, 70))  # the hinge
+        legs.box((x, -0.07, cd / 2 - 0.85), (leg, 0.1, 0.7), "legs")
+        legs.box((x, -0.13, cd / 2 - 1.15), (leg - 0.2, 0.03, 0.12), fixed=RUBBER, hit=False)  # its rubber tip
 
     usb = part("usb_board", "USB board", ["bottom_case"])
     uz = back_in - 0.5
@@ -1170,8 +1392,31 @@ def build_keyboard(kb, spec, extras=True, seed=None):
         center = tuple((a[i] + b[i]) / 2 for i in range(3))
         cable.box(center, tuple(max(abs(a[i] - b[i]), 0.2) for i in range(3)), "cable")
 
-    foam = part("case_foam", "case foam", ["bottom_case"])
+    under_foam = ["bottom_case"]
     holes = [(x - 0.4, x + 0.4, z - 0.4, z + 0.4) for x, z in spots] + [(px - 1.2, px + 1.2, uz - 0.6, back_in)]
+    if spec.get("weight"):  # a heavy brass bar on the floor: it makes the keyboard sit solid and sound deeper
+        ww, wd = wu * 0.4, hu * 0.42
+        weight = part("weight", "brass weight", ["bottom_case"])
+        weight.box((0, FLOOR + 0.07, 0), (ww, 0.14, wd), fixed=(204, 166, 92))
+        for k in range(3):  # brushed lines, and the maker's mark
+            weight.box((0, FLOOR + 0.142, -wd / 2 + (k + 1) * wd / 4), (ww - 0.4, 0.004, 0.03), fixed=(180, 144, 78),
+                       hit=False)
+        weight.post((ww / 2 - 0.6, FLOOR + 0.14, 0), 0.22, 0.008, fixed=(224, 190, 116), hit=False)
+        under_foam.append("weight")
+        holes.append((-ww / 2 - 0.1, ww / 2 + 0.1, -wd / 2 - 0.1, wd / 2 + 0.1))
+    battery_at = None
+    if spec.get("wireless"):  # a flat battery pouch on the floor, in a hole in the foam
+        bw, bd = min(5.0, wu / 2 - 1.0), 2.2  # (between the ribs on the floor)
+        bx, bz = 0.0, -0.6
+        battery_at = (bx, bz, bw, bd)
+        battery = part("battery", "battery", ["bottom_case"])
+        battery.box((bx, FLOOR + 0.06, bz), (bw, 0.12, bd), fixed=(176, 184, 198))
+        battery.box((bx, FLOOR + 0.122, bz), (bw - 0.4, 0.004, bd * 0.5), fixed=(96, 140, 196), hit=False)  # label
+        battery.box((bx + bw / 2 - 0.4, FLOOR + 0.06, bz + bd / 2 + 0.06), (0.36, 0.1, 0.12), fixed=SILVER,
+                    hit=False)  # where its lead comes out
+        under_foam.append("battery")
+        holes.append((bx - bw / 2 - 0.1, bx + bw / 2 + 0.1, bz - bd / 2 - 0.1, bz + bd / 2 + 0.1))
+    foam = part("case_foam", "case foam", under_foam)
     inner = (-cw / 2 + WALL, cw / 2 - WALL, -cd / 2 + WALL, back_in)
     for x0, x1, z0, z1 in rects_minus_holes(*inner, holes):
         foam.box(((x0 + x1) / 2, FOAM_Y, (z0 + z1) / 2), (x1 - x0, 0.14, z1 - z0), fixed=FOAM, hit=False)
@@ -1199,6 +1444,22 @@ def build_keyboard(kb, spec, extras=True, seed=None):
     pcb.box((px - 1.0, top + 0.07, hu / 2 + 0.02), (0.5, 0.14, 0.2), fixed=WHITE, hit=False)  # the cable's socket
     for x, z in spots:  # the mounting holes
         pcb.post((x, top, z), 0.2, 0.01, fixed=GOLDEN, hit=False)
+    if knob_at:  # the knob's encoder, soldered on, its shaft up through the plate (the knob itself pulls off)
+        kx, kz = knob_at
+        pcb.box((kx, top + 0.15, kz), (0.62, 0.3, 0.62), fixed=(40, 42, 48), hit=False)
+        pcb.post((kx, top + 0.3, kz), 0.12, CAP_Y + 0.2 - top - 0.3, fixed=SILVER, hit=False)
+
+    later = []  # what has to be off before the plate foam and the plate go on
+    if battery_at:  # the battery's lead: up the back, round the board's edge, and plugged in on top
+        bx, bz, bw, bd = battery_at
+        lx = bx + bw / 2 - 0.4
+        lead = part("battery_lead", "battery lead", ["battery", "pcb"])
+        lead.box((lx, top + 0.07, hu / 2 + 0.05), (0.42, 0.12, 0.17), fixed=WHITE)
+        for d, col in ((-0.07, WIRES[0]), (0.07, WIRES[1])):
+            lead.wire([(lx + d, FLOOR + 0.06, bz + bd / 2 + 0.1), (lx + d, FLOOR + 0.06, hu / 2 + 0.2),
+                       (lx + d, top + 0.05, hu / 2 + 0.2), (lx + d, top + 0.05, hu / 2 + 0.12)], 0.04, col)
+        lead.target((lx, top + 0.07, hu / 2 + 0.08), (0.7, 0.3, 0.5))
+        later.append("battery_lead")
 
     inside = part("inner_cable", "internal cable", ["pcb", "usb_board"])
     inside.box((px + 0.6, 0.55, uz - 0.25), (0.46, 0.12, 0.18), fixed=WHITE)  # its plug on the USB board
@@ -1209,8 +1470,10 @@ def build_keyboard(kb, spec, extras=True, seed=None):
                      (x1, top + 0.25, hu / 2 + 0.2), (x1, top + 0.25, hu / 2 + 0.02)], 0.04, col)
     inside.target((px - 0.2, 0.62, hu / 2), (2.2, 0.3, 0.6))
 
-    plate_foam = part("plate_foam", "plate foam", ["pcb"])
+    plate_foam = part("plate_foam", "plate foam", ["pcb"] + later)
     cut = [(cx - 0.42, cx + 0.42, cz - 0.42, cz + 0.42) for _, cx, cz, _, _ in keys]
+    if knob_at:
+        cut.append((knob_at[0] - 0.4, knob_at[0] + 0.4, knob_at[1] - 0.4, knob_at[1] + 0.4))
     for x0, x1, z0, z1 in rects_minus_holes(-wu / 2 - 0.1, wu / 2 + 0.1, -hu / 2 - 0.1, hu / 2 + 0.1, cut):
         plate_foam.box(((x0 + x1) / 2, PLATE_FOAM_Y, (z0 + z1) / 2), (x1 - x0, 0.2, z1 - z0), fixed=PLATE_FOAM,
                        hit=False)
@@ -1219,6 +1482,8 @@ def build_keyboard(kb, spec, extras=True, seed=None):
     plate = part("plate", "steel plate", ["plate_foam", "inner_cable"])
     plate_holes = [(cx - HOLE / 2, cx + HOLE / 2, cz - HOLE / 2, cz + HOLE / 2) for _, cx, cz, _, _ in keys]
     cut = list(plate_holes)
+    if knob_at:  # a hole for the knob's shaft
+        cut.append((knob_at[0] - 0.3, knob_at[0] + 0.3, knob_at[1] - 0.3, knob_at[1] + 0.3))
     for i in long_keys:  # and a slot for each stabiliser housing
         _, cx, cz, w, h = keys[i]
         wide, ends = stab_ends(cx, cz, w, h)
@@ -1228,12 +1493,15 @@ def build_keyboard(kb, spec, extras=True, seed=None):
         plate.box(((x0 + x1) / 2, PLATE_Y, (z0 + z1) / 2), (x1 - x0, 0.08, z1 - z0), fixed=STEEL, hit=False)
     plate.target((0, PLATE_Y, 0), (wu + 0.5, 0.08, hu + 0.5))
 
-    stab_of = {}
+    stab_of = board.stab_of
+    lube_spots = {}
     for i in long_keys:  # one stabiliser under each long key
         label_, cx, cz, w, h = keys[i]
         stab = part(f"stab{i}", f"{nice_label(label_)} stabiliser", ["plate"])
+        stab.lubed = False  # they come dry, and rattle until they're lubed
         stab_of[i] = stab
         wide, ends = stab_ends(cx, cz, w, h)
+        lube_spots[stab] = [(ex, ez, wide) for ex, ez in ends]
         for ex, ez in ends:
             stab.box((ex, SWITCH_Y + 0.11, ez), (0.26, 0.22, 0.42) if wide else (0.42, 0.22, 0.26), fixed=WHITE)
             stab.box((ex, SWITCH_Y + 0.25, ez), (0.12, 0.06, 0.12), fixed=(214, 214, 208), hit=False)  # its stem
@@ -1270,6 +1538,8 @@ def build_keyboard(kb, spec, extras=True, seed=None):
     caps, legends = Shapes(), Shapes()
     for i, (label_, cx, cz, w, h) in enumerate(keys):
         body, ink = cap_colours(spec, label_, None)
+        if i in grimy:
+            body, ink = grubby(body, ink)
         caps.begin(i).use(body, "cap").keycap((cx, CAP_Y, cz), w - 0.1, h - 0.1)
         text = KEY_LEGENDS.get(label_, label_)
         if text:
@@ -1286,8 +1556,21 @@ def build_keyboard(kb, spec, extras=True, seed=None):
         c = KeyItem(board.caps, i, key, board.rows[i])
         c.below = [s.key] + ([stab_of[i].key] if i in stab_of else [])
         c.body, c.legend = cap_colours(spec, key[0], None)
+        c.grimy = i in grimy
 
-    frame = part("top_frame", "top frame", ["plate"])
+    under_frame = ["plate"]
+    if spec.get("gaskets"):  # rubber strips round the plate's edge: the plate floats on them, held by the frame
+        for side, (gx, gz, sx_, sz_) in (("front", (0, -hu / 2 - 0.17, wu * 0.5, 0.14)),
+                                          ("back", (0, hu / 2 + 0.17, wu * 0.5, 0.14)),
+                                          ("left", (-wu / 2 - 0.17, 0, 0.14, hu * 0.5)),
+                                          ("right", (wu / 2 + 0.17, 0, 0.14, hu * 0.5))):
+            g = part(f"gasket_{side}", f"{side} gasket", ["plate"])
+            g.box((gx, PLATE_Y + 0.14, gz), (sx_, 0.2, sz_), fixed=(226, 140, 116))  # soft coral silicone
+            g.box((gx, PLATE_Y + 0.245, gz), (max(0.08, sx_ - 0.06), 0.01, max(0.08, sz_ - 0.06)),
+                  fixed=(240, 166, 142), hit=False)
+            under_frame.append(g.key)
+
+    frame = part("top_frame", "top frame", under_frame)
     iw, idp = wu + 0.24, hu + 0.24  # the opening the keys come through
     fy, fh = sum(FRAME_Y) / 2, FRAME_Y[1] - FRAME_Y[0]
     for z in (1, -1):
@@ -1298,6 +1581,18 @@ def build_keyboard(kb, spec, extras=True, seed=None):
         frame.box((cw / 2 - 0.9 - k * 0.45, FRAME_Y[1] + 0.01, cd / 2 - 0.27), (0.14, 0.02, 0.14), fixed=(40, 60, 44),
                   hit=False)
 
+    if knob_at:  # the volume knob: an aluminium cap pushed onto the encoder's shaft, with a grip round it
+        kx, kz = knob_at
+        knob = part("knob", "volume knob", ["plate"], origin=(kx, 0, kz))
+        knob.post((kx, CAP_Y - 0.02, kz), 0.42, 0.5, fixed=(206, 208, 214), segments=24)
+        for k in range(16):  # the ridges you grip it by
+            a = k * 2 * math.pi / 16
+            knob.box((kx + math.cos(a) * 0.425, CAP_Y + 0.2, kz + math.sin(a) * 0.425), (0.05, 0.36, 0.05),
+                     fixed=(176, 178, 186), hit=False)
+        knob.post((kx, CAP_Y + 0.48, kz), 0.34, 0.012, fixed=(222, 224, 230), hit=False, segments=24)
+        knob.box((kx, CAP_Y + 0.495, kz + 0.22), (0.06, 0.01, 0.14), fixed=spec["accent"], hit=False)  # its mark
+        board.knob = knob
+
     for i, (x, z) in enumerate(spots):
         s = part(f"screw{i}", "screw", ["top_frame"], lift=(0, -1, 0), screw=True, origin=(x, 0, z))
         s.post((x, 0, z), 0.22, -0.07, fixed=SILVER)
@@ -1307,11 +1602,25 @@ def build_keyboard(kb, spec, extras=True, seed=None):
     for i, (x, z) in enumerate(spots[:4]):
         foot = part(f"foot{i}", "rubber foot", ["bottom_case", f"screw{i}"], lift=(0, -1, 0))
         foot.post((x, -0.01, z), 0.42, -0.12, fixed=RUBBER, segments=18)
+    if spec.get("wireless"):  # its little USB receiver, kept safe in the slot underneath
+        receiver = part("receiver", "USB receiver", ["bottom_case"], lift=(0, -1, 0))
+        rx, rz = cw / 4, 0.2
+        receiver.box((rx - 0.15, -0.07, rz), (1.0, 0.12, 0.5), fixed=(40, 42, 48))
+        receiver.box((rx + 0.5, -0.06, rz), (0.4, 0.09, 0.4), fixed=SILVER)
+        receiver.box((rx - 0.5, -0.135, rz), (0.2, 0.01, 0.3), fixed=spec["accent"], hit=False)
 
     for p in parts:
         p.finish()
         if p.paintable:
             p.repaint(part_colours(spec, None))
+    for stab, ends in lube_spots.items():  # the lube, once it's on: a glossy dab where the wire meets each housing
+        dabs = Shapes().use((236, 196, 110))
+        for ex, ez, wide in ends:
+            dabs.box((ex, SWITCH_Y + 0.235, ez), (0.2, 0.05, 0.2))
+            bend = (ex, SWITCH_Y + 0.05, ez - 0.28) if wide else (ex + 0.28, SWITCH_Y + 0.05, ez)
+            dabs.box(bend, (0.16, 0.08, 0.16))
+        stab.lube = dabs.mesh(stab.root, f"lube on {stab.key}").np
+        stab.lube.stash()
 
     if extras:
         def gap_point():
@@ -1324,14 +1633,15 @@ def build_keyboard(kb, spec, extras=True, seed=None):
                 if not any(a - 0.05 < x < b + 0.05 and c - 0.05 < z < d + 0.05 for a, b, c, d in plate_holes):
                     return x, z
             return 0.0, -hu / 2 - 0.15
+        more = spec.get("dirt", 1.0)
         specks = []
-        for _ in range(38):
+        for _ in range(round(min(38, 4 + len(keys) / 2.4) * more)):  # (a small keyboard has less room for crumbs)
             x, z = gap_point()
             specks.append((rnd.choice(("dust", "dust", "crumb", "crumb", "hair")) if len(specks) % 9 else "hair",
                            x, PLATE_Y + 0.04, z, rnd))
         board.dirt.append(Dirt(plate, specks))
         specks = []
-        for _ in range(14):
+        for _ in range(round(min(14, 3 + len(keys) / 7) * more)):
             x, z = rnd.uniform(-wu / 2 + 0.3, wu / 2 - 0.3), rnd.uniform(-hu / 2 + 0.3, hu / 2 - 0.3)
             specks.append((rnd.choice(("dust", "dust", "crumb")), x, top + 0.02, z, rnd))
         board.dirt.append(Dirt(pcb, specks))
@@ -1343,6 +1653,314 @@ def build_keyboard(kb, spec, extras=True, seed=None):
             x, z = rnd.uniform(-wu / 2 + 1, wu / 2 - 1), rnd.uniform(-hu / 2 + 0.6, hu / 2 - 0.6)
             board.trinket = Trinket(kind, pcb, (x, top, z), rnd.uniform(0, 360))
     return board
+
+
+# ---- computer mice ----
+
+MOUSE_FLOOR, MOUSE_BASE = 0.08, 0.3  # the bottom shell's floor, and the top of its rim
+MOUSE_PCB = (0.24, 0.32)  # the mouse's circuit board, bottom and top
+
+
+def mouse_shape(spec):
+    """A mouse's shape, along its length (t from 0 at your palm to 1 at the buttons, which point away from you): how
+    wide it is there (half of it), how high its top is, and where that is. It's widest at the back, with a waist
+    where your thumb and finger grip it, highest under your palm and low at the buttons, round at both ends."""
+    W, L, H = spec["size"]
+
+    def round_end(t):
+        return max(0.0, 1 - abs(2 * t - 1) ** 5) ** 0.22
+
+    def half(t):
+        w = (0.88 + 0.12 * math.sin(math.pi * t)) * (1 - 0.07 * math.exp(-((t - 0.6) / 0.12) ** 2))
+        return W / 2 * w * round_end(t)
+
+    def top(t):
+        h = 0.42 + 0.58 * math.exp(-((t - 0.38) / 0.36) ** 2)
+        return MOUSE_BASE + (H - MOUSE_BASE) * h * round_end(t) ** 0.6
+
+    def z(t):
+        return -L / 2 + L * t
+    return half, top, z
+
+
+def build_mouse(kb, spec, extras=True, seed=None):
+    """A computer mouse, the way they're made: the bottom shell, the sensor's lens in it, the circuit board (its two
+    main switches, the wheel's encoder and the sensor are soldered on) held by a small screw, the scroll wheel, the
+    cable, and the top shell with the buttons, held on by screws hidden under the feet. A gaming mouse has a
+    weight, a board for its side buttons, and a light-up logo; a wireless one, a battery and its receiver under a
+    cover on the bottom."""
+    W, L, H = spec["size"]
+    half, top, z = mouse_shape(spec)
+    board = Board(spec)
+    board.size = board.inner = (W, L)
+    board.height = H
+    parts = board.parts
+    rnd = random.Random(seed)
+    wireless = spec.get("wireless")
+
+    def part(*args, **kwargs):
+        parts.append(Part3D(kb, *args, **kwargs))
+        return parts[-1]
+
+    def outline(scale=1.0, t0=0.0, t1=1.0, n=28):
+        ts = [t0 + (t1 - t0) * k / n for k in range(n + 1)]
+        return [(half(t) * scale, z(t)) for t in ts] + [(-half(t) * scale, z(t)) for t in reversed(ts)]
+
+    sensor_t = 0.72 if wireless else 0.45
+    sz = z(sensor_t)
+    bay = (0.22, 0.58) if wireless else None  # the battery's bay, in the floor
+    bw = 1.25  # (its width)
+
+    # The bottom shell: its floor (with a window for the sensor, and a bay for a battery), the rim round it
+    shell = part("bottom_shell", "bottom shell")
+    if bay:
+        for t0, t1 in ((0.0, bay[0]), (bay[1], 1.0)):
+            shell.colour("inside", None).slab(outline(1, t0, t1, 10), 0, MOUSE_FLOOR)
+        ts = [bay[0] + (bay[1] - bay[0]) * k / 8 for k in range(9)]
+        for side in (1, -1):
+            strip = [(side * half(t), z(t)) for t in ts] + [(side * bw / 2, z(bay[1])), (side * bw / 2, z(bay[0]))]
+            shell.colour("inside", None).slab(strip, 0, MOUSE_FLOOR)
+    else:
+        shell.colour("inside", None).slab(outline(), 0, MOUSE_FLOOR)
+    shell.colour("inside", None).wall(outline(0.995), MOUSE_FLOOR, MOUSE_BASE, 0.1)
+    shell.grow((0, MOUSE_BASE / 2, 0), (W, MOUSE_BASE, L))
+    fy, fh = MOUSE_FLOOR / 2 + 0.01, MOUSE_FLOOR + 0.02  # you click it by its floor (round the battery's bay, if it has one)
+    if bay:
+        zb0, zb1 = z(bay[0]), z(bay[1])
+        for z0, z1 in ((-L * 0.46, zb0), (zb1, L * 0.46)):
+            shell.target((0, fy, (z0 + z1) / 2), (W * 0.9, fh, z1 - z0))
+        for side in (1, -1):
+            shell.target((side * (bw / 2 + W * 0.2), fy, (zb0 + zb1) / 2), (W * 0.4, fh, zb1 - zb0))
+    else:
+        shell.target((0, fy, 0), (W * 0.9, fh, L * 0.92))
+    shell.box((0, -0.003, sz), (0.46, 0.008, 0.56), fixed=(20, 20, 24), hit=False)  # the sensor's window
+    shell.box((0, -0.006, sz + 0.12), (0.1, 0.004, 0.1), fixed=(120, 30, 30), hit=False)  # its light, glowing through
+    if not wireless:
+        label = Shapes().use((255, 255, 255))
+        lw = min(1.6, W * 0.45)
+        lh, lz = lw * 168 / 512, z(0.27)
+        label.quad((-lw / 2, -0.008, lz + lh / 2), (lw / 2, -0.008, lz + lh / 2), (lw / 2, -0.008, lz - lh / 2),
+                   (-lw / 2, -0.008, lz - lh / 2), (0, -1, 0), [(0, 0), (1, 0), (1, 1), (0, 1)])
+        shell.extras.append((label, Texture(draw_label(spec), filtering="mipmap")))
+    else:  # its on/off switch, on the bottom
+        shell.box((0, -0.004, z(0.63)), (0.5, 0.01, 0.22), fixed=BLACK, hit=False)
+        shell.box((-0.1, -0.012, z(0.63)), (0.18, 0.012, 0.16), fixed=spec["accent"], hit=False)
+
+    lens = part("lens", "sensor lens", ["bottom_shell"])
+    lens.box((0, MOUSE_FLOOR + 0.06, sz), (0.62, 0.12, 0.72), fixed=(176, 214, 226))
+    lens.box((0, MOUSE_FLOOR + 0.13, sz + 0.05), (0.26, 0.04, 0.26), fixed=(206, 234, 240), hit=False)
+
+    under_board = ["lens", "bottom_shell"]
+    if spec.get("weight"):  # a steel weight on the floor, so it glides steady
+        weight = part("mouse_weight", "steel weight", ["bottom_shell"])
+        weight.box((0, MOUSE_FLOOR + 0.06, z(0.27)), (min(1.5, W * 0.42), 0.12, 1.1), fixed=(150, 154, 162))
+        weight.box((0, MOUSE_FLOOR + 0.122, z(0.27)), (0.5, 0.004, 0.5), fixed=(120, 124, 132), hit=False)
+        under_board.append("mouse_weight")
+
+    # The circuit board: its two main switches under the buttons, the wheel's encoder, the sensor, a chip
+    t0 = 0.62 if wireless else 0.14
+    y0, y1 = MOUSE_PCB
+    pcb = part("pcb", "circuit board", under_board)
+    pcb.shapes.use(PCB_GREEN).slab(outline(0.8, t0, 0.95, 12), y0, y1)
+    pcb.grow((0, (y0 + y1) / 2, (z(t0) + z(0.95)) / 2), (W * 0.8, y1 - y0, z(0.95) - z(t0)))
+    pcb.target((0, (y0 + y1) / 2, (z(t0) + z(0.95)) / 2), (W * 0.75, y1 - y0, z(0.95) - z(t0)))
+    switch_t = 0.86
+    for side in (-1, 1):  # the main switches: a black box each, with a little white plunger
+        x = side * half(switch_t) * 0.42
+        pcb.box((x, y1 + 0.12, z(switch_t)), (0.5, 0.24, 0.42), fixed=BLACK, hit=False)
+        pcb.box((x, y1 + 0.27, z(switch_t)), (0.12, 0.06, 0.12), fixed=WHITE, hit=False)
+    wheel_t, R = 0.79, 0.4
+    wz = z(wheel_t)
+    wy = top(wheel_t) - R + 0.14  # (it pokes up out of the slot between the buttons)
+    pcb.box((0.31, (y1 + wy + 0.12) / 2, wz), (0.22, wy + 0.12 - y1, 0.46), fixed=(58, 60, 66), hit=False)  # encoder
+    pcb.box((-0.31, (y1 + wy + 0.06) / 2, wz), (0.06, wy + 0.06 - y1, 0.2), fixed=(58, 60, 66), hit=False)  # bracket
+    pcb.box((0, y1 + 0.09, sz), (0.7, 0.18, 0.78), fixed=BLACK, hit=False)  # the sensor
+    for k in range(4):
+        for side in (-1, 1):
+            pcb.box((side * 0.38, y1 + 0.02, sz - 0.27 + k * 0.18), (0.08, 0.03, 0.06), fixed=SILVER, hit=False)
+    pcb.box((0.3, y1 + 0.03, sz - 0.48), (0.12, 0.06, 0.12), fixed=(210, 50, 50), hit=False)  # its red light
+    chip_x, chip_t = (-0.75, 0.68) if wireless else (-0.45, 0.3)
+    pcb.box((chip_x, y1 + 0.03, z(chip_t)), (0.5, 0.06, 0.5), fixed=BLACK, hit=False)
+    for k in range(0 if wireless else 3):
+        pcb.box((0.25 + k * 0.18, y1 + 0.02, z(chip_t)), (0.1, 0.04, 0.06), fixed=(190, 150, 100), hit=False)
+    if spec.get("rgb"):  # the lights for its logo
+        for k in range(3):
+            pcb.box((-0.25 + k * 0.25, y1 + 0.03, z(0.24)), (0.14, 0.06, 0.14), fixed=WHITE, hit=False)
+    sx_, sz_ = 0.55, z(0.66 if wireless else 0.6)  # its little screw's hole
+    pcb.post((sx_, y1, sz_), 0.16, 0.006, fixed=GOLDEN, hit=False)
+    pcb.target((sx_, y1 + 0.012, sz_), (0.34, 0.024, 0.34), ("hole", 0))  # (below the screw's head, when it's in)  # (the screws are counted in build order)
+    plug_at = (-0.55, z(0.92))
+    if not wireless:
+        pcb.box((plug_at[0], y1 + 0.08, plug_at[1]), (0.5, 0.16, 0.24), fixed=WHITE, hit=False)  # the cable's socket
+
+    board_screw = part("board_screw", "board screw", ["pcb"], lift=(0, 1, 0), screw=True, origin=(sx_, y1, sz_))
+    board_screw.post((sx_, y1, sz_), 0.14, 0.06, fixed=SILVER)
+    for size in ((0.22, 0.02, 0.04), (0.04, 0.02, 0.22)):
+        board_screw.box((sx_, y1 + 0.065, sz_), size, fixed=(108, 110, 120), hit=False)
+
+    under_top = ["bottom_shell", "board_screw", "wheel"]
+    if spec.get("side"):  # the side buttons' own little board, standing up inside the left side
+        side_t = 0.56
+        sxb = -(half(side_t) - 0.3)
+        side_board = part("side_board", "side button board", ["pcb"])
+        side_board.box((sxb, 0.78, z(side_t)), (0.06, 0.46, 1.0), fixed=PCB_GREEN)
+        for k in (-1, 1):
+            side_board.box((sxb - 0.08, 0.86, z(side_t) + k * 0.24), (0.1, 0.18, 0.24), fixed=BLACK, hit=False)
+        side_board.wire([(sxb + 0.05, 0.6, z(side_t)), (sxb + 0.4, y1 + 0.04, z(side_t))], 0.05, (220, 180, 90))
+        under_top.append("side_board")
+
+    wheel = part("wheel", "scroll wheel", ["pcb"], origin=(0, wy, wz))
+    wheel.shapes.use((52, 52, 58)).axle((0, 0, 0), R, 0.26, 22)  # (made about its own middle: it turns)
+    for k in range(14):  # the grip on its rubber tyre
+        a = k * 2 * math.pi / 14
+        p, q = math.sin(a) * (R + 0.012), math.cos(a) * (R + 0.012)
+        wheel.shapes.use((70, 70, 78)).rod((-0.13, p, q), (0.13, p, q), 0.035)
+    wheel.shapes.use(spec["accent"]).axle((0, 0, 0), R * 0.6, 0.28, 16)  # its hub, showing at the sides
+    wheel.shapes.use(SILVER).axle((0.03, 0, 0), 0.05, 0.62, 8)  # its axle
+    wheel.grow((0, wy, wz), (0.3, 2 * R, 2 * R))
+    wheel.target((0, wy, wz), (0.32, 2 * R, 2 * R))
+
+    if not wireless:
+        cable = part("cable", "USB cable", ["pcb", "bottom_shell"], lift=(0, 0.4, 1))
+        cy = MOUSE_BASE + 0.12
+        cable.box((plug_at[0], y1 + 0.2, plug_at[1]), (0.46, 0.12, 0.2), fixed=WHITE)  # its plug, in the socket
+        cable.wire([(plug_at[0], y1 + 0.26, plug_at[1]), (plug_at[0], cy, plug_at[1]), (0, cy, plug_at[1]),
+                    (0, cy, L / 2 - 0.1)], 0.06, (40, 40, 44))
+        cable.colour("cable", None).rod((0, cy, L / 2 - 0.15), (0, cy, L / 2 + 0.45), 0.24)  # its strain relief
+        route = [(0, cy, L / 2 + 0.45), (0.08, cy - 0.08, L / 2 + 1.2), (0.45, cy - 0.18, L / 2 + 1.85),
+                 (1.1, cy - 0.24, L / 2 + 2.3), (1.9, cy - 0.27, L / 2 + 2.55)]
+        for a, b in zip(route, route[1:]):
+            cable.colour("cable", None).rod(a, b, 0.14)
+        cable.grow((0.9, cy - 0.1, L / 2 + 1.5), (2.0, 0.4, 2.2))
+        cable.target((0, cy, L / 2 + 0.15), (0.4, 0.4, 0.8))
+        under_top.append("cable")
+
+    # The top shell, with the buttons: a smooth dome over it all. The buttons are meshes of their own, so they can
+    # go down when they're clicked; the slot between them, where the wheel pokes through, is dark.
+    def dome(lift=0.0):
+        def f(t, a):
+            c, s = math.cos(a), math.sin(a)
+            return (half(t) * math.copysign(abs(c) ** 0.75, c), MOUSE_BASE + (top(t) - MOUSE_BASE) * abs(s) ** 0.85
+                    - lift, z(t))
+        return f
+
+    def inside(p):
+        return (0, MOUSE_BASE * 0.5, p[2])
+    top_shell = part("top_shell", "top shell", under_top)
+    tb, g = 0.64, 0.07
+    top_shell.colour("case", None).surface(dome(), 0, tb, 16, 0, math.pi, 22, inside)
+    top_shell.colour("case", None).surface(dome(), tb, 1, 10, 0, 0.22 * math.pi - 0.02, 4, inside)
+    top_shell.colour("case", None).surface(dome(), tb, 1, 10, 0.78 * math.pi + 0.02, math.pi, 4, inside)
+    top_shell.shapes.use((34, 34, 40)).surface(dome(0.05), tb, 1, 10, math.pi / 2 - g, math.pi / 2 + g, 2, inside)
+    top_shell.grow((0, (MOUSE_BASE + H) / 2, 0), (W, H - MOUSE_BASE, L))
+    top_shell.target((0, (MOUSE_BASE + H) / 2, 0), (W * 0.92, H - MOUSE_BASE, L * 0.94))
+    buttons = {}
+    for name, (a0, a1) in (("right", (0.22 * math.pi, math.pi / 2 - g - 0.015)),
+                           ("left", (math.pi / 2 + g + 0.015, 0.78 * math.pi))):
+        s = Shapes().use((255, 255, 255), "case")
+        s.surface(dome(), tb + 0.008, 1, 10, a0, a1, 8, inside)
+        buttons[name] = s
+    if spec.get("side"):  # two side buttons, under your thumb
+        for k, t in enumerate((0.5, 0.63)):
+            p = dome()(t, 0.84 * math.pi)
+            top_shell.box((p[0] - 0.04, p[1], p[2]), (0.14, 0.2, 0.5), fixed=shade(spec["case"], 1.9), hit=False)
+            top_shell.target((p[0] - 0.08, p[1], p[2]), (0.3, 0.3, 0.55), ("side", k))
+    logo = None
+    if spec.get("rgb"):  # its logo, lit from inside
+        p = dome()(0.24, math.pi / 2)
+        logo = Shapes().use(spec["accent"], "logo")
+        logo.slab([(-0.28, p[2]), (0, p[2] + 0.2), (0.28, p[2]), (0, p[2] - 0.2)], p[1] - 0.02, p[1] + 0.012)
+
+    # Underneath: the screws, each under a foot
+    n = spec["feet"]
+    if n == 2:
+        spots, feet = [(0, 0.1), (0, 0.93)], [(0, 0.1, 1.5, 0.32), (0, 0.92, 1.7, 0.28)]
+    elif n == 3:
+        spots = [(0, 0.08), (-0.5, 0.88), (0.5, 0.88)]
+        feet = [(0, 0.08, 1.2, 0.3), (-0.5, 0.88, 0.42, 0.42), (0.5, 0.88, 0.42, 0.42)]
+    else:
+        spots = [(-0.55, 0.13), (0.55, 0.13), (-0.55, 0.88), (0.55, 0.88)]
+        feet = [(x, t, 0.5, 0.5) for x, t in spots]
+    screws = []
+    for i, (fx, t) in enumerate(spots):
+        x = fx * half(t) * 1.25
+        zz = z(t)
+        shell.post((x, 0, zz), 0.17, -0.004, fixed=(24, 26, 30), tag=("hole", i + 1), segments=12)  # its well
+        s = part(f"screw{i}", "screw", ["top_shell"], lift=(0, -1, 0), screw=True, origin=(x, 0, zz))
+        s.post((x, 0, zz), 0.15, -0.018, fixed=SILVER)
+        s.post((x, 0, zz), 0.06, MOUSE_BASE + 0.5, fixed=(170, 172, 180), hit=False)
+        for size in ((0.24, 0.006, 0.04), (0.04, 0.006, 0.24)):
+            s.box((x, -0.02, zz), size, fixed=(108, 110, 120), hit=False)
+        screws.append((x, zz))
+    for i, ((x, zz), (_, t, fw, fd)) in enumerate(zip(screws, feet)):
+        foot = part(f"foot{i}", "foot", ["bottom_shell", f"screw{i}"], lift=(0, -1, 0))
+        cx = x if n != 2 else 0.0
+        r = min(fw, fd) / 2
+        pts = []
+        for k in range(20):  # a rounded strip, or a round pad
+            a = k * 2 * math.pi / 20
+            ex, ez = math.cos(a), math.sin(a)
+            pts.append((cx + ex * r + math.copysign(fw / 2 - r, ex) * (abs(ex) > 1e-6),
+                        zz + ez * r + math.copysign(fd / 2 - r, ez) * (abs(ez) > 1e-6)))
+        foot.shapes.use(spec["skate"]).slab(pts, -0.045, -0.001)
+        foot.grow((cx, -0.023, zz), (fw, 0.045, fd))
+        foot.target((cx, -0.025, zz), (fw, 0.05, fd))
+
+    if wireless:  # under a cover on the bottom: an AA battery, and the receiver tucked in beside it
+        bz0, bz1 = z(bay[0]), z(bay[1])
+        bm = (bz0 + bz1) / 2
+        battery = part("mouse_battery", "AA battery", ["bottom_shell", "top_shell"], lift=(0, -1, 0))
+        battery.shapes.use((70, 150, 96)).axle((-0.2, 0.38, bm), 0.36, 2.4, 18, along="z")
+        battery.shapes.use((212, 176, 90)).axle((-0.2, 0.38, bm + 0.8), 0.365, 0.4, 18, along="z")
+        battery.shapes.use(SILVER).axle((-0.2, 0.38, bm + 1.26), 0.12, 0.12, 10, along="z")  # its + end
+        battery.grow((-0.2, 0.38, bm), (0.74, 0.74, 2.6))
+        battery.target((-0.2, 0.38, bm), (0.74, 0.74, 2.6))
+        receiver = part("receiver", "USB receiver", ["bottom_shell", "top_shell"], lift=(0, -1, 0))
+        receiver.box((0.42, 0.12, bm - 0.15), (0.3, 0.14, 0.7), fixed=(40, 42, 48))
+        receiver.box((0.42, 0.12, bm + 0.32), (0.26, 0.1, 0.3), fixed=SILVER)
+        cover = part("battery_cover", "battery cover", ["mouse_battery", "receiver"], lift=(0, -1, 0))
+        cover.box((0, -0.012, bm), (bw + 0.2, 0.03, bz1 - bz0 + 0.16), "inside")
+        for k in range(4):  # the ridges you push it off by
+            cover.box((0, -0.03, bz0 + 0.15 + k * 0.1), (0.5, 0.01, 0.04), fixed=(40, 40, 46), hit=False)
+
+    for p in parts:
+        p.finish()
+    for name, s in buttons.items():
+        mesh = s.mesh(top_shell.root, f"{name} button")
+        top_shell.more.append(mesh)
+        board.mouse[name] = mesh.np
+    if logo is not None:
+        board.mouse["logo"] = logo.mesh(top_shell.root, "logo", shadow=False)
+    for p in parts:
+        if p.paintable:
+            p.repaint(part_colours(spec, None))
+    board.mouse["wheel"] = wheel
+    board.mouse["sensor"] = (0, sz)
+
+    if extras:  # hair caught round the wheel, dust on the board, crumbs in the bottom
+        specks = []
+        for _ in range(3):  # caught round the wheel's axle
+            specks.append(("hair", rnd.uniform(-0.2, 0.2), y1 + 0.02, wz + rnd.uniform(-0.5, 0.5), rnd))
+        for _ in range(9):
+            t = rnd.uniform(t0 + 0.04, 0.9)
+            specks.append((rnd.choice(("dust", "dust", "hair", "crumb")), rnd.uniform(-0.5, 0.5) * half(t), y1 + 0.02,
+                           z(t), rnd))
+        board.dirt.append(Dirt(pcb, specks))
+        specks = []
+        for _ in range(8):
+            t = rnd.uniform(0.1, 0.9)
+            if bay and bay[0] - 0.03 < t < bay[1] + 0.03:
+                continue
+            specks.append((rnd.choice(("crumb", "dust", "crumb")), rnd.uniform(-0.6, 0.6) * half(t),
+                           MOUSE_FLOOR + 0.01, z(t), rnd))
+        board.dirt.append(Dirt(shell, specks))
+    board.caps, board.switches = KeySet("keycap", kb, Shapes()), KeySet("switch", kb, Shapes())
+    return board
+
+
+def build_product(kb, spec, extras=True, seed=None):
+    """A keyboard or a mouse, whichever spec is."""
+    return (build_mouse if kind_of(spec) == "mouse" else build_keyboard)(kb, spec, extras, seed)
 
 
 # ---- the desk ----
@@ -1419,6 +2037,41 @@ def screw_head(s, x, z):
     s.use(SILVER).cylinder((x, 0, z), 0.22, 0.07, 14)
     for size in ((0.34, 0.02, 0.05), (0.05, 0.02, 0.34)):
         s.use((108, 110, 120)).box((x, 0.072, z), size)
+
+
+def bowl_shapes():
+    """A glazed bowl of warm, soapy water, with a sponge beside it."""
+    s = Shapes()
+    glaze = (92, 134, 176)
+    s.use(shade(glaze, 0.86)).cylinder((0, 0, 0), 0.8, 0.12, 26)  # its foot
+    s.use(glaze).cylinder((0, 0.12, 0), 1.05, 0.3, 26)
+    s.use(glaze).cylinder((0, 0.42, 0), 1.3, 0.34, 26)
+    s.use(shade(glaze, 1.25)).cylinder((0, 0.76, 0), 1.32, 0.05, 26)  # its rim
+    s.use((124, 186, 218)).cylinder((0, 0.66, 0), 1.16, 0.12, 26)  # the water
+    rnd = random.Random(8)
+    for _ in range(9):  # suds, round the edge
+        a, r = rnd.uniform(0, 2 * math.pi), rnd.uniform(0.6, 1.0)
+        size = rnd.uniform(0.1, 0.2)
+        s.use((246, 250, 255)).cylinder((math.cos(a) * r, 0.78, math.sin(a) * r), size, size * 0.6, 10)
+    s.use((250, 214, 100)).box((1.75, 0.16, -0.5), (0.9, 0.32, 0.6))  # the sponge, with its green scrubby side
+    s.use((96, 160, 96)).box((1.75, 0.35, -0.5), (0.9, 0.06, 0.6))
+    return s
+
+
+class Bowl:
+    """The wash bowl on the desk: click it to wash the keycaps waiting in the tray, the way you'd soak real ones in
+    warm, soapy water to get years of grime off."""
+    name = "wash bowl"
+
+    def __init__(self, parent, pos):
+        self.root = parent.attachNewNode("bowl")
+        self.root.setPos(*pos)
+        bowl_shapes().mesh(self.root, "bowl")
+        node = self.root.attachNewNode(CollisionNode("bowl"))
+        node.node().addSolid(CollisionBox(Point3(0.3, 0.4, 0), 1.6, 0.5, 1.35))
+        node.node().setIntoCollideMask(PICK_MASK)
+        node.setPythonTag("part", self)
+        node.setPythonTag("tag", None)
 
 
 # ---- sound ----
@@ -1522,14 +2175,14 @@ def material(part):
     key = part.key
     if "foam" in key:
         return "foam"
-    if key == "plate":
+    if key in ("plate", "weight", "mouse_weight", "mouse_battery"):
         return "metal"
-    if key in ("pcb", "usb_board"):
+    if key in ("pcb", "usb_board", "side_board"):
         return "board"
-    if key.startswith("foot"):
+    if key.startswith(("foot", "gasket")) or key in ("battery", "wheel"):
         return "rubber"
-    if "cable" in key:
-        return "cable"
+    if "cable" in key or key in ("battery_lead", "receiver", "knob", "lens"):
+        return "cable"  # (a small click)
     return "plastic"  # the case, the frame, the legs, the stabilisers
 
 
@@ -1582,7 +2235,9 @@ class Workshop(Entity):
         self.art = art()
         self.ui, self.tips, self.flights, self.tweens = [], {}, [], {}
         self.parts, self.part_set, self.board = [], set(), None
-        self.spec = KEYBOARD_MODELS[1]
+        self.spec = _BY_KEY["tkl"]
+        self.menu_kind = "keyboard"  # which the menu shows
+        self.kind, self.tools = "keyboard", TOOLS
         self.state, self.phase = "menu", "apart"
         self.lit = self.held = None
         self.turning = {}  # screws turning out (or in): screw -> how far along, 0 to 1
@@ -1643,6 +2298,31 @@ class Workshop(Entity):
             np.setBin("fixed", 10)
             np.hide(SHADOW_MASK)
             self.steam.append(np)
+        self.bubbles = []
+        for k in range(8):  # soap bubbles, rising off the wash bowl while keycaps soak
+            card = CardMaker("bubble")
+            card.setFrame(-0.5, 0.5, -0.5, 0.5)
+            np = application.base.render.attachNewNode(card.generate())
+            np.setTexture(self.art["glow"]._texture)
+            np.setTransparency(TransparencyAttrib.M_alpha)
+            np.setDepthWrite(False)
+            np.setLightOff(1)
+            np.setShaderOff(1)
+            np.setBillboardPointEye()
+            np.setBin("fixed", 11)
+            np.hide()
+            self.bubbles.append(np)
+        glow = Shapes().use((255, 255, 255))  # a mouse's sensor light, shining on the mat under it as it moves
+        glow.quad((-0.5, 0, -0.5), (-0.5, 0, 0.5), (0.5, 0, 0.5), (0.5, 0, -0.5), (0, 1, 0),
+                  [(0, 0), (0, 1), (1, 1), (1, 0)])
+        self.sensor_light = glow.mesh(application.base.render, "sensor light", texture=self.art["glow"],
+                                      shadow=False).np
+        self.sensor_light.setTransparency(TransparencyAttrib.M_alpha)
+        self.sensor_light.setDepthWrite(False)
+        self.sensor_light.setLightOff(1)
+        self.sensor_light.setShaderOff(1)
+        self.sensor_light.setBin("fixed", 9)
+        self.sensor_light.hide()
         self.pitch = Entity(position=(0, PIVOT_Y, 0), shader=COZY)  # turns it over, round the x axis
         self.yaw = Entity(parent=self.pitch, shader=None)  # turns it round, about its own up
         self.kb = Entity(parent=self.yaw, y=-0.9, shader=None)  # so it turns about its middle
@@ -1654,8 +2334,7 @@ class Workshop(Entity):
     def arrange_desk(self, spec, trays):
         """Lay the desk out round a keyboard of this size: the cutting mat under it, the trays in front, the tea and
         the plant behind."""
-        _, wu, hu = keyboard_layout(spec["size"])
-        cw, cd = wu + 2 * MARGIN, hu + 2 * MARGIN
+        cw, cd = footprint(spec)
         for np in self.mat.getChildren():
             np.removeNode()
         w, d, cz = cw + 7, cd + 11, -2.2
@@ -1686,23 +2365,29 @@ class Workshop(Entity):
             np.removeNode()
         cw, cd = board.size
         wu, hu = board.inner
-        tw, td = wu * TRAY_SCALE + 0.8, hu * TRAY_SCALE + 0.8
-        gap, dish_w = 0.9, 2.6
-        z = -cd / 2 - 1.5 - td / 2
-        x0 = -(2 * tw + 2 * gap + dish_w) / 2
-        centres = [x0 + tw / 2, x0 + tw + gap + tw / 2, x0 + 2 * tw + 2 * gap + dish_w / 2]
-        floor = 0.18
-        for cx, colour, keyset, base in ((centres[0], (184, 136, 96), board.caps, CAP_Y),
-                                         (centres[1], (176, 182, 192), board.switches, SWITCH_Y - 0.25)):
-            frame = self.tray_root.attachNewNode("tray")
-            frame.setPos(cx, DESK_Y + 0.05, z)
-            tray_shapes(tw, td, 0.22, colour, floor).mesh(frame)
-            holder = frame.attachNewNode("contents")
-            holder.setPos(0, floor - base * TRAY_SCALE, 0)
-            holder.setScale(TRAY_SCALE)
-            keyset.add_tray(holder)
+        if kind_of(board.spec) == "mouse":  # nothing to lay out but its screws: just the dish, in front
+            self.bowl = None
+            dish_at = (0, -cd / 2 - 1.7)
+        else:
+            tw, td = wu * TRAY_SCALE + 0.8, hu * TRAY_SCALE + 0.8
+            gap, dish_w, bowl_w = 0.9, 2.6, 3.6
+            z = -cd / 2 - 1.5 - td / 2
+            x0 = -(bowl_w + 2 * tw + 3 * gap + dish_w) / 2 + bowl_w + gap  # the wash bowl, the trays, the dish
+            centres = [x0 + tw / 2, x0 + tw + gap + tw / 2, x0 + 2 * tw + 2 * gap + dish_w / 2]
+            self.bowl = Bowl(self.tray_root, (x0 - gap - 2.25, DESK_Y + 0.05, z - 0.1))  # (its sponge on the right)
+            floor = 0.18
+            for cx, colour, keyset, base in ((centres[0], (184, 136, 96), board.caps, CAP_Y),
+                                             (centres[1], (176, 182, 192), board.switches, SWITCH_Y - 0.25)):
+                frame = self.tray_root.attachNewNode("tray")
+                frame.setPos(cx, DESK_Y + 0.05, z)
+                tray_shapes(tw, td, 0.22, colour, floor).mesh(frame)
+                holder = frame.attachNewNode("contents")
+                holder.setPos(0, floor - base * TRAY_SCALE, 0)
+                holder.setScale(TRAY_SCALE)
+                keyset.add_tray(holder)
+            dish_at = (centres[2], z)
         dish = self.tray_root.attachNewNode("dish")
-        dish.setPos(centres[2], DESK_Y + 0.05, z)
+        dish.setPos(dish_at[0], DESK_Y + 0.05, dish_at[1])
         dish_shapes().mesh(dish)
         self.dish = dish.attachNewNode("screws")
         self.dish.setPos(0, 0.226, 0)
@@ -1732,10 +2417,10 @@ class Workshop(Entity):
         self.show_root = Entity(position=(0, 1.4, 0), shader=COZY)
         self.show_spin = Entity(parent=self.show_root, shader=None)
         self.showcase = {}
-        for spec in KEYBOARD_MODELS:
+        for spec in ALL_MODELS:
             holder = self.show_spin.attachNewNode(spec["key"])
             holder.setY(-0.9)
-            build_keyboard(holder, spec, extras=False)
+            build_product(holder, spec, extras=False)
             holder.stash()
             self.showcase[spec["key"]] = holder
         self.shown = None
@@ -1761,6 +2446,10 @@ class Workshop(Entity):
                 ok = part.placed and part in self.part_set
             if ok:
                 return part, node.getPythonTag("tag"), Vec3(*entry.getSurfacePoint(self.kb))
+        if self.bowl is not None:  # off the keyboard: the wash bowl, on the desk
+            self.traverser.traverse(self.bowl.root)
+            if self.queue.getNumEntries():
+                return self.bowl, None, None
         return None, None, None
 
     def over_panel(self):
@@ -1770,8 +2459,9 @@ class Workshop(Entity):
     # ---- the camera ----
 
     def view(self, spec, where):
-        _, wu, hu = keyboard_layout(spec["size"])
-        cw, cd = wu + 2 * MARGIN, hu + 2 * MARGIN
+        cw, cd = footprint(spec)
+        if kind_of(spec) == "mouse":  # (small: seen from a little further off, so it doesn't fill the screen)
+            cw = max(cw, 10.5)
         if where == "menu":
             target, elevation, distance, width = Vec3(0, 0.5, 0), 24, 34, cw / 0.6
         elif where == "result":
@@ -1816,7 +2506,7 @@ class Workshop(Entity):
         """Where the camera goes while you work: the keyboard (as it sits, level) and the trays in front of it."""
         cw, cd = self.board.size
         lift = PIVOT_Y + self.kb.y
-        points = [Vec3(x, y + lift, z) for x in (-cw / 2, cw / 2) for y in (0, FRAME_Y[1] + 0.3)
+        points = [Vec3(x, y + lift, z) for x in (-cw / 2, cw / 2) for y in (0, self.board.height + 0.3)
                   for z in (-cd / 2, cd / 2)]
         render = application.base.render
         for tray in self.tray_root.getChildren():
@@ -2197,6 +2887,7 @@ class Workshop(Entity):
     def show_menu(self, instant=False):
         self.state = "menu"
         self.clear_play()
+        self.menu_kind = kind_of(self.spec)
         self.show_root.enabled = True
         self.show_root.position = (0, 1.4, 0)
         self.arrange_desk(self.spec, trays=False)
@@ -2212,19 +2903,33 @@ class Workshop(Entity):
         self.icon("game", (-0.25, 0.375), 0.13, col=(255, 255, 255))
         self.text("FIXER 3D", (-0.165, 0.377), 4.2, CREAM, origin=(-0.5, 0), bold=True)
         self.model_buttons = []
-        for i, spec in enumerate(KEYBOARD_MODELS):
-            x = (i - (len(KEYBOARD_MODELS) - 1) / 2) * 0.4
-            self.card((x, -0.385), (0.34, 0.085), CREAM, corner=0.03, z=0.25, collider=False, body=False)
-            b = self.button(short_name(spec), (x, -0.385), (0.34, 0.085), lambda s=spec: self.start(s), CREAM, COCOA,
-                            text_size=1.25, corner=0.35, z=0.2)
+        per_row = 4
+        for k, (kind, label) in enumerate(KINDS):  # keyboards, or mice
+            on = kind == self.menu_kind
+            self.button(label, ((k - (len(KINDS) - 1) / 2) * 0.2, -0.232), (0.18, 0.05),
+                        lambda kind=kind: self.pick_kind(kind), HONEY if on else PAPER, CREAM if on else COCOA,
+                        text_size=0.95, corner=0.5, z=0.2)
+        for i, spec in enumerate(m for m in ALL_MODELS if kind_of(m) == self.menu_kind):  # smallest first
+            x = (i % per_row - (per_row - 1) / 2) * 0.33
+            y = -0.315 - (i // per_row) * 0.1
+            self.card((x, y), (0.3, 0.072), CREAM, corner=0.026, z=0.25, collider=False, body=False)
+            b = self.button(short_name(spec), (x, y), (0.3, 0.072), lambda s=spec: self.start(s), CREAM, COCOA,
+                            text_size=1.1, corner=0.35, z=0.2)
             b.spec = spec
             self.model_buttons.append(b)
-        self.menu_marker = self.add(Entity(parent=camera.ui, model=Quad(radius=0.5, aspect=0.14 / 0.008),
-                                           scale=(0.14, 0.008), color=rgb(HONEY), z=0.15))
+        self.menu_marker = self.add(Entity(parent=camera.ui, model=Quad(radius=0.5, aspect=0.12 / 0.007),
+                                           scale=(0.12, 0.007), color=rgb(HONEY), z=0.15))
         self.corner_buttons()
 
+    def pick_kind(self, kind):
+        """The menu's tabs: keyboards, or mice."""
+        if kind != self.menu_kind:
+            self.menu_kind = kind
+            self.preview(next(m for m in ALL_MODELS if kind_of(m) == kind))
+            self.menu_ui()
+
     def preview(self, spec):
-        """Show this keyboard on the menu."""
+        """Show this keyboard (or mouse) on the menu."""
         if self.shown == spec["key"]:
             return
         if self.shown:
@@ -2249,7 +2954,7 @@ class Workshop(Entity):
                 self.preview(b.spec)
         for b in self.model_buttons:
             if b.spec["key"] == self.shown:
-                self.menu_marker.position = (b.x, b.y - 0.058, 0.15)
+                self.menu_marker.position = (b.x, b.y - 0.046, 0.15)
         if not self.offscreen and held_keys["left mouse"] and hovered is None and not self.volume_drag:
             self.show_spin.rotation_y -= mouse.velocity.x * 200
 
@@ -2266,7 +2971,7 @@ class Workshop(Entity):
         self.pitch.y, self.desk_lift = PIVOT_Y, 0.0
         self.yaw.rotation = Vec3(0, spin, 0)
         self.yaw.animate("rotation_y", 0, duration=0.9, curve=curve.in_out_sine)
-        self.board = build_keyboard(self.kb, spec, extras=True)
+        self.board = build_product(self.kb, spec, extras=True)
         self.measure_board()
         self.parts = self.board.in_order()
         by_key = {p.key: p for p in self.parts}
@@ -2276,20 +2981,29 @@ class Workshop(Entity):
         self.big = [p for p in self.parts if isinstance(p, Part3D) and not p.screw]
         self.screws = [p for p in self.parts if p.screw]
         self.caps, self.switches = self.board.caps.items, self.board.switches.items
+        self.kind = kind_of(spec)
+        # (a mouse needs no keycap or switch pullers, and has no stabilisers to lube)
+        self.tools = TOOLS if self.kind == "keyboard" else [t for t in TOOLS if t[0] in ("hand", "driver", "brush")]
         self.make_trays(self.board)
         self.arrange_desk(spec, trays=True)
-        self.phase, self.tool, self.paint = "apart", "puller", 0
+        self.phase, self.tool, self.paint = "apart", "puller" if self.kind == "keyboard" else "hand", 0
         self.switch_kind = [k[0] for k in SWITCH_KINDS].index(spec["switch"])
+        self.checks = {}  # a mouse's test: what's been tried
+        self.moved, self.mouse_down = 0.0, {}  # how far it's been moved; its buttons held down
         self.held = self.lit = None
         self.turning = {}
         self.dragging = False
         self.said, self.found = set(), None
         self.tested, self.keys_down, self.flash, self.wave = set(), set(), {}, -1.0
         self.mouse_key = None
+        self.knob = self.board.knob
+        self.knob_turned = False
+        self.stabs = [p for p in self.parts if p.key.startswith("stab")]
+        self.washing, self.washed = 0.0, 0
         self.state = "play"
         self.aim("play", 0.9)
         self.build_ui()
-        self.say("Click a keycap with the keycap puller to pull it off.")
+        self.say(spec.get("intro", "Click a keycap with the keycap puller to pull it off."))
 
     def clear_play(self):
         for np in self.kb.getChildren():
@@ -2303,6 +3017,7 @@ class Workshop(Entity):
         self.held = self.lit = None
         self.turning = {}
         self.corners = []
+        self.bowl, self.washing = None, 0.0
 
     def build_ui(self):
         """The screen round the keyboard: the job card, the tools on the left, the parts box and the colours on the
@@ -2330,15 +3045,16 @@ class Workshop(Entity):
         self.corner_buttons()
         # the tools, down the left
         rail = L + 0.072
-        self.card((rail, -0.02), (0.1, 0.5), group="tools")
-        for i, (tool, name) in enumerate(TOOLS):
-            y = 0.18 - i * 0.096
+        n = len(self.tools)
+        self.card((rail, 0.244 - n * 0.044), (0.1, n * 0.088 + 0.032), group="tools")
+        for i, (tool, name) in enumerate(self.tools):
+            y = 0.2 - i * 0.088
             b = self.icon_button(tool, (rail, y), 0.076, lambda t=tool: self.pick_tool(t), name, group="tools")
             self.text(str(i + 1), (rail + 0.03, y - 0.022), 0.75, MUTED, group="tools")
             self.tool_buttons.append((tool, b))
         # the parts box, top right
         bx = R - 0.21
-        chips = ["keycaps", "switches"] + self.big
+        chips = (["keycaps", "switches"] if self.kind == "keyboard" else []) + self.big
         rows = (len(chips) + 1) // 2
         top = 0.405
         height = 0.07 + rows * 0.034
@@ -2379,13 +3095,30 @@ class Workshop(Entity):
                             stem, CREAM, tip=kind, group="switches", corner=0.5, sound="paint")
             self.switch_swatches.append(b)
         # testing it, at the end
-        self.card((R - 0.21, 0.255), (0.38, 0.27), group="test")
-        self.text("Test every key", (R - 0.382, 0.37), 1.1, COCOA, bold=True, group="test")
-        self.text("Type on your own keyboard, or click the keys. Each one lights up and clicks, the way its "
-                  "switch feels.", (R - 0.382, 0.335), 0.82, MUTED, group="test", wordwrap=34)
-        self.test_count = self.text("", (R - 0.382, 0.235), 0.95, HONEY_DARK, group="test")
-        self.button("Finish", (R - 0.21, 0.165), (0.2, 0.055), self.finish_test, HONEY, CREAM, text_size=1.1,
-                    group="test", z=-0.05)
+        self.check_rows = []
+        if self.kind == "mouse":  # a row for each thing to try, with a dot that lights up once it works
+            checks = self.mouse_checks()
+            height = 0.17 + len(checks) * 0.034
+            self.card((R - 0.21, 0.39 - height / 2), (0.38, height), group="test")
+            self.text("Test it", (R - 0.382, 0.37), 1.1, COCOA, bold=True, group="test")
+            self.text("Use your own mouse:", (R - 0.382, 0.335), 0.82, MUTED, group="test")
+            for k, (check, label) in enumerate(checks):
+                y = 0.29 - k * 0.034
+                dot = self.icon("dot", (R - 0.37, y), 0.024, PAPER_DARK, group="test")
+                text = self.text(label, (R - 0.35, y), 0.9, MUTED, origin=(-0.5, 0), group="test")
+                self.check_rows.append((check, dot, text))
+            self.test_count = self.knob_text = None
+            self.button("Finish", (R - 0.21, 0.39 - height + 0.045), (0.2, 0.055), self.finish_test, HONEY, CREAM,
+                        text_size=1.1, group="test", z=-0.05)
+        else:
+            self.card((R - 0.21, 0.24), (0.38, 0.3), group="test")
+            self.text("Test every key", (R - 0.382, 0.37), 1.1, COCOA, bold=True, group="test")
+            self.text("Type on your own keyboard, or click the keys. Each one lights up and clicks, the way its "
+                      "switch feels.", (R - 0.382, 0.335), 0.82, MUTED, group="test", wordwrap=34)
+            self.test_count = self.text("", (R - 0.382, 0.235), 0.95, HONEY_DARK, group="test")
+            self.knob_text = self.text("", (R - 0.382, 0.205), 0.85, MUTED, group="test")
+            self.button("Finish", (R - 0.21, 0.135), (0.2, 0.055), self.finish_test, HONEY, CREAM, text_size=1.1,
+                        group="test", z=-0.05)
         # the message line, the tooltip, and what's in your hand
         self.toast = self.add(Entity(parent=camera.ui, model=Quad(radius=0.5, aspect=12), scale=(0.6, 0.05),
                                      position=(0, -0.44, 0.05), color=rgb(CREAM)))
@@ -2401,25 +3134,41 @@ class Workshop(Entity):
                                           color=rgb(CREAM), z=-0.31))
         # help, and leaving
         self.card((0, 0.02), (0.78, 0.62), CREAM, group="help")
-        self.text("How to play", (-0.36, 0.3), 1.6, COCOA, bold=True, group="help")
-        self.text("\n".join([
-            "Take it all apart, into the box and the trays. Then build it",
-            "back up in any colours, and test every key.",
-            "",
-            "One click, one part. Pick the tool for it first:",
-            "1  Hand: lift parts off; click a part in the box to hold it,",
-            "    then click where it goes.",
-            "2  Screwdriver: click a screw. Some hide under the feet.",
-            "3  Keycap puller: click a keycap.",
-            "4  Switch puller: click a switch, once its keycap is off.",
-            "5  Brush: hold it down and drag it over the crumbs.",
-            "",
-            "Right-click: put back what you hold.   Drag: turn it round.",
-            "Scroll: zoom.   F: flip over.   R: level.   M: music.",
-            "F11: full screen or window.   Esc: back."]), (-0.36, 0.24), 0.95, COCOA, group="help")
+        self.text("How to play", (-0.36, 0.315), 1.6, COCOA, bold=True, group="help")
+        if self.kind == "mouse":
+            lines = ["Take it all apart, into the box. Then build it back up in",
+                     "any colour, and test it with your own mouse.",
+                     "",
+                     "One click, one part. Pick the tool for it first:",
+                     "1  Hand: lift parts off; click a part in the box to hold it,",
+                     "    then click where it goes. The feet peel off underneath.",
+                     "2  Screwdriver: click a screw. They hide under the feet.",
+                     "3  Brush: hold it down and drag it over the dust.",
+                     "",
+                     "Right-click: put back what you hold.   Drag: turn it round.",
+                     "Scroll: zoom.   F: flip over.   R: level.   M: music.",
+                     "F11: full screen or window.   Esc: back."]
+        else:
+            lines = ["Take it all apart, into the box and the trays. Then build it",
+                     "back up in any colours, and test every key.",
+                     "",
+                     "One click, one part. Pick the tool for it first:",
+                     "1  Hand: lift parts off; click a part in the box to hold it,",
+                     "    then click where it goes.",
+                     "2  Screwdriver: click a screw. Some hide under the feet.",
+                     "3  Keycap puller: click a keycap.",
+                     "4  Switch puller: click a switch, once its keycap is off.",
+                     "5  Brush: hold it down and drag it over the crumbs.",
+                     "6  Lube: click a stabiliser, so its long key won't rattle.",
+                     "Wash bowl: click it to wash the grimy keycaps in the tray.",
+                     "",
+                     "Right-click: put back what you hold.   Drag: turn it round.",
+                     "Scroll: zoom.   F: flip over.   R: level.   M: music.",
+                     "F11: full screen or window.   Esc: back."]
+        self.text("\n".join(lines), (-0.36, 0.255), 0.95, COCOA, group="help")
         self.button("Got it", (0, -0.24), (0.16, 0.055), self.toggle_help, HONEY, CREAM, group="help")
         self.card((0, 0.02), (0.56, 0.2), CREAM, group="leave")
-        self.text("Leave this keyboard?", (0, 0.08), 1.4, COCOA, origin=(0, 0), bold=True, group="leave")
+        self.text(f"Leave this {self.kind}?", (0, 0.08), 1.4, COCOA, origin=(0, 0), bold=True, group="leave")
         self.text("It goes back on the shelf as it was.", (0, 0.035), 0.95, MUTED, origin=(0, 0), group="leave")
         self.button("Stay", (-0.1, -0.035), (0.16, 0.055), self.ask_leave, PAPER, COCOA, group="leave")
         self.button("Leave", (0.1, -0.035), (0.16, 0.055), self.show_menu, HONEY, CREAM, group="leave")
@@ -2444,13 +3193,16 @@ class Workshop(Entity):
         self.state = "result"
         self.held = None
         self.unhighlight()
-        spotless = all(not d.left for d in self.board.dirt)
-        tested = len(self.tested) >= len(self.caps)
+        spotless = all(not d.left for d in self.board.dirt) and not any(c.grimy for c in self.caps)
+        smooth = all(s.lubed for s in self.stabs)
         if not self.offscreen:
             key = self.spec["key"]
             self.save["fixed"][key] = self.save["fixed"].get(key, 0) + 1
             write_save(self.save)
-        self.stars = [True, spotless, tested]
+        if self.kind == "mouse":
+            self.stars = [(True, "Built"), (spotless, "Spotless"), (self.all_tested(), "All tested")]
+        else:
+            self.stars = [(True, "Built"), (spotless, "Spotless"), (smooth, "Smooth"), (self.all_tested(), "All tested")]
         self.aim("result", 1.0)
         self.result_ui()
 
@@ -2462,21 +3214,32 @@ class Workshop(Entity):
         self.card((cx, 0.0), (0.6, 0.78))
         self.text("Good as new!", (cx, 0.32), 2.6, COCOA, origin=(0, 0), bold=True)
         self.text(f"{short_name(self.spec)}, taken apart and built your way", (cx, 0.255), 0.95, MUTED, origin=(0, 0))
-        for i, (got, what) in enumerate(zip(self.stars, ("Built", "Spotless", "Every key tested"))):
-            x = cx - 0.18 + i * 0.18
-            self.icon("star", (x, 0.165), 0.085, HONEY if got else PAPER_DARK)
+        for i, (got, what) in enumerate(self.stars):
+            x = cx + (i - (len(self.stars) - 1) / 2) * (0.14 if len(self.stars) > 3 else 0.18)
+            self.icon("star", (x, 0.165), 0.08, HONEY if got else PAPER_DARK)
             self.text(what, (x, 0.105), 0.85, COCOA if got else MUTED, origin=(0, 0))
         crumbs = sum(len(d.points) - len(d.left) for d in self.board.dirt)
         lines = [f"{crumbs} crumbs and specks of dust brushed out"]
-        lines.append(f"{len(self.tested)} of {len(self.caps)} keys tested")
+        if self.washed:
+            lines.append(f"{self.washed} keycaps washed")
+        if self.stabs:
+            lines.append(f"{sum(s.lubed for s in self.stabs)} of {len(self.stabs)} stabilisers lubed")
+        if self.kind == "mouse":
+            checks = self.mouse_checks()
+            lines.append(f"{sum(c in self.checks for c, _ in checks)} of {len(checks)} things tested")
+        else:
+            lines.append(f"{len(self.tested)} of {len(self.caps)} keys tested" +
+                         ("" if not self.knob else ", and the knob" if self.knob_turned else " (not the knob)"))
         if self.found:
             lines.append(f"Found inside: a {self.found}")
         found = len(set(self.save.get("found", [])))
         lines.append(f"Things found so far: {found} of {len(TRINKETS)}")
         self.text("\n".join(lines), (cx - 0.25, 0.04), 1.0, COCOA)
-        self.text("Real repairers photograph every step, and keep each part's screws together. Keycaps in "
-                  "different rows are shaped differently, so they go back in the rows they came from.",
-                  (cx - 0.25, -0.17), 0.82, MUTED, wordwrap=50)
+        tip = ("Real repairers photograph every step, and keep each part's screws together. Keycaps in different "
+               "rows are shaped differently, so they go back in the rows they came from." if self.kind == "keyboard"
+               else "A mouse's screws nearly always hide under its feet, and the feet don't stick as well once "
+                    "they're peeled: repairers keep spare ones.")
+        self.text(tip, (cx - 0.25, -0.17), 0.82, MUTED, wordwrap=50)
         self.button("Fix another", (cx - 0.13, -0.32), (0.22, 0.065), self.show_menu, HONEY, CREAM, text_size=1.1)
         self.button("Again", (cx + 0.13, -0.32), (0.22, 0.065), lambda: self.start(self.spec), PAPER, COCOA,
                     text_size=1.1)
@@ -2542,6 +3305,12 @@ class Workshop(Entity):
         first = next((q for q in above if not q.screw), None)
         if first is None:
             return "It's still screwed on from underneath: flip it over (F) and undo the screws (2)."
+        if first.key == "battery_lead":
+            return "Unplug the battery lead first: never work on a circuit board with its battery connected."
+        if first.key == "mouse_battery":
+            return "Take the battery out first, from underneath: never open up a mouse with its battery in."
+        if first.key == "receiver":
+            return "Its USB receiver is still tucked in underneath: flip it over (F) and take it out."
         if isinstance(first, KeyItem):
             n = sum(isinstance(q, KeyItem) and q.kind == first.kind for q in above)
             tool = "keycap puller (3)" if first.kind == "keycap" else "switch puller (4)"
@@ -2655,7 +3424,7 @@ class Workshop(Entity):
                     self.put_key(cap)
             elif (body, ink) != (cap.body, cap.legend):
                 cap.body, cap.legend = body, ink
-                cap.set.paint(i, body, ink)
+                cap.set.paint(i, *look(cap))
                 self.sounds.play("paint", 0.35)
         elif mode == "place switches":
             if not sw.placed:
@@ -2679,7 +3448,7 @@ class Workshop(Entity):
         ks.on_board(item.i, None)
         item.hit.stash()
         if item.kind == "keycap":
-            ks.paint(item.i, item.body, item.legend, tray=True)
+            ks.paint(item.i, *look(item), tray=True)
         else:
             ks.paint(item.i, SWITCH_KINDS[item.style][3], tray=True)
         flyer = ks.flyer(item.i, self.flyers, item.center)
@@ -2700,7 +3469,7 @@ class Workshop(Entity):
         ks = item.set
         if item.kind == "keycap":
             item.body, item.legend = cap_colours(self.spec, item.label, PAINTS[self.paint][1])
-            ks.paint(item.i, item.body, item.legend)
+            ks.paint(item.i, *look(item))
         else:
             item.style = self.switch_kind
             ks.paint(item.i, SWITCH_KINDS[item.style][3])
@@ -2829,6 +3598,176 @@ class Workshop(Entity):
         n = len(set(self.save["found"]))
         self.say(f"You found a {trinket.name} in there! ({n} of {len(TRINKETS)} things found so far)", HONEY_DARK)
 
+    # -- the wash bowl, the lube, the knob --
+
+    def wash(self):
+        """A click on the wash bowl: the grimy keycaps in the tray go in for a soak."""
+        if self.washing > 0:
+            return
+        dirty = [c for c in self.caps if not c.placed and c.grimy]
+        if not dirty:
+            if any(c.grimy for c in self.caps):
+                self.say("Pull the grimy keycaps off first: they go in the bowl from the tray.")
+            elif any(not c.placed for c in self.caps):
+                self.say("The keycaps in the tray are clean already.")
+            else:
+                self.say("The bowl is for keycaps: pull some off, then give them a wash.")
+            return
+        self.washing = WASH_TIME
+        self.sounds.play("wash", 0.6)
+        self.jiggle(self.board.caps.tray)
+        self.say(f"Into the warm, soapy water with {len(dirty)} keycap{'s' if len(dirty) > 1 else ''}...")
+
+    def finish_wash(self):
+        ks = self.board.caps
+        n = 0
+        for c in self.caps:
+            if not c.placed and c.grimy:
+                c.grimy = False
+                ks.paint(c.i, c.body, c.legend, tray=True)
+                n += 1
+        self.washed += n
+        if n:
+            self.sounds.play("sparkle", 0.5)
+            left = sum(c.grimy for c in self.caps)
+            self.say(f"Squeaky clean! {n} keycap{'s' if n > 1 else ''} washed." +
+                     (f" {left} more still want a wash." if left else ""), HONEY_DARK)
+
+    def update_wash(self):
+        """Bubbles rising off the bowl while the keycaps soak."""
+        shown = self.washing > 0 and self.bowl is not None
+        if shown:
+            self.washing -= time.dt
+            top = application.base.render.getRelativePoint(self.bowl.root, Point3(0, 0.8, 0))
+            for k, np in enumerate(self.bubbles):
+                phase = (self.clock * 0.9 + k / len(self.bubbles)) % 1.0
+                a = k * 2.4
+                np.setPos(top + LVector3f(math.cos(a) * 0.8 * (1 - phase), 0.2 + phase * 2.2, math.sin(a) * 0.6))
+                np.setScale(0.5 + 0.5 * math.sin(math.pi * phase))
+                np.setColorScale(0.86, 0.95, 1.0, math.sin(math.pi * phase))
+            if self.washing <= 0:
+                self.finish_wash()
+        if self.bubbles[0].isHidden() == shown:
+            for np in self.bubbles:
+                if shown:
+                    np.show()
+                    np.hide(SHADOW_MASK)  # (no shadows from a bubble)
+                else:
+                    np.hide()
+
+    def lube(self, stab):
+        """A dab of lube on a stabiliser's wire, where it meets each housing: no more rattle."""
+        if stab.lubed:
+            self.say(f"The {stab.name} is lubed already.")
+            return
+        stab.lubed = True
+        stab.lube.unstash()
+        self.sounds.play("lube", 0.6)
+        n = sum(s.lubed for s in self.stabs)
+        self.say(f"Nice and smooth: {n} of {len(self.stabs)} stabilisers lubed.", HONEY_DARK if n == len(self.stabs)
+                 else COCOA)
+
+    def turn_knob(self, way):
+        """The knob, in the test: a notch of volume up (or down), with its soft click."""
+        self.knob.root.setH(self.knob.root.getH() - way * 18)
+        self.sounds.play("knob", 0.6)
+        if not self.knob_turned:
+            self.knob_turned = True
+            self.say("The knob turns, notch by notch: volume up, volume down. It works!", HONEY_DARK)
+            self.check_all_tested()
+
+    def all_tested(self):
+        if self.kind == "mouse":
+            return all(c in self.checks for c, _ in self.mouse_checks())
+        return len(self.tested) >= len(self.caps) and (self.knob is None or self.knob_turned)
+
+    def check_all_tested(self):
+        if self.all_tested():
+            self.sounds.play("fanfare", 0.6)
+            self.say("Everything works! Press Finish when you're done" + (" typing." if self.kind == "keyboard"
+                                                                         else "."), HONEY_DARK)
+
+    # -- testing a mouse, with your own --
+
+    def mouse_checks(self):
+        checks = [("left", "Left click"), ("right", "Right click"), ("scroll", "Scroll the wheel"),
+                  ("middle", "Click the wheel"), ("move", "Move it about")]
+        if self.spec.get("side"):
+            checks.append(("side", "Side buttons"))
+        return checks
+
+    def mouse_try(self, check):
+        """Something tried in a mouse's test: it works, and the first time it's ticked off."""
+        if check in self.checks:
+            return
+        self.checks[check] = True
+        if self.all_tested():
+            self.check_all_tested()
+
+    def mouse_button(self, name, down):
+        """Its left or right button, or the wheel (clicked down): it goes down, and clicks."""
+        if self.mouse_down.get(name) == down:
+            return
+        self.mouse_down[name] = down
+        m = self.board.mouse
+        if name == "middle":
+            wheel = m["wheel"]
+            wheel.root.setPos(wheel.origin + Vec3(0, -0.05 if down else 0, 0))
+        elif name in m:
+            m[name].setPos(0, -0.045 if down else 0, 0)
+        if down:
+            self.sounds.play("mouse_click", 0.6, pitch=0.85 if name == "middle" else 1.0)
+            self.mouse_try(name)
+        else:
+            self.sounds.play("mouse_click", 0.25, pitch=1.15)  # (and a softer one as it comes back up)
+
+    def mouse_input(self, key):
+        """The real mouse's buttons and wheel, in a mouse's test. True if that's all the key was for."""
+        if key in ("right mouse down", "right mouse up"):
+            self.mouse_button("right", key.endswith("down"))
+            return False  # (a right drag still turns it round)
+        if key in ("middle mouse down", "middle mouse up"):
+            self.mouse_button("middle", key.endswith("down"))
+            return True
+        if key in ("scroll up", "scroll down"):  # the wheel turns, notch by notch
+            wheel = self.board.mouse["wheel"]
+            wheel.root.setP(wheel.root.getP() + (-20 if key == "scroll up" else 20))
+            self.sounds.play("knob", 0.5)
+            self.mouse_try("scroll")
+            return True
+        if key in ("mouse4", "mouse5"):  # (the side buttons, on a mouse that has them)
+            if self.spec.get("side"):
+                self.sounds.play("mouse_click", 0.5, pitch=1.2)
+                self.mouse_try("side")
+            return True
+        return False
+
+    def update_mouse_test(self):
+        """Moving your own mouse moves this one's sensor: its light shines on the mat under it; and a gaming
+        mouse's logo glows round the colours."""
+        testing = self.state == "play" and self.kind == "mouse" and self.phase == "test"
+        if not testing:
+            if not self.sensor_light.isHidden():
+                self.sensor_light.hide()
+            return
+        speed = 0.0 if self.offscreen else Vec3(mouse.velocity).length()
+        self.moved += speed
+        if self.moved > 0.6:
+            self.mouse_try("move")
+        glow = getattr(self, "glow", 0.0)
+        self.glow = glow + (min(1.0, 0.3 + speed * 60) - glow) * min(1.0, time.dt * 10)
+        x, z = self.board.mouse["sensor"]
+        p = application.base.render.getRelativePoint(self.kb, Point3(x, 0, z))
+        self.sensor_light.setPos(p.x, DESK_Y + 0.08, p.z)
+        self.sensor_light.setScale(3.2 + 1.2 * self.glow)
+        self.sensor_light.setColorScale(1.0, 0.25, 0.22, 0.25 + 0.6 * self.glow)
+        if self.sensor_light.isHidden():
+            self.sensor_light.show()
+            self.sensor_light.hide(SHADOW_MASK)
+        logo = self.board.mouse.get("logo")
+        if logo is not None:
+            logo.paint(0, "logo", hue(self.clock * 0.2, 0.6))
+
     # -- how it's going --
 
     def after_change(self):
@@ -2846,17 +3785,48 @@ class Workshop(Entity):
 
     def hint(self):
         """A word on what to do next, as each stage gets done."""
+        if self.kind == "mouse":
+            self.mouse_hint()
+            return
         if "caps" not in self.said and not any(c.placed for c in self.caps):
             self.said.add("caps")
             dirty = any(d.left and d.host.key == "plate" for d in self.board.dirt)
-            self.say("All the keycaps are off! " + ("Brush the crumbs off the plate (5), then pull the switches (4)."
-                                                    if dirty else "Now pull the switches (4)."))
+            grimy = sum(c.grimy for c in self.caps)
+            dry = any(not s.lubed for s in self.stabs)
+            self.say("All the keycaps are off! " + (
+                f"{grimy} of them are grimy: click the wash bowl to give them a soak." if grimy else
+                "Lube the stabilisers (6) while you can reach them." if dry else
+                "Brush the crumbs off the plate (5), then pull the switches (4)." if dirty else
+                "Now pull the switches (4)."))
         elif "switches" not in self.said and not any(s.placed for s in self.switches):
             self.said.add("switches")
             if any(p.key.startswith("stab") and p.placed for p in self.parts):
-                self.say("Switches out! Lift the stabilisers out with the hand (1).")
+                self.say("Switches out! Lube the stabilisers (6), then lift them out with the hand (1)."
+                         if any(not s.lubed for s in self.stabs) else
+                         "Switches out! Lift the stabilisers out with the hand (1).")
+            elif self.knob is not None and self.knob.placed:
+                self.say("Switches out! Lift the volume knob off with the hand (1).")
             else:
                 self.say("Switches out! The top frame is screwed on from underneath: flip it over (F).")
+
+    def mouse_hint(self):
+        by_key = {p.key: p for p in self.parts}
+        feet = [p for p in self.parts if p.key.startswith("foot")]
+        screws = [p for p in self.parts if p.key.startswith("screw")]
+        battery = by_key.get("mouse_battery")
+        if "feet" not in self.said and not any(f.placed for f in feet):
+            self.said.add("feet")
+            self.say("Feet off! Undo the screws that were under them, with the screwdriver (2).")
+        elif "screws" not in self.said and not any(q.placed for q in screws):
+            self.said.add("screws")
+            self.say("Screws out! Now pop the battery cover off, and take the battery out." if battery and battery.placed
+                     else "Screws out! Flip it back over (F), and lift the top shell off with the hand (1).")
+        elif battery and "battery" not in self.said and not battery.placed:
+            self.said.add("battery")
+            self.say("Battery out: now it's safe to open. Flip it back over (F) and lift the top shell off.")
+        elif "shell" not in self.said and not by_key["top_shell"].placed:
+            self.said.add("shell")
+            self.say("The top shell's off! Lift the scroll wheel out, and undo the board's little screw (2).")
 
     # -- testing it --
 
@@ -2874,9 +3844,11 @@ class Workshop(Entity):
             for name in names:
                 lookup.setdefault(name, []).append(i)
         self.key_lookup = lookup
+        self.checks, self.moved, self.mouse_down = {}, 0.0, {}
         self.sounds.play("fanfare", 0.7)
         self.build_ui()
-        self.say("It's back together! Type on it: every key you press lights up.", HONEY_DARK)
+        self.say("It's back together! Type on it: every key you press lights up." if self.kind == "keyboard" else
+                 "It's back together! Click, scroll and move your own mouse: this one does it too.", HONEY_DARK)
 
     def press_key(self, i):
         if i in self.keys_down or not self.caps[i].placed:
@@ -2887,9 +3859,19 @@ class Workshop(Entity):
         self.flash[i] = 0.6
         new = i not in self.tested
         self.tested.add(i)
-        if new and len(self.tested) == len(self.caps):
-            self.sounds.play("fanfare", 0.6)
-            self.say("Every single key works! Press Finish when you're done typing.", HONEY_DARK)
+        done = new and len(self.tested) == len(self.caps)
+        stab = self.board.stab_of.get(i)
+        if stab is not None and not stab.lubed:  # a dry stabiliser: its wire rattles
+            self.sounds.play("rattle", 0.5)
+            if "rattle" not in self.said and not done:
+                self.said.add("rattle")
+                self.say(f"Hear that rattle? The {nice_label(self.caps[i].label)} key's stabiliser wants lube "
+                         "(6). Next time!")
+        if done:
+            if self.knob is not None and not self.knob_turned:
+                self.say("Every key works! Now turn the knob: scroll on it, or click it.", HONEY_DARK)
+            else:
+                self.check_all_tested()
 
     def release_key(self, i):
         if i in self.keys_down:
@@ -2912,18 +3894,18 @@ class Workshop(Entity):
             cap = self.caps[i]
             if left <= 0:
                 del self.flash[i]
-                ks.paint(i, cap.body, GLOW if i in self.tested else cap.legend)
+                ks.paint(i, look(cap)[0], GLOW if i in self.tested else look(cap)[1])
             else:
                 self.flash[i] = left
                 lit = hue(self.board.keys[i][1] / 24 + self.clock * 0.2, 0.45)
-                ks.paint(i, mix(cap.body, lit, min(1.0, left / 0.6) * 0.75), GLOW)
+                ks.paint(i, mix(look(cap)[0], lit, min(1.0, left / 0.6) * 0.75), GLOW)
         if self.wave >= 0:  # when it's first together: a rainbow ripples across the legends
             self.wave += time.dt
             for i, cap in enumerate(self.caps):
                 if i in self.flash:
                     continue
                 k = self.board.keys[i][1] / 6 - self.wave * 3
-                ks.meshes[1].paint(i, "legend", hue(k / 4, 0.6) if self.wave < 2.4 else cap.legend)
+                ks.meshes[1].paint(i, "legend", hue(k / 4, 0.6) if self.wave < 2.4 else look(cap)[1])
             if self.wave >= 2.4:
                 self.wave = -1.0
 
@@ -2954,6 +3936,8 @@ class Workshop(Entity):
             return
         if self.phase == "test" and not self.confirming and self.test_key(key):
             return
+        if self.phase == "test" and self.kind == "mouse" and not self.confirming and self.mouse_input(key):
+            return
         if key == "escape":
             if self.help_open:
                 self.toggle_help()
@@ -2967,15 +3951,18 @@ class Workshop(Entity):
         elif key == "h":
             self.toggle_help()
         if self.phase != "test":
-            if key in ("1", "2", "3", "4", "5"):
-                self.pick_tool(TOOLS[int(key) - 1][0])
+            if key in [str(k + 1) for k in range(len(self.tools))]:
+                self.pick_tool(self.tools[int(key) - 1][0])
             elif key == "f":
                 self.pitch.animate("rotation_x", self.pitch.rotation_x + 180, duration=0.5, curve=curve.in_out_sine)
                 self.sounds.play("turn", 0.5)
             elif key == "r":
                 self.pitch.animate("rotation_x", round(self.pitch.rotation_x / 360) * 360, duration=0.4)
                 self.yaw.animate("rotation_y", round(self.yaw.rotation_y / 360) * 360, duration=0.4)
-        if key == "scroll up":
+        if key in ("scroll up", "scroll down") and self.phase == "test" and self.knob is not None \
+                and self.pick()[0] is self.knob:  # scrolling on the knob turns it
+            self.turn_knob(1 if key == "scroll up" else -1)
+        elif key == "scroll up":
             camera.fov = max(12, camera.fov - 2)
         elif key == "scroll down":
             camera.fov = min(70, camera.fov + 2)
@@ -2989,6 +3976,8 @@ class Workshop(Entity):
             self.click()
         elif key == "left mouse up":
             self.dragging = self.brushing = False
+            if self.phase == "test" and self.kind == "mouse":
+                self.mouse_button("left", False)
             if self.mouse_key is not None:
                 self.release_key(self.mouse_key)
                 self.mouse_key = None
@@ -3007,16 +3996,29 @@ class Workshop(Entity):
         if self.over_panel() or self.help_open or self.confirming:
             return  # its buttons handle themselves
         part, tag, point = self.pick()
+        if self.phase == "test" and self.kind == "mouse":  # your own mouse's left button: this one's goes down too
+            if tag and tag[0] == "side":
+                self.sounds.play("mouse_click", 0.5, pitch=1.2)
+                self.mouse_try("side")
+            else:
+                self.mouse_button("left", True)
+                self.dragging = True  # (and a drag still turns it round)
+            return
         if self.phase == "test":
             i = self.slot_at(part, point) if isinstance(part, KeyItem) else None
             if i is not None and self.caps[i].placed:
                 self.press_key(i)
                 self.mouse_key = i
+            elif part is not None and part is self.knob:
+                self.turn_knob(1)
             else:
                 self.dragging = True
             return
         if isinstance(part, Trinket):
             self.collect(part)
+            return
+        if isinstance(part, Bowl):
+            self.wash()
             return
         if self.held in ("keycaps", "switches"):
             if part is None:
@@ -3050,6 +4052,12 @@ class Workshop(Entity):
         elif tool == "brush":  # the one tool you can hold down and drag
             self.brushing, self.brush_from, self.brush_travel = True, point, 0.0
             self.brush_at(point)
+        elif tool == "lube":
+            if part in self.stabs:
+                self.lube(part)
+            else:
+                self.say("Lube goes on the stabilisers: the wire clips under the long keys, once their keycaps "
+                         "are off.")
         elif isinstance(part, KeyItem) or part.screw:
             self.say(self.advice(part))
         else:
@@ -3066,11 +4074,19 @@ class Workshop(Entity):
 
     def actionable(self, part):
         """Can the tool in your hand do something to this?"""
-        if part is None or self.held is not None:
+        if part is None:
+            return False
+        if isinstance(part, Bowl):  # (whatever's in your hand)
+            return self.phase != "test" and any(not c.placed and c.grimy for c in self.caps)
+        if self.phase == "test":  # the keys to press, and the knob to turn
+            return part is self.knob or isinstance(part, KeyItem) and part.kind == "keycap"
+        if self.held is not None:
             return False
         if isinstance(part, Trinket):
             return True
         tool = self.tool
+        if tool == "lube":
+            return part in self.stabs and not part.lubed
         if tool == "hand":
             return isinstance(part, Part3D) and not part.screw
         if tool == "driver":
@@ -3112,6 +4128,8 @@ class Workshop(Entity):
         self.update_tweens()
         self.update_flights()
         self.update_steam()
+        self.update_wash()
+        self.update_mouse_test()
         if abs(window.aspect_ratio - self.layout_aspect) > 0.01:
             self.vignette.scale = (window.aspect_ratio + 0.02, 1.02)
             {"menu": self.menu_ui, "play": self.build_ui, "result": self.result_ui}[self.state]()
@@ -3170,6 +4188,9 @@ class Workshop(Entity):
         on = sum(p.placed for p in self.parts)
         if phase == "test":
             done, total = len(self.tested), len(self.caps)
+            if self.kind == "mouse":
+                checks = self.mouse_checks()
+                done, total = sum(c in self.checks for c, _ in checks), len(checks)
         else:
             done = total - on if phase == "apart" else on
         for i, t in enumerate(self.steps):
@@ -3215,9 +4236,18 @@ class Workshop(Entity):
                 self.switch_ring.position = (ring.x, ring.y, 0.1)
             building = phase == "build"
             self.show_group("paint", building)
-            self.show_group("switches", building)
+            self.show_group("switches", building and self.kind == "keyboard")
         else:
-            self.set_text(self.test_count, f"{len(self.tested)} of {len(self.caps)} keys tested")
+            for check, dot, text in self.check_rows:  # (a mouse's)
+                done = check in self.checks
+                for e, col in ((dot, HONEY if done else PAPER_DARK), (text, COCOA if done else MUTED)):
+                    if getattr(e, "tinted", None) != col:
+                        e.color, e.tinted = rgb(col), col
+            if self.test_count is not None:
+                self.set_text(self.test_count, f"{len(self.tested)} of {len(self.caps)} keys tested")
+            if self.knob is not None:
+                self.set_text(self.knob_text, "The knob works!" if self.knob_turned else
+                              "And turn the knob: scroll on it.")
         if self.message_time > 0:
             self.message_time -= time.dt
             if self.message_time <= 0:
@@ -3227,7 +4257,7 @@ class Workshop(Entity):
         glyph = ("keycap" if held == "keycaps" else "switch" if held == "switches" else
                  "hand" if isinstance(held, Part3D) else self.tool)
         if phase == "test":
-            glyph = "keycap"
+            glyph = "keycap" if self.kind == "keyboard" else "hand"
         if self.badge_icon.texture != self.art[glyph]:
             self.badge_icon.texture = self.art[glyph]
         tip = ""

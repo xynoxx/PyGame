@@ -24,7 +24,7 @@ from array import array
 
 RATE = 44100  # for the sound effects
 SLOW_RATE = 16000  # for the music and the rain: they're soft, so they don't need the high notes
-VERSION = 4  # bump to make them all again
+VERSION = 6  # bump to make them all again
 TAKES = 3  # how many takes there are of the sounds you hear most
 
 
@@ -277,6 +277,62 @@ def effect_brush(v=0):
     return warm(b, 5000)
 
 
+def bubble(buf, at, freq, amp, rate=RATE):
+    """One bubble in water: a little round note that rises as the bubble does, and dies away fast (that rising
+    "bloop" is what makes water sound like water)."""
+    start = int(at * rate)
+    phase = 0.0
+    for k in range(max(0, min(len(buf) - start, int(0.07 * rate)))):
+        t = k / rate
+        phase += 2 * math.pi * freq * (1 + 4 * t) / rate
+        buf[start + k] += amp * min(1.0, t / 0.002) * math.exp(-t / 0.012) * math.sin(phase)
+
+
+def effect_wash(v=0):
+    """Keycaps into a bowl of warm, soapy water: a gentle slosh, and bubbles."""
+    rnd = random.Random(50)
+    b = blank(1.6)
+    swish(b, 0, 1.4, 0.6, seed=50, low=200, high=1100)
+    for _ in range(26):
+        bubble(b, rnd.uniform(0.04, 1.3), rnd.uniform(500, 1300), rnd.uniform(0.15, 0.45))
+    return warm(b, 5000)
+
+
+def effect_lube(v=0):
+    """A dab of lube on a stabiliser: a soft little squish."""
+    b = blank(0.25)
+    swish(b, 0, 0.12, 1.0, seed=60, low=250, high=900)
+    knock(b, 0.05, RUBBER, 0.35, 0.004)
+    return warm(b, 3500)
+
+
+def effect_rattle(v=0):
+    """A stabiliser that wants lube: its dry wire ticks against the housings as the key goes down."""
+    rnd, d = take(70, v)
+    b = blank(0.15)
+    for k, level in enumerate((1.0, 0.55, 0.3)):
+        knock(b, k * 0.016 + rnd.uniform(0, 0.003), [(2100, 0.01, 1.0), (3400, 0.006, 0.4)], level, 0.0005, d)
+    return warm(b, 5000)
+
+
+def effect_knob(v=0):
+    """A notch of the volume knob: a soft, small click."""
+    _, d = take(80, v)
+    b = blank(0.1)
+    knock(b, 0, [(2600, 0.005, 1.0), (4000, 0.003, 0.3)], 1.0, 0.0006, d)
+    knock(b, 0, CASE, 0.1, 0.002)
+    return warm(b, 5000)
+
+
+def effect_mouse_click(v=0):
+    """A mouse button: its little switch's crisp click, and the shell round it answering softly."""
+    _, d = take(90, v)
+    b = blank(0.12)
+    knock(b, 0, [(2900, 0.006, 1.0), (4600, 0.004, 0.35)], 1.0, 0.0004, d)
+    knock(b, 0, [(900, 0.012, 1.0), (1900, 0.007, 0.3)], 0.3, 0.0012, d)
+    return warm(b, 5500)
+
+
 def effect_turn(v=0):
     """The keyboard turned over in your hands: a soft hush as it moves."""
     b = blank(0.32)
@@ -381,6 +437,8 @@ EFFECTS = {
     **{f"lift_{m}": (effect_lift(m), 1) for m in MATERIALS},
     **{f"put_{m}": (effect_put(m), 1) for m in MATERIALS},
     "screw_out": (effect_screw(True), 2), "screw_in": (effect_screw(False), 2),
+    "wash": (effect_wash, 1), "lube": (effect_lube, 1), "rattle": (effect_rattle, 2), "knob": (effect_knob, 2),
+    "mouse_click": (effect_mouse_click, TAKES),
     "turn": (effect_turn, 1), "ui": (effect_ui, 1), "hover": (effect_hover, 1), "paint": (effect_paint, 1),
     "nope": (effect_nope, 1), "swap": (effect_swap, 1), "fanfare": (effect_fanfare, 1),
     "chime": (lambda v=0: bells([72, 76, 79, 84], 0.09), 1),
