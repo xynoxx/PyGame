@@ -97,6 +97,10 @@ SWITCH_KINDS = [("red", "Linear", "smooth and quiet", (214, 60, 56)),
                 ("pink", "Silent", "dampened: hardly a sound", (232, 150, 176))]
 TOOLS = [("hand", "Hand"), ("driver", "Screwdriver"), ("puller", "Keycap puller"), ("switcher", "Switch puller"),
          ("brush", "Brush"), ("lube", "Lube")]
+SWAB, BLOWER = ("swab", "Alcohol swab"), ("blower", "Air blower")  # (only the jobs that need them have these)
+SOLDER = ("solder", "Soldering iron")
+FRESH = {"battery": "fresh battery", "cushions": "fresh cushions", "swollen": "new battery", "paste": "thermal paste"}  # a new part, in the box
+SWAB_WORK = 3  # swabs to work the alcohol into a sticky switch, or the crust off a battery contact
 TRINKETS = ["lucky coin", "paperclip", "guitar pick", "tiny die", "star sticker", "toy brick"]
 KEY_NAMES = {"Back": "Backspace", "Caps": "Caps Lock", "Ent": "numpad Enter", "Num": "Num Lock",
              "PrtSc": "Print Screen", "ScrLk": "Scroll Lock", "PgUp": "Page Up", "PgDn": "Page Down",
@@ -159,14 +163,187 @@ MICE = [
          skate=(236, 236, 232),
          intro="A wireless travel mouse, with a battery under a cover underneath: take that out before you open it."),
 ]
-for _m in MICE:  # (what the screen's colour picker and the switch card expect of any product)
+# Microphones: five real kinds, each made the way it really is (form says which). size is the room one takes on the
+# desk (width, depth); height is how tall it stands.
+MICS = [
+    dict(kind="mic", key="mic_lav", form="lav", name="Lavalier mic", size=(8.6, 4.2), height=1.35,
+         case=(52, 54, 60), accent=(236, 150, 78), cable=(44, 44, 50),
+         intro="A tiny clip-on mic, for interviews and videos. Its long, thin cable has tied itself in knots."),
+    dict(kind="mic", key="mic_stage", form="stage", name="Stage mic", size=(11.4, 3.2), height=2.6,
+         case=(58, 60, 68), accent=(214, 72, 64), cable=(36, 36, 40),
+         intro="A tough dynamic mic, for singing on stage. Its ball grille unscrews by hand: click it with the hand."),
+    dict(kind="mic", key="mic_wireless", form="wireless", name="Wireless mic", size=(10.6, 3.0), height=2.4,
+         case=(40, 42, 50), accent=(90, 170, 230), cable=(40, 42, 50),
+         intro="A wireless handheld mic. Its battery sleeve twists off: take the batteries out before you open it."),
+    dict(kind="mic", key="mic_podcast", form="podcast", name="USB podcast mic", size=(5.0, 5.0), height=7.8,
+         case=(232, 226, 214), accent=(222, 120, 96), cable=(232, 226, 214),
+         intro="A USB mic for podcasts, on its own desk stand. The thumb screws on its yoke turn by hand."),
+    dict(kind="mic", key="mic_studio", form="studio", name="Studio condenser", size=(5.4, 5.4), height=8.9,
+         case=(70, 82, 104), accent=(212, 176, 90), cable=(40, 40, 44),
+         intro="A studio condenser in its shock mount. Its gold capsule is delicate: handle it with care."),
+]
+# Webcams: three real kinds, each built the way it really is. size is the room one takes on the desk; height is
+# how tall it stands.
+WEBCAMS = [
+    dict(kind="webcam", key="cam_clip", form="clipcam", name="Clip-on webcam", size=(7.0, 4.0), height=3.1,
+         case=(58, 60, 68), accent=(150, 154, 162), cable=(40, 40, 44),
+         intro="A webcam that clips on top of a monitor. Somebody's left a big greasy thumbprint on its lens window."),
+    dict(kind="webcam", key="cam_ball", form="ballcam", name="Ball webcam", size=(5.0, 5.0), height=5.1,
+         case=(232, 228, 218), accent=(90, 170, 220), cable=(232, 228, 218),
+         intro="A round old webcam on a weighted stand. Its focus ring turns by hand, and it's out of focus."),
+    dict(kind="webcam", key="cam_stream", form="streamcam", name="Streaming webcam", size=(4.6, 4.2), height=4.6,
+         case=(44, 46, 54), accent=(236, 150, 78), cable=(44, 46, 54),
+         intro="A streamer's webcam with a ring light round its lens, on a little tripod. Its light flickers."),
+]
+# Headsets, lying flat on the desk with their cushions up, the way you'd put one down. bottom is the cushions' colour.
+HEADSETS = [
+    dict(kind="headset", key="hs_office", form="office_hs", name="Office headset", size=(9.0, 7.2), height=1.6,
+         case=(60, 62, 70), bottom=(40, 40, 44), accent=(90, 150, 210), cable=(36, 36, 40),
+         intro="A USB headset for calls. Its ear cushions are old and flaking: you'll fit fresh ones."),
+    dict(kind="headset", key="hs_gaming", form="gaming_hs", name="Gaming headset", size=(10.0, 7.8), height=1.8,
+         case=(34, 36, 42), bottom=(56, 56, 62), accent=(90, 220, 160), cable=(30, 30, 34),
+         intro="A gaming headset with lights round its cups. The left side has gone silent."),
+    dict(kind="headset", key="hs_wireless", form="wireless_hs", name="Wireless headphones", size=(9.4, 7.4),
+         height=1.65, case=(214, 204, 188), bottom=(160, 140, 120), accent=(196, 120, 90), cable=(214, 204, 188),
+         intro="Bluetooth headphones with a battery in the right cup, and the battery's swollen up. Careful with it."),
+]
+# Computers, lying on their sides on the bench with their glass up, the way you'd work on one: a case on its own, and
+# a whole desktop PC (just the tower: no screen, no keyboard). bottom is their plastic trim's colour.
+COMPUTERS = [
+    dict(kind="computer", key="pc_case", form="pc_case", name="PC case", size=(14.4, 14.8), height=6.95,
+         case=(104, 128, 156), bottom=(48, 48, 54), accent=(240, 200, 120), cable=(30, 30, 34),
+         intro="An empty PC case, on its side with its glass up. Some of its dust filters are clogged."),
+    dict(kind="computer", key="pc_tower", form="pc_tower", name="Desktop PC", size=(14.4, 14.8), height=6.95,
+         case=(46, 48, 56), bottom=(34, 34, 38), accent=(236, 150, 78), cable=(30, 30, 34),
+         intro="A whole desktop PC, on its side with its glass up. It's been running hot."),
+]
+for _m in MICE + MICS + WEBCAMS + HEADSETS + COMPUTERS:  # (what the colour picker and the switch card expect of any)
     _m.setdefault("cap", _m["case"])
     _m.setdefault("switch", "blue")
-_BY_KEY = {m["key"]: m for m in KEYBOARD_MODELS + MORE_KEYBOARDS + MICE}
+_BY_KEY = {m["key"]: m for m in KEYBOARD_MODELS + MORE_KEYBOARDS + MICE + MICS + WEBCAMS + HEADSETS + COMPUTERS}
+# Every one has a job of its own, besides taking it apart, building it back and testing it, and a star for doing it:
+# what the job card calls it, the star's name, and how it's done ({hand}, {swab}... become the tools' numbers).
+SPECIALS = {
+    "sum": ("Do a sum on it", "Sum", "In the test, work out the sum on the card: type the answer, then Enter."),
+    "fn_layer": ("Try the Fn layer", "Fn layer",
+                 "In the test, click Fn: I, J, K and L turn into the arrow keys. Press all four."),
+    "pair": ("Pair it", "Paired", "In the test, hold Esc down for two seconds to pair it over Bluetooth."),
+    "volume": ("Turn the music with it", "Volume",
+               "In the test, its knob turns the music: all the way down, then all the way up."),
+    "sticky": ("Unstick the sticky key", "Unstuck",
+               "A drink was spilled in it, and the {sticky} switch sticks. Once its keycap is off, swab the switch "
+               "with alcohol ({swab})."),
+    "swap": ("Fit new switches", "New switches",
+             "It's hot-swap: build it back with new switches, all of one kind, but not the red ones it came with."),
+    "pangram": ("Type the quick brown fox", "Typed",
+                "In the test, type the line on the card. It has every letter in it, so a bad key can't hide."),
+    "shake": ("Shake out the loose crumbs", "Shaken out",
+              "Before you take it apart, flip it over (F) and shake it (drag it about) to tip the loose crumbs out."),
+    "double_click": ("Fix the double-click", "One click",
+                     "Its left button double-clicks. With the top shell off, click the left switch on the board "
+                     "with the hand ({hand}) to bend its spring back."),
+    "dpi": ("Try every DPI speed", "DPI",
+            "In the test, click the DPI button behind the wheel, through all four speeds."),
+    "battery": ("Fit a fresh battery", "Battery",
+                "Its battery is flat. Once it's out, click Fresh battery in the parts box to swap it."),
+    "foam": ("Wash the foam", "Fresh foam",
+             "The foam windscreen under the grille is grubby. Hold it (click it in the parts box), then click the "
+             "wash bowl."),
+    "gain": ("Set the gain", "Gain",
+             "In the test, hold Space to talk, and turn the gain knob (scroll on it) until the meter sits in the "
+             "green."),
+    "blower": ("Puff the capsule clean", "Capsule",
+               "The capsule is dusty. With the headbasket off, puff it clean with the air blower ({blower}): never "
+               "brush a capsule."),
+    "untangle": ("Untangle the cable", "Untangled", "Click each knot in the cable with the hand ({hand}) to undo it."),
+    "contacts": ("Clean the contacts", "Contacts",
+                 "The battery contacts are crusty. With the batteries out, swab them clean ({swab})."),
+    "smudge": ("Wipe the lens clean", "Clear lens",
+               "A greasy thumbprint smudges its lens window: wipe it with the alcohol swab ({swab}) till it's clear."),
+    "focus": ("Focus it", "In focus", "In the test, turn its focus ring (scroll on it) until the picture is sharp."),
+    "flicker": ("Stop the flicker", "Steady light",
+                "Its ring light flickers: the ribbon cable inside has worked loose. With the front panel off, press "
+                "its loose end home with the hand ({hand})."),
+    "cushions": ("Fit fresh ear cushions", "Fresh cushions",
+                 "Its ear cushions are flaking. Once both are off, click Fresh cushions in the parts box."),
+    "solder": ("Fix the dead left side", "Both sides",
+               "The left side's silent: a wire's come off the little board in the left cup. With the left driver "
+               "out, touch the soldering iron ({solder}) to it."),
+    "swollen": ("Swap the swollen battery", "Safe battery",
+                "Its battery has swollen up. Unplug its lead, lift it out gently, and click New battery in the parts "
+                "box."),
+    "filters": ("Wash the dust filters", "Clean filters",
+                "Some of its dust filters are clogged grey. Once it's apart, hold each one (click it in the parts "
+                "box), then click the wash bowl."),
+    "paste": ("Fresh thermal paste", "Cool CPU",
+              "Its CPU runs hot: the old paste has dried out. With the cooler off, wipe it off the CPU with the swab "
+              "({swab}), then click Thermal paste in the box."),
+}
+for _key, _special in (("numpad", "sum"), ("compact", "fn_layer"), ("wireless65", "pair"), ("knob75", "volume"),
+                       ("tkl", "sticky"), ("gasket96", "swap"), ("full", "pangram"), ("vintage", "shake"),
+                       ("mouse_office", "double_click"), ("mouse_gaming", "dpi"), ("mouse_travel", "battery"),
+                       ("mic_lav", "untangle"), ("mic_stage", "foam"), ("mic_wireless", "contacts"),
+                       ("mic_podcast", "gain"), ("mic_studio", "blower"), ("cam_clip", "smudge"),
+                       ("cam_ball", "focus"), ("cam_stream", "flicker"), ("hs_office", "cushions"),
+                       ("hs_gaming", "solder"), ("hs_wireless", "swollen"), ("pc_case", "filters"),
+                       ("pc_tower", "paste")):
+    _BY_KEY[_key]["special"] = _special
+PANGRAM = "the quick brown fox jumps over the lazy dog"
+# What a real repairer knows about each job, for the end
+TIPS = {
+    "sum": "A number pad's Enter is a key of its own, and Num Lock decides whether its keys type numbers or move "
+           "the cursor about.",
+    "fn_layer": "Small keyboards keep their missing keys on layers: holding Fn changes what the keys do, the way "
+                "Shift turns letters into capitals.",
+    "pair": "Wireless keyboards pair by holding a key combination until the light blinks. After that, they remember "
+            "the computer.",
+    "volume": "A volume knob like this is a rotary encoder: it sends one pulse for every notch it turns, one way or "
+              "the other.",
+    "sticky": "Isopropyl alcohol (90% or more) dissolves dried drink and dries fast, leaving nothing behind: swab "
+              "it in, press the switch again and again, and let it dry.",
+    "swap": "On a hot-swap board, switches push into sockets. Pull each one straight out, and push the new one "
+            "straight in with its pins straight.",
+    "pangram": "'The quick brown fox jumps over the lazy dog' has every letter in it, so typing it shows up a dead "
+               "or sticky key at once.",
+    "shake": "Turn a keyboard over and shake it before you take it apart: most of the loose crumbs fall straight "
+             "out.",
+    "double_click": "A mouse that double-clicks has a worn switch: the little spring inside has gone soft. Bending "
+                    "it back helps for a while; a new switch fixes it for good.",
+    "dpi": "DPI is how far the pointer moves for each inch you move the mouse: the higher it is, the faster.",
+    "battery": "A flat battery makes a wireless mouse stutter and skip. Take old batteries out before they leak.",
+    "foam": "A stage mic's foam collects lipstick and breath: wash it in warm, soapy water, and let it dry right "
+            "through before it goes back in.",
+    "gain": "Set the gain so your voice sits in the green: too low and it's lost in hiss, too high and it clips "
+            "and crackles.",
+    "blower": "Never touch a condenser's diaphragm: it's thinner than a hair. A puff of air from a blower is all "
+              "the cleaning it wants.",
+    "untangle": "Coil a mic cable over-under, one loop forwards and the next one back, and it won't twist into "
+                "knots next time.",
+    "contacts": "That green-white crust is from a battery that leaked. Alcohol on a swab dissolves it; then fresh "
+                "batteries, and take them out when it's put away.",
+    "smudge": "Clean a lens with a little alcohol on a soft swab or a lens wipe: never a tissue or your shirt, which "
+              "leave scratches and lint.",
+    "focus": "A manual focus ring moves the lens nearer the sensor or further away: further for things up close, "
+             "nearer for things far off.",
+    "flicker": "Ribbon cables sit in their sockets under a little latch: a knock can lift one end, and the light (or "
+               "the screen) flickers. Seat it straight, and close the latch.",
+    "cushions": "Ear cushions are made to be swapped: most twist or clip off, and fresh ones make an old headset "
+                "comfy (and clean) again.",
+    "solder": "A wire that breaks off a board is the commonest headset fault. Heat the pad and the wire together, "
+              "and let the solder flow: a shiny joint is a good one.",
+    "swollen": "A lithium battery that swells is worn out and unsafe: never press, bend or puncture it, and take it "
+               "to a battery recycling point, not the bin.",
+    "filters": "Dust filters keep the fluff out of a PC. Wash them every few months in warm, soapy water, and let "
+               "them dry right through before they go back on.",
+    "paste": "Thermal paste fills the tiny gaps between a CPU and its cooler. When it dries out, wipe the old off with "
+             "alcohol and put on a pea-sized dot: the cooler spreads it thin.",
+}
 # On the menu, smallest first
 MODELS = [_BY_KEY[k] for k in ("numpad", "compact", "wireless65", "knob75", "tkl", "gasket96", "full", "vintage")]
-ALL_MODELS = MODELS + MICE
-KINDS = [("keyboard", "Keyboards"), ("mouse", "Mice")]
+ALL_MODELS = MODELS + MICE + MICS + WEBCAMS + HEADSETS + COMPUTERS
+KINDS = [("keyboard", "Keyboards"), ("mouse", "Mice"), ("mic", "Mics"), ("webcam", "Webcams"), ("headset", "Headsets"),
+         ("computer", "Computers")]
+HEARS = ("mic", "webcam", "headset")  # the kinds with a microphone in them, tested by talking
 
 
 def kind_of(spec):
@@ -187,6 +364,16 @@ def out_quad(s):
 
 def mix(a, b, s):
     return tuple(x + (y - x) * s for x, y in zip(a, b))
+
+
+def turn(np, axis, degrees):
+    """Turn a node to this many degrees about one axis: y is upright (a screw, a knob on top), x lies across (a
+    wheel, a grille on a mic lying down), z points back (a knob on a mic's front)."""
+    {"x": np.setP, "y": np.setH, "z": np.setR}[axis](degrees)
+
+
+def turned(np, axis):
+    return {"x": np.getP, "y": np.getH, "z": np.getR}[axis]()
 
 
 def hue(h, sat=0.55, val=1.0):
@@ -226,7 +413,7 @@ def part_colours(spec, paint):
 
 def footprint(spec):
     """How much room a product takes on the desk: its width and depth."""
-    if kind_of(spec) == "mouse":
+    if kind_of(spec) != "keyboard":
         return spec["size"][0], spec["size"][1]
     _, wu, hu = layout_for(spec["size"])
     return wu + 2 * MARGIN, hu + 2 * MARGIN
@@ -477,6 +664,39 @@ class Shapes:
             self.tri(at(h, 0, 0), at(h, *a), at(h, *b), way(1, 0, 0))
             self.tri(at(-h, 0, 0), at(-h, *b), at(-h, *a), way(-1, 0, 0))
 
+    def lathe(self, profile, axis="x", center=(0, 0, 0), segments=20):
+        """A round thing, turned as on a lathe: profile is (along, radius) points down its axis (x, y or z), through
+        center. A radius of 0 closes an end; two points at the same place along it make a flat ring or disc."""
+        cx, cy, cz = center
+        n = len(profile) - 1
+
+        def at(u):
+            k = min(n - 1, int(u * n))
+            s = u * n - k
+            (a0, r0), (a1, r1) = profile[k], profile[k + 1]
+            return a0 + (a1 - a0) * s, r0 + (r1 - r0) * s
+
+        def f(u, v):
+            a, r = at(u)
+            c, s = math.cos(v) * r, math.sin(v) * r
+            if axis == "x":
+                return cx + a, cy + c, cz + s
+            if axis == "y":
+                return cx + c, cy + a, cz + s
+            return cx + c, cy + s, cz + a
+
+        def inside(p):  # the point on the axis beside it
+            return (p[0], cy, cz) if axis == "x" else (cx, p[1], cz) if axis == "y" else (cx, cy, p[2])
+        self.surface(f, 0, 1, 2 * n, 0, 2 * math.pi, segments, inside)
+
+    def ring(self, center, radius, thick, segments=24):
+        """A thin hoop lying flat (round the y axis), like a shock mount's frame."""
+        x, y, z = center
+        pts = [(x + math.cos(2 * math.pi * k / segments) * radius, y, z + math.sin(2 * math.pi * k / segments) * radius)
+               for k in range(segments + 1)]
+        for a, b in zip(pts, pts[1:]):
+            self.rod(a, b, thick)
+
     def wall(self, points, y0, y1, thick):
         """A thin wall standing round an outline (points round it, in x and z), `thick` thick, inside it."""
         cx = sum(p[0] for p in points) / len(points)
@@ -590,6 +810,17 @@ class Mesh3:
             vals = array("f", (colour[0] / 255, colour[1] / 255, colour[2] / 255, 1.0)) * (e - s)
             self.col[4 * s:4 * e] = vals
             view[4 * s:4 * e] = vals
+
+    def show_glyph(self, item, where):
+        """Point a legend's square at another spot in its texture (u0, v0, u1, v1): another letter on the same key."""
+        span = self.items.get(item)
+        if not span or self.np.node().getNumGeoms() == 0:
+            return
+        s, e = span
+        u0, v0, u1, v1 = where
+        corners = [(u0, v0), (u1, v0), (u1, v1), (u0, v0), (u1, v1), (u0, v1)]  # (as Shapes.quad lays them)
+        vals = array("f", [c for k in range(e - s) for c in corners[k % 6]])
+        self.view(3)[2 * s:2 * e] = vals  # (just on the card: its uv array is shared with the tray's copy)
 
     def brighten(self, item, factor):
         """Light an item up (when the mouse is on it), or with factor 1, set it back."""
@@ -842,6 +1073,27 @@ def draw_icon(name, size=128):
         cap((764, 260), (260, 764), 110)
     elif name == "dot":
         d.ellipse([P(312, 312), P(712, 712)], fill=W)
+    elif name == "swab":  # a cotton bud, soaked in alcohol: a thin stick with a fluffy tip at each end
+        cap((250, 774), (774, 250), 46)
+        for x, y in ((214, 810), (810, 214)):
+            d.ellipse([P(x - 120, y - 120), P(x + 120, y + 120)], fill=W)
+        d.ellipse([P(560, 690), P(680, 810)], fill=W)  # a drop of the alcohol
+        d.polygon([P(575, 710), P(620, 610), P(665, 710)], fill=W)
+    elif name == "solder":  # a soldering iron: a fat handle, a thin barrel, a fine tip, and a wisp of smoke
+        cap((170, 860), (430, 600), 180)
+        cap((430, 600), (520, 510), 110)
+        cap((520, 510), (760, 270), 56)
+        cap((760, 270), (850, 180), 22)
+        for t in (0.35, 0.6):
+            px, py = 170 + 260 * t, 860 - 260 * t
+            cap((px - 60, py - 60), (px + 60, py + 60), 18, CLEAR)
+        d.arc([P(760, 40), P(940, 220)], 200, 330, fill=W, width=int(30 * k))
+    elif name == "blower":  # a rubber air blower: a round bulb, and a nozzle with a puff coming out of it
+        d.ellipse([P(130, 380), P(600, 850)], fill=W)
+        cap((520, 470), (720, 270), 110)
+        cap((720, 270), (800, 190), 56)
+        for r in (110, 200):
+            d.arc([P(800 - r, 190 - r), P(800 + r, 190 + r)], -80, 10, fill=W, width=int(36 * k))
     return img.resize((size, size), Image.LANCZOS)
 
 
@@ -976,6 +1228,49 @@ def draw_label(spec):
     return img
 
 
+FOCUS_AT = 0.6  # where a ball webcam's focus ring is sharp, from 0 to 1
+
+
+def draw_preview(blur=0.0, bright=1.0, closed=False):
+    """What a webcam sees, for its test card: you at your desk, smiling, with a window and a plant behind you. It's
+    blurred when the lens is smudged or out of focus, darker in dim light, and black with the shutter closed."""
+    from PIL import Image, ImageDraw, ImageEnhance, ImageFilter, ImageFont
+    W, H = 320, 180
+    if closed:
+        img = Image.new("RGB", (W, H), (20, 20, 24))
+        ImageDraw.Draw(img).text((W / 2, H / 2), "Shutter closed", font=ImageFont.truetype(font_file(), 22),
+                                 fill=(120, 116, 110), anchor="mm")
+        return img
+    img = Image.new("RGB", (W, H), (226, 206, 178))  # a warm wall
+    d = ImageDraw.Draw(img)
+    d.rectangle([196, 18, 296, 106], fill=(250, 244, 232))  # a window, and the sky through it
+    d.rectangle([202, 24, 290, 100], fill=(168, 208, 236))
+    d.ellipse([214, 40, 258, 60], fill=(250, 250, 252))
+    d.line([(246, 24), (246, 100)], fill=(250, 244, 232), width=4)
+    d.line([(202, 62), (290, 62)], fill=(250, 244, 232), width=4)
+    d.rectangle([186, 106, 306, 112], fill=(196, 160, 120))  # its sill, and a plant on it
+    d.rectangle([272, 88, 292, 106], fill=(196, 112, 82))
+    for x, y in ((276, 74), (284, 70), (290, 78), (270, 80)):
+        d.ellipse([x - 7, y - 9, x + 7, y + 9], fill=(112, 162, 104))
+    d.rectangle([30, 36, 82, 80], fill=(150, 110, 80))  # a picture on the wall
+    d.rectangle([35, 41, 77, 75], fill=(236, 196, 140))
+    d.ellipse([92, 128, 228, 236], fill=(120, 160, 200))  # you: a cosy jumper,
+    d.rectangle([146, 112, 174, 136], fill=(232, 190, 154))
+    d.ellipse([118, 38, 202, 110], fill=(84, 58, 44))  # your hair,
+    d.ellipse([126, 52, 194, 128], fill=(238, 198, 162))  # your face,
+    d.pieslice([120, 36, 200, 92], 180, 360, fill=(84, 58, 44))
+    for x in (146, 174):
+        d.ellipse([x - 4, 82, x + 4, 92], fill=(60, 44, 40))
+        d.ellipse([x - 11, 96, x - 1, 104] if x < 160 else [x + 1, 96, x + 11, 104], fill=(244, 170, 160))
+    d.arc([146, 92, 174, 116], 20, 160, fill=(150, 80, 70), width=3)  # and a smile
+    d.rectangle([0, 160, W, H], fill=(150, 112, 84))  # the edge of the desk
+    if blur > 0.05:
+        img = img.filter(ImageFilter.GaussianBlur(blur))
+    if abs(bright - 1) > 0.01:
+        img = ImageEnhance.Brightness(img).enhance(bright)
+    return img
+
+
 def legend_atlas(labels):
     """One texture with every legend on the keyboard drawn in white (its corners' colours tint it), and where
     each one is."""
@@ -1008,7 +1303,8 @@ def art():
     """Every icon and texture, drawn once."""
     if not ART:
         for name in ("hand", "driver", "puller", "switcher", "brush", "lube", "sound", "mute", "music", "music_off",
-                     "power", "home", "help", "star", "keycap", "switch", "again", "close", "dot"):
+                     "power", "home", "help", "star", "keycap", "switch", "again", "close", "dot", "swab", "blower",
+                     "solder"):
             ART[name] = Texture(draw_icon(name), filtering="mipmap")
         ART["game"] = Texture(draw_game_icon(256), filtering="mipmap")
         ART["wood"] = Texture(draw_wood(), filtering="mipmap")
@@ -1040,6 +1336,11 @@ class Part3D:
         self.more = []  # more meshes of its own that move by themselves (a mouse's buttons), painted with it
         self.tags = set()
         self.hit = self.clicker(f"part-{key}")
+        self.material = None  # what it sounds like coming off and going on, when its key doesn't say
+        self.twist = None  # "x", "y" or "z": it unscrews by hand (a grille, a cap), turning about that axis
+        self.thumb = False  # a thumb screw: it turns by hand, as well as with the screwdriver
+        self.spin = "y"  # which way round a screw (or a knob) turns: about y (upright), x or z
+        self.grimy = False  # (a mic's foam that wants a wash)
 
     def clicker(self, name, tag=None):
         """A set of click boxes that tell the mouse which part they belong to (and, for a screw hole, which)."""
@@ -1083,6 +1384,20 @@ class Part3D:
         if hit:
             self.target(center, size, tag)
 
+    def lathe(self, profile, axis, center, tint=None, fixed=SILVER, hit=True, tag=None, segments=20):
+        """A round piece turned on a lathe (see Shapes.lathe), clickable by the box round it."""
+        self.colour(tint, fixed).lathe(profile, axis, self.rel(center), segments)
+        along = [a for a, _ in profile]
+        r, mid, length = max(r for _, r in profile), (min(along) + max(along)) / 2, max(along) - min(along)
+        i = "xyz".index(axis)
+        c = [center[0], center[1], center[2]]
+        c[i] += mid
+        size = [2 * r, 2 * r, 2 * r]
+        size[i] = max(length, 0.04)
+        self.grow(c, size)
+        if hit:
+            self.target(c, size, tag)
+
     def wire(self, points, thickness, fixed, hit=False):
         """A wire bent along points, one straight bit at a time (each bit runs along one axis)."""
         for a, b in zip(points, points[1:]):
@@ -1098,8 +1413,9 @@ class Part3D:
 
     def repaint(self, colours):
         for tag in self.tags:
-            for mesh in [self.mesh] + self.more:
-                mesh.paint(0, tag, colours[tag])
+            if tag in colours:  # (a tag of its own, like a mic's foam, is painted by itself)
+                for mesh in [self.mesh] + self.more:
+                    mesh.paint(0, tag, colours[tag])
 
     @property
     def paintable(self):
@@ -1181,11 +1497,27 @@ class KeyItem:
         keyset.items.append(self)
 
 
-class Dirt:
-    """Crumbs, dust and hair on one part, brushed away a speck at a time."""
+# How messy a thing comes in: a new level for every job. The builders scatter MESS_MOST times the specks a dusty one
+# has, and each part keeps its own share of them (some a lot, some none at all), so it's never the same twice.
+MESS_MOST = 1.8
+MESS_LEVELS = ((0.3, "Nearly clean"), (0.7, "A bit dusty"), (1.05, "Dusty"), (1.4, "Grubby"), (1.8, "Filthy"))
+_mess = {"level": 1.05}  # (this job's, while it's being built)
 
-    def __init__(self, host, specks):
+
+class Dirt:
+    """Crumbs, dust and hair on one part, brushed away a speck at a time. It keeps its share of the specks it's
+    given, as messy as this job is (and least of them, whatever)."""
+
+    def __init__(self, host, specks, delicate=False, least=0):
         self.host = host
+        self.delicate = delicate  # on a mic's capsule: only air may touch it, never the brush
+        if specks:
+            rnd = specks[0][4]
+            share = _mess["level"] * rnd.uniform(0.35, 1.45) / MESS_MOST
+            if rnd.random() < 0.12 / _mess["level"]:  # now and then, a part that's stayed clean
+                share = 0.0
+            keep = min(len(specks), max(least, 3 if delicate else 0, round(len(specks) * min(1.0, share))))
+            specks = rnd.sample(specks, keep)
         shapes = Shapes()
         self.points = []
         for i, (kind, x, y, z, rnd) in enumerate(specks):
@@ -1272,12 +1604,17 @@ class Board:
         self.caps = self.switches = None
         self.keys, self.rows = [], []
         self.dirt, self.trinket = [], None
+        self.mess = "Dusty"  # how messy it came in (see MESS_LEVELS)
         self.size = self.inner = (0, 0)
         self.space_x = 0.0
         self.stab_of = {}  # key number -> the stabiliser under it
         self.knob = None
         self.height = FRAME_Y[1]  # how tall it is, put together
         self.mouse = {}  # a mouse's moving bits, for its test: its buttons, its wheel, its logo
+        self.mic = {}  # a mic's: its lights, the knots in its cable, the crust on its contacts
+        self.special = {}  # what its own job needs: which key is sticky, the spill, the pairing light...
+        self.legend_where = {}  # where each legend is in the keycaps' texture
+        self.attach = []  # (shapes, part key, name, hidden): meshes of their own on a part, made once it's finished
 
     def in_order(self):
         """Every part, in the order it's built: they're made in that order, with the switches and keycaps going in
@@ -1320,6 +1657,8 @@ def build_keyboard(kb, spec, extras=True, seed=None):
         knob_at = (spec["knob"][0] - wu / 2, -(spec["knob"][1] - hu / 2))
     # The keycaps that want a wash: the ones typed on most, mostly (or, on an old keyboard, every one)
     grime = spec.get("grime", 0.12)
+    if grime < 1:  # (as grubby as this one's messy)
+        grime *= _mess["level"]
     worn = {"Space", "Enter", "Back", "Shift", "E", "A", "S", "D", "W", "R", "T", "O", "N", "I", "0", "1", "5", "Ent",
             "+"}
     grimy = {i for i, k in enumerate(keys)
@@ -1332,10 +1671,74 @@ def build_keyboard(kb, spec, extras=True, seed=None):
         reach = min((w if wide else h) / 2 - 0.4, 2.7)
         return wide, [(cx + d * reach, cz) if wide else (cx, cz + d * reach) for d in (-1, 1)]
 
-    sx, sz = cw / 2 - 0.9, cd / 2 - 0.8
-    spots = [(-sx, -sz), (sx, -sz), (-sx, sz), (sx, sz), (0, -sz), (0, sz)]  # screws: the four corners are under feet
-    px = wu / 2 - 3.0  # where the USB socket is, along the back
+    px = wu / 2 - 3.0 if wu > 8 else 0.0  # where the USB socket is, along the back (a number pad's is in the middle)
     back_in = cd / 2 - WALL  # the inside of the back wall
+    uz = back_in - 0.5  # the middle of the USB board, just inside it
+    lw = min(3.6, cw - 1.6)  # the sticker underneath
+    lh = lw * 168 / 512
+    # The chip that reads the keys sits where there's room on top of the circuit board: under the space bar, between
+    # its switch and the stabiliser at its left end. A number pad has no room on top, so its chip is underneath.
+    space = next((k for k in keys if k[0] == "Space"), None)
+    mcu = (space[1] - 1.45, space[2]) if space else None
+    battery_at = (0.0, -0.6, min(5.0, wu / 2 - 1.0), 2.2) if spec.get("wireless") else None  # (x, z, width, depth)
+    weight_at = (wu * 0.4, hu * 0.42) if spec.get("weight") else None  # (width, depth), in the middle
+    lead_x = battery_at[0] + battery_at[2] / 2 - 0.4 if battery_at else None  # where the battery's lead plugs in
+
+    def clear_of(x, z, boxes, r):
+        """Is a circle of radius r at (x, z) clear of every one of these boxes (x0, x1, z0, z1)?"""
+        for x0, x1, z0, z1 in boxes:
+            dx, dz = max(x0 - x, 0.0, x - x1), max(z0 - z, 0.0, z - z1)
+            if dx * dx + dz * dz < r * r:
+                return False
+        return True
+
+    # Where the screws go. Each goes up through a post in the bottom case to a mounting hole in the circuit board,
+    # so it has to miss everything: on the board, each switch's pads, the stabilisers' holes, the chip, the knob's
+    # encoder and the sockets; in the case, the USB board, the battery, the weight and the ribs on the floor;
+    # underneath, the sticker and the receiver's slot. They go in the gaps between the switches, where four keys
+    # meet: one at each corner, under a rubber foot, and on a bigger board one or two along the front and the back.
+    on_board = [(cx - 0.37, cx + 0.37, cz - 0.37, cz + 0.37) for _, cx, cz, _, _ in keys]
+    for i in long_keys:
+        wide, ends = stab_ends(*keys[i][1:])
+        on_board += [(ex - (0.13 if wide else 0.21), ex + (0.13 if wide else 0.21),
+                      ez - (0.21 if wide else 0.13), ez + (0.21 if wide else 0.13)) for ex, ez in ends]
+    if mcu:
+        on_board.append((mcu[0] - 0.68, mcu[0] + 0.85, mcu[1] - 0.58, mcu[1] + 0.58))
+    if knob_at:
+        on_board.append((knob_at[0] - 0.31, knob_at[0] + 0.31, knob_at[1] - 0.31, knob_at[1] + 0.31))
+    on_board.append((px - 1.25, px - 0.75, hu / 2 - 0.08, hu / 2 + 0.12))  # the internal cable's socket
+    in_case = [(px - 1.1, px + 1.1, uz - 0.45, back_in)] + [(x - 0.06, x + 0.06, -cd / 2, cd / 2)
+                                                            for x in (-wu / 4, wu / 4)]
+    if battery_at:
+        bx, bz, bw, bd = battery_at
+        on_board.append((lead_x - 0.21, lead_x + 0.21, hu / 2 - 0.04, hu / 2 + 0.14))
+        in_case += [(bx - bw / 2 - 0.1, bx + bw / 2 + 0.1, bz - bd / 2 - 0.1, bz + bd / 2 + 0.1),
+                    (lead_x - 0.1, lead_x + 0.1, bz + bd / 2, hu / 2 + 0.25)]  # (and its lead, along the floor)
+    if weight_at:
+        in_case.append((-weight_at[0] / 2 - 0.1, weight_at[0] / 2 + 0.1, -weight_at[1] / 2 - 0.1,
+                        weight_at[1] / 2 + 0.1))
+    underneath = [(-lw / 2, lw / 2, -0.3 - lh / 2, -0.3 + lh / 2)]
+    if spec.get("wireless"):
+        underneath.append((cw / 4 - 0.75, cw / 4 + 0.75, 0.2 - 0.375, 0.2 + 0.375))
+    gaps = {(round(x, 3), round(z, 3)) for _, cx, cz, w, h in keys for x in (cx - w / 2, cx + w / 2)
+            for z in (cz - h / 2, cz + h / 2)}
+    gaps |= {(sx_ * wu / 2, sz_ * hu / 2) for sx_ in (-1, 1) for sz_ in (-1, 1)}  # (the corners, if no key's there)
+    spots = []
+
+    def screw_spot(tx, tz, under):
+        """The gap nearest (tx, tz) that a screw fits in, `under` being the room its foot or head takes."""
+        fits = [(math.hypot(x - tx, z - tz), x, z) for x, z in sorted(gaps)
+                if clear_of(x, z, on_board, 0.17) and clear_of(x, z, in_case, 0.3) and clear_of(x, z, underneath, under)
+                and all(math.hypot(x - a, z - b) > 1.5 for a, b in spots)]
+        assert fits, f"{spec['key']}: nowhere for a screw near {tx:.2f}, {tz:.2f}"
+        return min(fits)[1:]
+    for tz in (-hu / 2, hu / 2):  # the four corners, first: (their screws are under the feet)
+        for tx in (-wu / 2, wu / 2):
+            spots.append(screw_spot(tx, tz, 0.47))
+    middle = [] if wu <= 8 else [0.0] if wu <= 16.5 else [-wu / 6, wu / 6]
+    for tz in (-hu / 2, hu / 2):
+        for tx in middle:
+            spots.append(screw_spot(tx, tz, 0.27))
 
     # The bottom case: floor, walls, the posts the screws go up into, the USB opening; underneath, the holes and
     # the sticker
@@ -1348,8 +1751,9 @@ def build_keyboard(kb, spec, extras=True, seed=None):
     for x, z in spots:
         case.post((x, FLOOR, z), 0.28, PCB_Y - 0.06 - FLOOR, "inside", hit=False)
         case.post((x, PCB_Y - 0.06, z), 0.1, -0.01, fixed=BLACK, hit=False)  # the screw's hole in the post
-    for x in (-wu / 4, wu / 4):  # ribs that stiffen the floor
-        case.box((x, FLOOR + 0.05, 0), (0.12, 0.1, cd - 2 * WALL), "inside", hit=False)
+    for x in (-wu / 4, wu / 4):  # ribs that stiffen the floor (stopping short of the USB board, where it's over one)
+        z0, z1 = -cd / 2 + WALL, (uz - 0.5 if abs(x - px) < 1.2 else back_in)
+        case.box((x, FLOOR + 0.05, (z0 + z1) / 2), (0.12, 0.1, z1 - z0), "inside", hit=False)
     case.box((px, 0.45, cd / 2 + 0.006), (0.8, 0.34, 0.01), fixed=BLACK, hit=False)  # the opening for the socket
     for i, (x, z) in enumerate(spots):
         case.post((x, 0, z), 0.24, -0.02, fixed=(24, 26, 30), tag=("hole", i), segments=12)
@@ -1358,23 +1762,21 @@ def build_keyboard(kb, spec, extras=True, seed=None):
         case.box((px + 1.38, 0.6, cd / 2 + 0.035), (0.22, 0.14, 0.05), fixed=spec["accent"], hit=False)
         case.box((cw / 4, -0.006, 0.2), (1.5, 0.01, 0.75), fixed=(24, 26, 30), hit=False)
     label = Shapes().use((255, 255, 255))
-    lw, lh = min(3.6, cw - 1.6), min(3.6, cw - 1.6) * 168 / 512
     label.quad((-lw / 2, -0.008, -0.3 + lh / 2), (lw / 2, -0.008, -0.3 + lh / 2), (lw / 2, -0.008, -0.3 - lh / 2),
                (-lw / 2, -0.008, -0.3 - lh / 2), (0, -1, 0), [(0, 0), (1, 0), (1, 1), (0, 1)])  # reads turned over
     case.extras.append((label, Texture(draw_label(spec), filtering="mipmap")))
 
-    legs = part("legs", "flip-out legs", ["bottom_case"], lift=(0, -1, 0))
-    if cw > 8:
-        leg, spread = 1.6, cw / 2 - 2.4
-    else:  # a number pad's are smaller, and closer in
-        leg, spread = min(1.6, cw / 4 - 0.3), cw / 4
-    for x in (-spread, spread):
-        legs.box((x, -0.04, cd / 2 - 0.45), (leg + 0.1, 0.08, 0.18), fixed=(60, 62, 70))  # the hinge
-        legs.box((x, -0.07, cd / 2 - 0.85), (leg, 0.1, 0.7), "legs")
-        legs.box((x, -0.13, cd / 2 - 1.15), (leg - 0.2, 0.03, 0.12), fixed=RUBBER, hit=False)  # its rubber tip
+    if wu > 8:  # flip-out legs at the back, just inside the back feet (a number pad just sits flat on its feet)
+        legs = part("legs", "flip-out legs", ["bottom_case"], lift=(0, -1, 0))
+        leg = 1.6
+        for side in (-1, 1):
+            x = spots[3 if side > 0 else 2][0] - side * (0.42 + 0.3 + leg / 2)  # (a gap between it and the foot)
+            legs.box((x, -0.04, cd / 2 - 0.45), (leg + 0.1, 0.08, 0.18), fixed=(60, 62, 70))  # the hinge
+            # folded flat, a leg is no deeper than the feet, so the keyboard stands on its feet, not on its legs
+            legs.box((x, -0.06, cd / 2 - 0.85), (leg, 0.08, 0.7), "legs")
+            legs.box((x, -0.1, cd / 2 - 1.15), (leg - 0.2, 0.02, 0.12), fixed=RUBBER, hit=False)  # its rubber tip
 
     usb = part("usb_board", "USB board", ["bottom_case"])
-    uz = back_in - 0.5
     usb.box((px, 0.31, uz), (2.2, 0.12, 0.9), fixed=PCB_GREEN)
     usb.box((px, 0.48, back_in), (0.62, 0.22, 0.5), fixed=SILVER)  # the USB-C socket, into the back wall
     usb.box((px, 0.48, back_in + 0.26), (0.36, 0.08, 0.03), fixed=BLACK, hit=False)  # its opening
@@ -1394,8 +1796,8 @@ def build_keyboard(kb, spec, extras=True, seed=None):
 
     under_foam = ["bottom_case"]
     holes = [(x - 0.4, x + 0.4, z - 0.4, z + 0.4) for x, z in spots] + [(px - 1.2, px + 1.2, uz - 0.6, back_in)]
-    if spec.get("weight"):  # a heavy brass bar on the floor: it makes the keyboard sit solid and sound deeper
-        ww, wd = wu * 0.4, hu * 0.42
+    if weight_at:  # a heavy brass bar on the floor: it makes the keyboard sit solid and sound deeper
+        ww, wd = weight_at
         weight = part("weight", "brass weight", ["bottom_case"])
         weight.box((0, FLOOR + 0.07, 0), (ww, 0.14, wd), fixed=(204, 166, 92))
         for k in range(3):  # brushed lines, and the maker's mark
@@ -1404,11 +1806,8 @@ def build_keyboard(kb, spec, extras=True, seed=None):
         weight.post((ww / 2 - 0.6, FLOOR + 0.14, 0), 0.22, 0.008, fixed=(224, 190, 116), hit=False)
         under_foam.append("weight")
         holes.append((-ww / 2 - 0.1, ww / 2 + 0.1, -wd / 2 - 0.1, wd / 2 + 0.1))
-    battery_at = None
-    if spec.get("wireless"):  # a flat battery pouch on the floor, in a hole in the foam
-        bw, bd = min(5.0, wu / 2 - 1.0), 2.2  # (between the ribs on the floor)
-        bx, bz = 0.0, -0.6
-        battery_at = (bx, bz, bw, bd)
+    if battery_at:  # a flat battery pouch on the floor, in a hole in the foam (between the ribs on the floor)
+        bx, bz, bw, bd = battery_at
         battery = part("battery", "battery", ["bottom_case"])
         battery.box((bx, FLOOR + 0.06, bz), (bw, 0.12, bd), fixed=(176, 184, 198))
         battery.box((bx, FLOOR + 0.122, bz), (bw - 0.4, 0.004, bd * 0.5), fixed=(96, 140, 196), hit=False)  # label
@@ -1431,19 +1830,26 @@ def build_keyboard(kb, spec, extras=True, seed=None):
             pcb.box((cx + dx, top + 0.008, cz + dz), (0.12, 0.016, 0.12), fixed=GOLDEN, hit=False)
         pcb.box((cx - 0.33, top + 0.02, cz - 0.15), (0.07, 0.04, 0.18), fixed=BLACK, hit=False)  # the diode
         pcb.box((cx, top + 0.02, cz - 0.27), (0.22, 0.04, 0.12), fixed=WHITE, hit=False)  # its light
-    mx, mz = -wu / 2 + 1.6, hu / 2 - 0.65  # the chip that reads the keys, with its pins
-    pcb.box((mx, top + 0.04, mz), (0.9, 0.08, 0.9), fixed=BLACK, hit=False)
+    for i in long_keys:  # the holes the stabilisers' housings clip through
+        wide, ends = stab_ends(*keys[i][1:])
+        for ex, ez in ends:
+            pcb.box((ex, top + 0.006, ez), (0.22, 0.012, 0.36) if wide else (0.36, 0.012, 0.22), fixed=BLACK, hit=False)
+    # the chip that reads the keys, with its pins, its crystal and its capacitors (see mcu, above)
+    mx, mz = mcu if mcu else (0.0, 0.0)
+    face, up = (top, 1) if mcu else (PCB_Y - 0.06, -1)  # (on top, or on the underside)
+    pcb.box((mx, face + up * 0.04, mz), (0.9, 0.08, 0.9), fixed=BLACK, hit=False)
     for k in range(8):
         off = -0.35 + k * 0.1
         for dx, dz in ((off, 0.5), (off, -0.5), (0.5, off), (-0.5, off)):
-            pcb.box((mx + dx, top + 0.012, mz + dz), (0.05 if abs(dz) == 0.5 else 0.12, 0.024,
-                                                     0.12 if abs(dz) == 0.5 else 0.05), fixed=SILVER, hit=False)
-    pcb.box((mx + 1.0, top + 0.05, mz), (0.42, 0.1, 0.2), fixed=SILVER, hit=False)  # the crystal
+            pcb.box((mx + dx, face + up * 0.012, mz + dz), (0.05 if abs(dz) == 0.5 else 0.12, 0.024,
+                                                           0.12 if abs(dz) == 0.5 else 0.05), fixed=SILVER, hit=False)
+    pcb.box((mx + 0.72, face + up * 0.05, mz + 0.12), (0.2, 0.1, 0.42), fixed=SILVER, hit=False)  # the crystal
     for k in range(5):
-        pcb.box((mx - 0.4 + k * 0.22, top + 0.02, mz - 0.75), (0.1, 0.04, 0.06), fixed=(190, 150, 100), hit=False)
+        pcb.box((mx - 0.62, face + up * 0.02, mz - 0.4 + k * 0.2), (0.06, 0.04, 0.1), fixed=(190, 150, 100), hit=False)
     pcb.box((px - 1.0, top + 0.07, hu / 2 + 0.02), (0.5, 0.14, 0.2), fixed=WHITE, hit=False)  # the cable's socket
-    for x, z in spots:  # the mounting holes
-        pcb.post((x, top, z), 0.2, 0.01, fixed=GOLDEN, hit=False)
+    for x, z in spots:  # the mounting holes: a plated ring round each, for the screw's post to bear on
+        pcb.post((x, top, z), 0.15, 0.01, fixed=GOLDEN, hit=False)
+        pcb.post((x, top, z), 0.07, 0.012, fixed=BLACK, hit=False)
     if knob_at:  # the knob's encoder, soldered on, its shaft up through the plate (the knob itself pulls off)
         kx, kz = knob_at
         pcb.box((kx, top + 0.15, kz), (0.62, 0.3, 0.62), fixed=(40, 42, 48), hit=False)
@@ -1452,7 +1858,7 @@ def build_keyboard(kb, spec, extras=True, seed=None):
     later = []  # what has to be off before the plate foam and the plate go on
     if battery_at:  # the battery's lead: up the back, round the board's edge, and plugged in on top
         bx, bz, bw, bd = battery_at
-        lx = bx + bw / 2 - 0.4
+        lx = lead_x
         lead = part("battery_lead", "battery lead", ["battery", "pcb"])
         lead.box((lx, top + 0.07, hu / 2 + 0.05), (0.42, 0.12, 0.17), fixed=WHITE)
         for d, col in ((-0.07, WIRES[0]), (0.07, WIRES[1])):
@@ -1534,7 +1940,10 @@ def build_keyboard(kb, spec, extras=True, seed=None):
 
     # A keycap for every key, with its legend on top
     used = [KEY_LEGENDS.get(k[0], k[0]) for k in keys]
+    if spec.get("special") == "fn_layer":  # the arrows its Fn layer puts on I, J, K and L
+        used += [KEY_LEGENDS[a] for a in ("Up", "Left", "Down", "Right")]
     atlas, where = legend_atlas([t for t in used if t])
+    board.legend_where = where
     caps, legends = Shapes(), Shapes()
     for i, (label_, cx, cz, w, h) in enumerate(keys):
         body, ink = cap_colours(spec, label_, None)
@@ -1577,7 +1986,10 @@ def build_keyboard(kb, spec, extras=True, seed=None):
         frame.box((0, fy, z * (idp + cd) / 4), (cw, fh, (cd - idp) / 2), "frame")
     for x in (1, -1):
         frame.box((x * (iw + cw) / 4, fy, 0), ((cw - iw) / 2, fh, idp), "frame")
-    for k in range(3):  # its lock lights
+    # its lock lights: Num, Caps and Scroll Lock on a board with a number pad or a Scroll Lock key; just the one on a
+    # number pad (Num Lock) or a small board (Caps Lock)
+    lights = 1 if spec["size"] in ("numpad", "60", "65", "75") else 3
+    for k in range(lights):
         frame.box((cw / 2 - 0.9 - k * 0.45, FRAME_Y[1] + 0.01, cd / 2 - 0.27), (0.14, 0.02, 0.14), fixed=(40, 60, 44),
                   hit=False)
 
@@ -1622,6 +2034,23 @@ def build_keyboard(kb, spec, extras=True, seed=None):
         stab.lube = dabs.mesh(stab.root, f"lube on {stab.key}").np
         stab.lube.stash()
 
+    special = spec.get("special")
+    if special == "sticky":  # a spilled drink, dried round one of the letters: its switch sticks down
+        sticky = rnd.choice([i for i, k in enumerate(keys) if len(k[0]) == 1 and k[0].isalpha()])
+        _, cx, cz, _, _ = keys[sticky]
+        spill = Shapes()
+        for dx, dz, w, d, col in ((0, 0, 1.06, 0.98, (150, 104, 52)), (0.12, -0.1, 0.84, 1.2, (166, 118, 60)),
+                                  (-0.16, 0.12, 0.7, 0.86, (138, 94, 46)), (0.3, 0.3, 0.4, 0.36, (176, 128, 66))):
+            spill.use(col).box((cx + dx, PLATE_Y + 0.041 + 0.002 * (dx > 0), cz + dz), (w, 0.004, d))
+        board.special["sticky"] = sticky
+        board.special["spill"] = spill.mesh(plate.root, "spill").np  # (it shows through round the switch)
+    if special == "pair":  # a little status light on the frame, by the lock lights: it blinks blue to pair
+        light = Shapes().use((255, 255, 255), "light")
+        light.box((cw / 2 - 0.9 - lights * 0.45, FRAME_Y[1] + 0.012, cd / 2 - 0.27), (0.2, 0.024, 0.2))
+        frame_part = next(p for p in parts if p.key == "top_frame")
+        board.special["light"] = light.mesh(frame_part.root, "pairing light", shadow=False)
+        board.special["light"].paint(0, "light", (40, 52, 70))
+
     if extras:
         def gap_point():
             """A spot on the plate between the switch holes, where crumbs collect."""
@@ -1633,20 +2062,22 @@ def build_keyboard(kb, spec, extras=True, seed=None):
                 if not any(a - 0.05 < x < b + 0.05 and c - 0.05 < z < d + 0.05 for a, b, c, d in plate_holes):
                     return x, z
             return 0.0, -hu / 2 - 0.15
-        more = spec.get("dirt", 1.0)
+        more = spec.get("dirt", 1.0) * MESS_MOST
         specks = []
         for _ in range(round(min(38, 4 + len(keys) / 2.4) * more)):  # (a small keyboard has less room for crumbs)
             x, z = gap_point()
             specks.append((rnd.choice(("dust", "dust", "crumb", "crumb", "hair")) if len(specks) % 9 else "hair",
                            x, PLATE_Y + 0.04, z, rnd))
-        board.dirt.append(Dirt(plate, specks))
+        board.dirt.append(Dirt(plate, specks, least=12 if special == "shake" else 0))  # (enough to shake out)
         specks = []
         for _ in range(round(min(14, 3 + len(keys) / 7) * more)):
             x, z = rnd.uniform(-wu / 2 + 0.3, wu / 2 - 0.3), rnd.uniform(-hu / 2 + 0.3, hu / 2 - 0.3)
             specks.append((rnd.choice(("dust", "dust", "crumb")), x, top + 0.02, z, rnd))
         board.dirt.append(Dirt(pcb, specks))
         kind = rnd.choice(TRINKETS)
-        if rnd.random() < 0.6:
+        if rnd.random() < 0.2:  # (not always something lost in there)
+            pass
+        elif rnd.random() < 0.6:
             x, z = gap_point()
             board.trinket = Trinket(kind, plate, (x, PLATE_Y + 0.04, z), rnd.uniform(0, 360))
         else:
@@ -1706,9 +2137,11 @@ def build_mouse(kb, spec, extras=True, seed=None):
         ts = [t0 + (t1 - t0) * k / n for k in range(n + 1)]
         return [(half(t) * scale, z(t)) for t in ts] + [(-half(t) * scale, z(t)) for t in reversed(ts)]
 
-    sensor_t = 0.72 if wireless else 0.45
+    # The sensor looks down through the floor, near the middle; in a wireless mouse the battery is there, so the
+    # sensor sits in front of it, just behind the wheel (it clears the wheel's underside).
+    sensor_t = 0.67 if wireless else 0.45
     sz = z(sensor_t)
-    bay = (0.22, 0.58) if wireless else None  # the battery's bay, in the floor
+    bay = (0.115, 0.585) if wireless else None  # the battery's bay, in the floor: long enough to lift an AA out of
     bw = 1.25  # (its width)
 
     # The bottom shell: its floor (with a window for the sensor, and a bay for a battery), the rim round it
@@ -1742,9 +2175,9 @@ def build_mouse(kb, spec, extras=True, seed=None):
         label.quad((-lw / 2, -0.008, lz + lh / 2), (lw / 2, -0.008, lz + lh / 2), (lw / 2, -0.008, lz - lh / 2),
                    (-lw / 2, -0.008, lz - lh / 2), (0, -1, 0), [(0, 0), (1, 0), (1, 1), (0, 1)])
         shell.extras.append((label, Texture(draw_label(spec), filtering="mipmap")))
-    else:  # its on/off switch, on the bottom
-        shell.box((0, -0.004, z(0.63)), (0.5, 0.01, 0.22), fixed=BLACK, hit=False)
-        shell.box((-0.1, -0.012, z(0.63)), (0.18, 0.012, 0.16), fixed=spec["accent"], hit=False)
+    else:  # its on/off switch, on the bottom, in front of the sensor
+        shell.box((0, -0.004, z(0.8)), (0.5, 0.01, 0.22), fixed=BLACK, hit=False)
+        shell.box((-0.1, -0.012, z(0.8)), (0.18, 0.012, 0.16), fixed=spec["accent"], hit=False)
 
     lens = part("lens", "sensor lens", ["bottom_shell"])
     lens.box((0, MOUSE_FLOOR + 0.06, sz), (0.62, 0.12, 0.72), fixed=(176, 214, 226))
@@ -1758,7 +2191,7 @@ def build_mouse(kb, spec, extras=True, seed=None):
         under_board.append("mouse_weight")
 
     # The circuit board: its two main switches under the buttons, the wheel's encoder, the sensor, a chip
-    t0 = 0.62 if wireless else 0.14
+    t0 = 0.595 if wireless else 0.14  # where the board starts (a wireless one's, just past the battery's + end)
     y0, y1 = MOUSE_PCB
     pcb = part("pcb", "circuit board", under_board)
     pcb.shapes.use(PCB_GREEN).slab(outline(0.8, t0, 0.95, 12), y0, y1)
@@ -1769,6 +2202,8 @@ def build_mouse(kb, spec, extras=True, seed=None):
         x = side * half(switch_t) * 0.42
         pcb.box((x, y1 + 0.12, z(switch_t)), (0.5, 0.24, 0.42), fixed=BLACK, hit=False)
         pcb.box((x, y1 + 0.27, z(switch_t)), (0.12, 0.06, 0.12), fixed=WHITE, hit=False)
+        if side == -1 and spec.get("special") == "double_click":  # the worn left one, to click on by itself
+            pcb.target((x, y1 + 0.16, z(switch_t)), (0.56, 0.34, 0.48), ("left switch",))
     wheel_t, R = 0.79, 0.4
     wz = z(wheel_t)
     wy = top(wheel_t) - R + 0.14  # (it pokes up out of the slot between the buttons)
@@ -1778,7 +2213,8 @@ def build_mouse(kb, spec, extras=True, seed=None):
     for k in range(4):
         for side in (-1, 1):
             pcb.box((side * 0.38, y1 + 0.02, sz - 0.27 + k * 0.18), (0.08, 0.03, 0.06), fixed=SILVER, hit=False)
-    pcb.box((0.3, y1 + 0.03, sz - 0.48), (0.12, 0.06, 0.12), fixed=(210, 50, 50), hit=False)  # its red light
+    led = (-0.45, sz + 0.44) if wireless else (0.3, sz - 0.48)  # its red light (on the board, beside the sensor)
+    pcb.box((led[0], y1 + 0.03, led[1]), (0.12, 0.06, 0.12), fixed=(210, 50, 50), hit=False)
     chip_x, chip_t = (-0.75, 0.68) if wireless else (-0.45, 0.3)
     pcb.box((chip_x, y1 + 0.03, z(chip_t)), (0.5, 0.06, 0.5), fixed=BLACK, hit=False)
     for k in range(0 if wireless else 3):
@@ -1786,7 +2222,7 @@ def build_mouse(kb, spec, extras=True, seed=None):
     if spec.get("rgb"):  # the lights for its logo
         for k in range(3):
             pcb.box((-0.25 + k * 0.25, y1 + 0.03, z(0.24)), (0.14, 0.06, 0.14), fixed=WHITE, hit=False)
-    sx_, sz_ = 0.55, z(0.66 if wireless else 0.6)  # its little screw's hole
+    sx_, sz_ = (0.62, z(0.66)) if wireless else (0.55, z(0.6))  # its little screw's hole (clear of the sensor's pins)
     pcb.post((sx_, y1, sz_), 0.16, 0.006, fixed=GOLDEN, hit=False)
     pcb.target((sx_, y1 + 0.012, sz_), (0.34, 0.024, 0.34), ("hole", 0))  # (below the screw's head, when it's in)  # (the screws are counted in build order)
     plug_at = (-0.55, z(0.92))
@@ -1806,7 +2242,9 @@ def build_mouse(kb, spec, extras=True, seed=None):
         side_board.box((sxb, 0.78, z(side_t)), (0.06, 0.46, 1.0), fixed=PCB_GREEN)
         for k in (-1, 1):
             side_board.box((sxb - 0.08, 0.86, z(side_t) + k * 0.24), (0.1, 0.18, 0.24), fixed=BLACK, hit=False)
-        side_board.wire([(sxb + 0.05, 0.6, z(side_t)), (sxb + 0.4, y1 + 0.04, z(side_t))], 0.05, (220, 180, 90))
+        side_board.wire([(sxb + 0.03, 0.6, z(side_t)), (sxb + 0.25, 0.6, z(side_t)),  # (bent along: wire() draws
+                         (sxb + 0.25, y1 + 0.03, z(side_t)), (sxb + 0.45, y1 + 0.03, z(side_t))],  # straight runs)
+                        0.05, (220, 180, 90))
         under_top.append("side_board")
 
     wheel = part("wheel", "scroll wheel", ["pcb"], origin=(0, wy, wz))
@@ -1824,8 +2262,9 @@ def build_mouse(kb, spec, extras=True, seed=None):
         cable = part("cable", "USB cable", ["pcb", "bottom_shell"], lift=(0, 0.4, 1))
         cy = MOUSE_BASE + 0.12
         cable.box((plug_at[0], y1 + 0.2, plug_at[1]), (0.46, 0.12, 0.2), fixed=WHITE)  # its plug, in the socket
-        cable.wire([(plug_at[0], y1 + 0.26, plug_at[1]), (plug_at[0], cy, plug_at[1]), (0, cy, plug_at[1]),
-                    (0, cy, L / 2 - 0.1)], 0.06, (40, 40, 44))
+        nose = L / 2 - 0.22  # (it runs up its own side to the nose, then across: clear of a screw in the middle)
+        cable.wire([(plug_at[0], y1 + 0.26, plug_at[1]), (plug_at[0], cy, plug_at[1]), (plug_at[0], cy, nose),
+                    (0, cy, nose), (0, cy, L / 2 - 0.1)], 0.06, (40, 40, 44))
         cable.colour("cable", None).rod((0, cy, L / 2 - 0.15), (0, cy, L / 2 + 0.45), 0.24)  # its strain relief
         route = [(0, cy, L / 2 + 0.45), (0.08, cy - 0.08, L / 2 + 1.2), (0.45, cy - 0.18, L / 2 + 1.85),
                  (1.1, cy - 0.24, L / 2 + 2.3), (1.9, cy - 0.27, L / 2 + 2.55)]
@@ -1870,21 +2309,38 @@ def build_mouse(kb, spec, extras=True, seed=None):
         p = dome()(0.24, math.pi / 2)
         logo = Shapes().use(spec["accent"], "logo")
         logo.slab([(-0.28, p[2]), (0, p[2] + 0.2), (0.28, p[2]), (0, p[2] - 0.2)], p[1] - 0.02, p[1] + 0.012)
+    dpi_light = None
+    if spec.get("special") == "dpi":  # a DPI button in the slot behind the wheel, and a light that shows its speed
+        p = dome(0.05)(0.69, math.pi / 2)
+        top_shell.box((0, p[1] + 0.03, p[2]), (0.17, 0.08, 0.3), fixed=(54, 56, 64), hit=False)
+        top_shell.target((0, p[1] + 0.05, p[2]), (0.36, 0.3, 0.42), ("dpi",))
+        q = dome()(0.6, math.pi / 2)
+        dpi_light = Shapes().use((255, 255, 255), "light")
+        dpi_light.box((0, q[1] + 0.006, q[2]), (0.1, 0.02, 0.22))
 
-    # Underneath: the screws, each under a foot
+    # Underneath: the screws, each under a foot, up through a boss in the bottom shell into the top shell. The
+    # front ones are in front of the main switches; where one goes up through the circuit board, the board has a
+    # hole for it, and rests on its boss.
     n = spec["feet"]
     if n == 2:
         spots, feet = [(0, 0.1), (0, 0.93)], [(0, 0.1, 1.5, 0.32), (0, 0.92, 1.7, 0.28)]
     elif n == 3:
-        spots = [(0, 0.08), (-0.5, 0.88), (0.5, 0.88)]
-        feet = [(0, 0.08, 1.2, 0.3), (-0.5, 0.88, 0.42, 0.42), (0.5, 0.88, 0.42, 0.42)]
+        spots = [(0, 0.07), (-0.5, 0.93), (0.5, 0.93)]
+        feet = [(0, 0.07, 1.2, 0.3), (-0.5, 0.93, 0.42, 0.42), (0.5, 0.93, 0.42, 0.42)]
     else:
-        spots = [(-0.55, 0.13), (0.55, 0.13), (-0.55, 0.88), (0.55, 0.88)]
+        spots = [(-0.55, 0.11), (0.55, 0.11), (-0.55, 0.92), (0.55, 0.92)]
         feet = [(x, t, 0.5, 0.5) for x, t in spots]
     screws = []
     for i, (fx, t) in enumerate(spots):
         x = fx * half(t) * 1.25
         zz = z(t)
+        through = t0 <= t <= 0.95  # (it goes up through the circuit board)
+        boss_top = y0 if through else MOUSE_BASE
+        shell.post((x, MOUSE_FLOOR, zz), 0.15, boss_top - MOUSE_FLOOR, "inside", hit=False)  # its boss
+        shell.post((x, boss_top, zz), 0.06, 0.004, fixed=BLACK, hit=False)
+        if through:
+            pcb.post((x, y1, zz), 0.15, 0.006, fixed=GOLDEN, hit=False)
+            pcb.post((x, y1, zz), 0.065, 0.008, fixed=BLACK, hit=False)
         shell.post((x, 0, zz), 0.17, -0.004, fixed=(24, 26, 30), tag=("hole", i + 1), segments=12)  # its well
         s = part(f"screw{i}", "screw", ["top_shell"], lift=(0, -1, 0), screw=True, origin=(x, 0, zz))
         s.post((x, 0, zz), 0.15, -0.018, fixed=SILVER)
@@ -1908,18 +2364,28 @@ def build_mouse(kb, spec, extras=True, seed=None):
 
     if wireless:  # under a cover on the bottom: an AA battery, and the receiver tucked in beside it
         bz0, bz1 = z(bay[0]), z(bay[1])
-        bm = (bz0 + bz1) / 2
+        bm = (bz0 + bz1) / 2 - 0.06  # (its + nub sticks out the front: so centred, all of it fits in the bay)
         battery = part("mouse_battery", "AA battery", ["bottom_shell", "top_shell"], lift=(0, -1, 0))
-        battery.shapes.use((70, 150, 96)).axle((-0.2, 0.38, bm), 0.36, 2.4, 18, along="z")
-        battery.shapes.use((212, 176, 90)).axle((-0.2, 0.38, bm + 0.8), 0.365, 0.4, 18, along="z")
+        flat = spec.get("special") == "battery"  # (it came in with a tired old one, faded and scuffed)
+        battery.shapes.use((128, 132, 120) if flat else (70, 150, 96)).axle((-0.2, 0.38, bm), 0.36, 2.4, 18,
+                                                                           along="z")
+        battery.shapes.use((150, 140, 112) if flat else (212, 176, 90)).axle((-0.2, 0.38, bm + 0.8), 0.365, 0.4, 18,
+                                                                              along="z")
         battery.shapes.use(SILVER).axle((-0.2, 0.38, bm + 1.26), 0.12, 0.12, 10, along="z")  # its + end
+        if flat:  # and a fresh one, ready to swap in
+            fresh = Shapes()
+            fresh.use((70, 150, 96)).axle((-0.2, 0.38, bm), 0.36, 2.4, 18, along="z")
+            fresh.use((212, 176, 90)).axle((-0.2, 0.38, bm + 0.8), 0.365, 0.4, 18, along="z")
+            fresh.use((236, 236, 230)).axle((-0.2, 0.38, bm - 0.4), 0.37, 0.5, 18, along="z")  # its white band
+            fresh.use(SILVER).axle((-0.2, 0.38, bm + 1.26), 0.12, 0.12, 10, along="z")
+            board.special["fresh"] = fresh
         battery.grow((-0.2, 0.38, bm), (0.74, 0.74, 2.6))
         battery.target((-0.2, 0.38, bm), (0.74, 0.74, 2.6))
         receiver = part("receiver", "USB receiver", ["bottom_shell", "top_shell"], lift=(0, -1, 0))
         receiver.box((0.42, 0.12, bm - 0.15), (0.3, 0.14, 0.7), fixed=(40, 42, 48))
         receiver.box((0.42, 0.12, bm + 0.32), (0.26, 0.1, 0.3), fixed=SILVER)
         cover = part("battery_cover", "battery cover", ["mouse_battery", "receiver"], lift=(0, -1, 0))
-        cover.box((0, -0.012, bm), (bw + 0.2, 0.03, bz1 - bz0 + 0.16), "inside")
+        cover.box((0, -0.012, (bz0 + bz1) / 2), (bw + 0.2, 0.03, bz1 - bz0 + 0.16), "inside")
         for k in range(4):  # the ridges you push it off by
             cover.box((0, -0.03, bz0 + 0.15 + k * 0.1), (0.5, 0.01, 0.04), fixed=(40, 40, 46), hit=False)
 
@@ -1931,6 +2397,14 @@ def build_mouse(kb, spec, extras=True, seed=None):
         board.mouse[name] = mesh.np
     if logo is not None:
         board.mouse["logo"] = logo.mesh(top_shell.root, "logo", shadow=False)
+    if dpi_light is not None:
+        board.mouse["dpi"] = dpi_light.mesh(top_shell.root, "DPI light", shadow=False)
+        board.mouse["dpi"].paint(0, "light", (226, 92, 80))  # (its first speed: red)
+    if "fresh" in board.special:  # the fresh battery, hidden away until it's swapped in
+        battery = next(p for p in parts if p.key == "mouse_battery")
+        board.special["old"] = battery.mesh.np
+        board.special["fresh"] = board.special["fresh"].mesh(battery.root, "fresh battery").np
+        board.special["fresh"].stash()
     for p in parts:
         if p.paintable:
             p.repaint(part_colours(spec, None))
@@ -1939,15 +2413,15 @@ def build_mouse(kb, spec, extras=True, seed=None):
 
     if extras:  # hair caught round the wheel, dust on the board, crumbs in the bottom
         specks = []
-        for _ in range(3):  # caught round the wheel's axle
+        for _ in range(5):  # caught round the wheel's axle
             specks.append(("hair", rnd.uniform(-0.2, 0.2), y1 + 0.02, wz + rnd.uniform(-0.5, 0.5), rnd))
-        for _ in range(9):
+        for _ in range(16):
             t = rnd.uniform(t0 + 0.04, 0.9)
             specks.append((rnd.choice(("dust", "dust", "hair", "crumb")), rnd.uniform(-0.5, 0.5) * half(t), y1 + 0.02,
                            z(t), rnd))
         board.dirt.append(Dirt(pcb, specks))
         specks = []
-        for _ in range(8):
+        for _ in range(15):
             t = rnd.uniform(0.1, 0.9)
             if bay and bay[0] - 0.03 < t < bay[1] + 0.03:
                 continue
@@ -1958,9 +2432,1736 @@ def build_mouse(kb, spec, extras=True, seed=None):
     return board
 
 
+# ---- microphones ----
+
+def ball_profile(radius, t1=math.pi, tip=-1, steps=12):
+    """A ball as a lathe profile, from its tip (along the axis, the way tip says) round to t1 radians (pi is all the
+    way round; less leaves it open at the back, the way a grille is where it screws on)."""
+    return [(tip * radius * math.cos(t1 * k / steps), radius * math.sin(t1 * k / steps)) for k in range(steps + 1)]
+
+
+def mesh_lines(part, center, radius, axis="x", tip=-1, t1=math.pi, rings=5, spokes=12, colour=(150, 152, 160),
+               thick=0.024):
+    """A ball grille's wire mesh, just proud of the ball: rings round it, and lines over it from its tip."""
+    R = radius * 1.012
+
+    def at(t, a):
+        along, r = tip * R * math.cos(t), R * math.sin(t)
+        c, s = r * math.cos(a), r * math.sin(a)
+        x, y, z = center
+        p = (x + along, y + c, z + s) if axis == "x" else (x + c, y + along, z + s) if axis == "y" else \
+            (x + c, y + s, z + along)
+        return part.rel(p)
+    s = part.shapes.use(colour)
+    for k in range(1, rings + 1):
+        t = t1 * k / (rings + 1)
+        pts = [at(t, 2 * math.pi * j / 18) for j in range(19)]
+        for a, b in zip(pts, pts[1:]):
+            s.rod(a, b, thick)
+    for j in range(spokes):
+        pts = [at(0.14 + (t1 - 0.14) * k / 8, 2 * math.pi * j / spokes) for k in range(9)]
+        for a, b in zip(pts, pts[1:]):
+            s.rod(a, b, thick)
+
+
+def knurl(part, center, radius, length, axis="x", n=14, colour=(150, 152, 160)):
+    """Ridges round a collar or a knob, the grip your fingers turn it by."""
+    x, y, z = center
+    s = part.shapes.use(colour)
+    for k in range(n):
+        a = 2 * math.pi * k / n
+        c, d = math.cos(a) * radius, math.sin(a) * radius
+        if axis == "x":
+            s.rod(part.rel((x - length / 2, y + c, z + d)), part.rel((x + length / 2, y + c, z + d)), 0.04)
+        elif axis == "y":
+            s.rod(part.rel((x + c, y - length / 2, z + d)), part.rel((x + c, y + length / 2, z + d)), 0.04)
+        else:
+            s.rod(part.rel((x + c, y + d, z - length / 2)), part.rel((x + c, y + d, z + length / 2)), 0.04)
+
+
+def specks_on(rnd, n, where, kinds=("dust", "dust", "hair", "crumb")):
+    """Specks of dust (or crumbs, or hair) at spots where() picks: n on a dusty one (so, for Dirt to pick from, as
+    many as on the messiest)."""
+    return [(rnd.choice(kinds), *where(), rnd) for _ in range(round(n * MESS_MOST))]
+
+
+def build_stage_mic(board, part, spec, rnd, extras):
+    """A dynamic stage mic, lying on its side: the handle, the ball grille that screws onto it (with a foam
+    windscreen lining it), the capsule on its rubber shock mount, the XLR insert in the tail held by a grub screw
+    underneath, and the cable."""
+    cy, gx, R = 1.3, -3.3, 1.3
+    body = part("body", "handle")
+    body.lathe([(-2.15, 0.0), (-2.15, 0.96), (-1.8, 1.02), (-1.45, 0.97), (-1.2, 0.9), (4.3, 0.64), (4.55, 0.6),
+                (4.55, 0.5)], "x", (0, cy, 0), "case", hit=False)
+    body.lathe([(-1.66, 1.035), (-1.5, 1.012)], "x", (0, cy, 0), fixed=spec["accent"], hit=False)  # a coloured band
+    body.target((1.0, cy, 0), (5.8, 1.9, 1.9))  # (not round the tail, where the XLR insert is)
+    sy = cy - 0.64  # (the underside of the handle there)
+    body.post((4.3, sy, 0), 0.13, -0.012, fixed=(24, 26, 30), tag=("hole", 0))  # the grub screw's hole
+    mount = part("shock_mount", "shock mount", ["body"], lift=(-1, 0.3, 0))
+    mount.lathe([(-2.3, 0.5), (-2.3, 0.84), (-1.9, 0.84), (-1.9, 0.5)], "x", (0, cy, 0), fixed=RUBBER)
+    mount.material = "rubber"
+    capsule = part("capsule", "capsule", ["shock_mount"], lift=(-1, 0.3, 0))
+    capsule.lathe([(-3.95, 0.0), (-3.95, 0.6), (-3.8, 0.7), (-2.3, 0.7), (-2.3, 0.0)], "x", (0, cy, 0),
+                  fixed=(48, 48, 54))
+    capsule.lathe([(-3.97, 0.0), (-3.97, 0.48)], "x", (0, cy, 0), fixed=(132, 134, 142), hit=False)  # its front
+    capsule.material = "board"
+    foam = part("foam", "foam windscreen", ["capsule"], lift=(-1, 0.35, 0))
+    foam.lathe(ball_profile(1.2, 2.5), "x", (gx, cy, 0), "foam")
+    foam.material, foam.grimy = "foam", True
+    grille = part("grille", "ball grille", ["foam", "body"], lift=(-1, 0, 0), origin=(gx, cy, 0))
+    grille.lathe(ball_profile(R, 2.42) + [(1.0, 0.99), (1.18, 0.99)], "x", (gx, cy, 0), fixed=(204, 206, 212))
+    mesh_lines(grille, (gx, cy, 0), R, "x", -1, 2.42, rings=5, spokes=14)
+    grille.twist, grille.material = "x", "metal"
+    insert = part("xlr_insert", "XLR insert", ["body", "capsule"], lift=(1, 0, 0))
+    insert.lathe([(4.05, 0.0), (4.05, 0.49), (4.62, 0.49), (4.62, 0.0)], "x", (0, cy, 0), fixed=(36, 36, 42))
+    for py, pz in ((0.2, 0.0), (-0.12, -0.17), (-0.12, 0.17)):  # its three pins
+        insert.shapes.use(SILVER).axle(insert.rel((4.68, cy + py, pz)), 0.055, 0.12, 8)
+    insert.material = "cable"
+    screw = part("screw0", "grub screw", ["xlr_insert"], lift=(0, -1, 0), screw=True, origin=(4.3, sy, 0))
+    screw.post((4.3, sy, 0), 0.11, -0.03, fixed=SILVER)
+    screw.box((4.3, sy - 0.032, 0), (0.18, 0.01, 0.035), fixed=(108, 110, 120), hit=False)
+    cable = part("cable", "XLR cable", ["xlr_insert"], lift=(1, 0.25, 0))
+    cable.lathe([(4.64, 0.0), (4.64, 0.56), (5.9, 0.52), (6.25, 0.32), (6.6, 0.2), (6.6, 0.0)], "x", (0, cy, 0),
+                "cable")
+    route = [(6.6, cy, 0), (7.3, cy - 0.25, 0.4), (7.9, cy - 0.45, 1.3), (8.2, cy - 0.55, 2.6)]
+    for a, b in zip(route, route[1:]):
+        cable.colour("cable", None).rod(a, b, 0.2)
+    cable.grow((7.4, cy - 0.3, 1.2), (1.8, 0.6, 2.8))
+    cable.material = "cable"
+    if extras:  # dust on the capsule, under the grille; and on the handle, from years of hands
+        board.dirt.append(Dirt(capsule, specks_on(rnd, 8, lambda: (rnd.uniform(-3.7, -2.5), cy + 0.71,
+                                                                 rnd.uniform(-0.3, 0.3)))))
+        def on_handle():
+            x = rnd.uniform(-0.8, 3.8)
+            return x, cy + 0.9 - (x + 1.2) * 0.26 / 5.5, rnd.uniform(-0.15, 0.15)
+        board.dirt.append(Dirt(body, specks_on(rnd, 6, on_handle, ("dust", "dust", "hair"))))
+    board.size = board.inner = (11.4, 3.2)
+    board.height = cy + R
+
+
+def build_lav_mic(board, part, spec, rnd, extras):
+    """A lavalier: the tiny capsule (big on the bench), its foam windscreen and tie clip, and the long thin cable
+    to its little locking connector. The cable has tied itself in knots."""
+    cy, cz = 0.66, -0.9  # the capsule's axis (its foam ball rests on the mat, as the cable does)
+    lie = 0.06  # the cable's middle, lying on the mat
+    pts = []
+    for k in range(41):  # the cable, from the middle of the capsule's tail, down onto the mat and across it
+        t = k / 40
+        x = -1.85 + 4.35 * t
+        z = cz + (0.7 - cz) * t + 1.1 * math.sin(math.pi * 3 * t) * (1 - abs(2 * t - 1)) ** 0.5
+        y = lie + (cy - lie) * max(0.0, 1 - k / 3) ** 2 if k < 40 else 0.3  # (and up into its connector)
+        pts.append((x, y, z))
+    cable = part("cable", "cable")
+    for a, b in zip(pts, pts[1:]):
+        cable.colour("cable", None).rod(a, b, 0.12)
+    for k in range(0, 40, 4):
+        cable.target(pts[k], (0.42, 0.32, 0.42))
+    cable.grow((0.3, cy / 2, 0.0), (4.6, cy + 0.1, 3.6))
+    cable.material = "cable"
+    knots = []
+    spots = sorted(rnd.sample((7, 13, 19, 25, 31), rnd.randint(2, 4)))  # (along it, somewhere: never two together)
+    for k, i in enumerate(i + rnd.randint(-1, 1) for i in spots):  # each knot, a little loop of the cable pulled tight
+        x, y, z = pts[i]
+        knot = Shapes().use(spec["cable"])
+        loop = [(x + 0.22 * math.sin(2 * math.pi * j / 12), y + 0.22 * (1 - math.cos(2 * math.pi * j / 12)), z +
+                 0.08 * math.sin(4 * math.pi * j / 12)) for j in range(13)]
+        for a, b in zip(loop, loop[1:]):
+            knot.rod(a, b, 0.1)
+        knot.box((x, y + 0.04, z), (0.24, 0.16, 0.2))
+        knots.append(knot)
+        cable.target((x, y + 0.2, z), (0.62, 0.6, 0.62), ("knot", k))
+    capsule = part("capsule", "capsule", ["cable"], lift=(0, 1, 0))
+    capsule.lathe([(-3.25, 0.0), (-3.25, 0.4), (-3.1, 0.44), (-2.0, 0.44), (-1.85, 0.22), (-1.85, 0.0)], "x",
+                  (0, cy, cz), "case")
+    capsule.lathe([(-3.27, 0.0), (-3.27, 0.3)], "x", (0, cy, cz), fixed=(150, 152, 160), hit=False)
+    capsule.material = "board"
+    foam = part("foam", "foam windscreen", ["capsule"], lift=(-1, 0.6, 0))
+    foam.lathe(ball_profile(0.66, 2.3), "x", (-3.05, cy, cz), fixed=(56, 56, 62))
+    foam.material = "foam"
+    clip = part("clip", "tie clip", ["capsule"], lift=(0, 1, 0))
+    for dy in (0.48, -0.48):  # its jaws, round the capsule
+        clip.box((-2.4, cy + dy, cz), (0.5, 0.08, 0.5), fixed=SILVER)
+    clip.box((-2.4, cy, cz + 0.52), (0.5, 1.04, 0.08), fixed=SILVER)
+    for dy in (0.12, -0.1):  # and the spring clip, for a shirt or a tie
+        clip.box((-2.4, cy + dy, cz + 1.1), (0.44, 0.06, 1.1), fixed=(176, 178, 186))
+    clip.material = "metal"
+    con = part("connector", "TA4 connector", ["cable"], lift=(1, 0.3, 0))
+    con.lathe([(2.5, 0.0), (2.5, 0.22), (2.7, 0.3), (3.7, 0.3), (3.76, 0.0)], "x", (0, 0.3, 0.7), fixed=(34, 34, 40))
+    con.material = "cable"
+    collar = part("collar", "locking collar", ["connector"], lift=(1, 0, 0), origin=(3.25, 0.3, 0.7))
+    collar.lathe([(2.95, 0.31), (2.95, 0.37), (3.55, 0.37), (3.55, 0.31)], "x", (0, 0.3, 0.7), fixed=SILVER)
+    knurl(collar, (3.25, 0.3, 0.7), 0.375, 0.5, "x")
+    collar.twist, collar.material = "x", "metal"
+    board.special["knots"] = knots  # (meshed once the cable is: see build_mic)
+    if extras:  # lint and dust along the cable
+        board.dirt.append(Dirt(cable, [(rnd.choice(("dust", "dust", "hair")), pts[k][0], lie + 0.07, pts[k][2], rnd)
+                                       for k in rnd.sample(range(3, 38), 16)]))
+    board.size = board.inner = (8.6, 4.2)
+    board.height = cy + 0.66
+
+
+def build_podcast_mic(board, part, spec, rnd, extras):
+    """A USB podcast mic standing in its yoke on a desk stand: the stand, the yoke, the body (its mute button and
+    its light on the front), the thumb screws that hold it in the yoke, the gain knob, the capsule under the
+    grille that screws off the top, and round the back the USB board under a panel held by a screw, and the
+    cable."""
+    base = part("base", "stand base")
+    base.post((0, 0, 0), 2.1, 0.3, "inside", segments=28)
+    base.post((0, 0.3, 0), 0.3, 0.32, fixed=SILVER, hit=False)  # the stem the yoke turns on
+    for k in range(4):  # rubber feet underneath, so it doesn't slide about the desk
+        a = math.pi / 4 + k * math.pi / 2
+        base.post((math.cos(a) * 1.6, 0, math.sin(a) * 1.6), 0.26, -0.06, fixed=RUBBER, hit=False)
+    base.material = "metal"
+    yoke = part("yoke", "yoke", ["base"])
+    yoke.box((0, 0.72, 0), (3.3, 0.2, 0.5), "frame")
+    for i, x in enumerate((-1.55, 1.55)):
+        yoke.box((x, 2.0, 0), (0.2, 2.6, 0.5), "frame")
+        yoke.target((x * 1.12, 3.0, 0), (0.5, 0.8, 0.8), ("hole", i))  # where its thumb screw goes in
+    yoke.material = "metal"
+    body = part("body", "mic body", ["yoke"])
+    # The body: round, with an opening in its back for the USB board, under the back panel (so the board shows
+    # once the panel's off), and a recess inside that the board sits in. The panel's screw goes into the body just
+    # above the opening.
+    lo, hi = 1.55, 2.97  # (the opening, bottom to top)
+    body.lathe([(1.4, 0.0), (1.4, 0.98), (1.5, 1.05), (lo, 1.05)], "y", (0, 0, 0), "case", hit=False, segments=48)
+    body.lathe([(hi, 1.05), (5.95, 1.05), (6.05, 1.0), (6.05, 0.0)], "y", (0, 0, 0), "case", hit=False, segments=48)
+    gap = math.radians(22.5)  # half the opening, round the body (0.8 wide): its edges on the round parts' facets
+    body.colour("case", None).surface(lambda u, v: (math.cos(v) * 1.05, lo + (hi - lo) * u, math.sin(v) * 1.05),
+                                      0, 1, 2, math.pi / 2 + gap, math.pi / 2 - gap + 2 * math.pi, 42,
+                                      lambda p: (0, p[1], 0))
+    recess, side = (40, 40, 44), 1.05 * math.sin(gap)
+    body.box((0, (lo + hi) / 2, 0.5), (2 * side, hi - lo, 0.06), fixed=recess, hit=False)  # its back wall
+    for x in (-side, side):  # and its sides
+        body.box((x, (lo + hi) / 2, 0.74), (0.02, hi - lo, 0.48), fixed=recess, hit=False)
+    for y in (lo, hi):  # bottom and top
+        body.box((0, y, 0.74), (2 * side, 0.02, 0.48), fixed=recess, hit=False)
+    body.target((0, 3.72, -0.28), (2.1, 4.65, 1.55))  # (all but the bottom of its back, where the USB board is)
+    body.target((0, 4.68, 0.78), (2.1, 2.74, 0.55))
+    body.shapes.use((64, 64, 70)).axle(body.rel((0, 5.25, -1.07)), 0.22, 0.12, 18, along="z")  # the mute button
+    body.target((0, 5.25, -1.15), (0.6, 0.6, 0.4), ("mute",))
+    light = Shapes().use((255, 255, 255), "light")
+    light.box((0, 5.72, -1.03), (0.38, 0.08, 0.06))
+    for i, x in enumerate((-1.75, 1.75)):  # the thumb screws, through the yoke into the body
+        s = part(f"screw{i}", "thumb screw", ["body"], lift=(math.copysign(1, x), 0, 0), screw=True,
+                 origin=(x, 3.0, 0))
+        s.shapes.use((54, 56, 62)).axle(s.rel((x, 3.0, 0)), 0.36, 0.26, 18)
+        knurl(s, (x, 3.0, 0), 0.37, 0.24, "x", 12, (40, 42, 48))
+        s.shapes.use(SILVER).axle(s.rel((math.copysign(1.31, x), 3.0, 0)), 0.09, 0.62, 8)  # (through the yoke, in)
+        s.grow((x, 3.0, 0), (0.3, 0.74, 0.74))
+        s.target((x, 3.0, 0), (0.34, 0.8, 0.8))
+        s.thumb, s.spin = True, "x"
+    knob = part("gain_knob", "gain knob", ["body"], lift=(0, 0, -1), origin=(0, 3.2, -1.25))
+    knob.shapes.use(spec["accent"]).axle(knob.rel((0, 3.2, -1.25)), 0.4, 0.34, 22, along="z")
+    knob.box((0, 3.45, -1.43), (0.07, 0.22, 0.02), fixed=CREAM, hit=False)  # its mark
+    knob.grow((0, 3.2, -1.25), (0.8, 0.8, 0.34))
+    knob.target((0, 3.2, -1.25), (0.84, 0.84, 0.4))
+    knob.spin, knob.material = "z", "cable"
+    capsule = part("capsule", "capsule", ["body"], lift=(0, 1, 0))
+    capsule.lathe([(5.4, 0.0), (5.4, 0.72), (6.5, 0.72), (6.5, 0.0)], "y", (0, 0, 0), fixed=(212, 176, 90))
+    capsule.lathe([(6.52, 0.0), (6.52, 0.55)], "y", (0, 0, 0), fixed=(236, 206, 120), hit=False)
+    capsule.material = "board"
+    grille = part("grille", "grille", ["capsule"], lift=(0, 1, 0), origin=(0, 6.9, 0))
+    dome = [(5.98, 1.03), (6.1, 1.08), (7.0, 1.08)] + [(7.0 + 0.8 * math.sin(math.pi / 2 * k / 8),
+                                                        1.08 * math.cos(math.pi / 2 * k / 8)) for k in range(1, 9)]
+    grille.lathe(dome, "y", (0, 0, 0), fixed=(206, 208, 214))
+    for k in range(5):  # its mesh: rings round it, and lines up it
+        grille.shapes.use((150, 152, 160)).ring(grille.rel((0, 6.25 + k * 0.2, 0)), 1.092, 0.024)
+    for j in range(16):
+        a = 2 * math.pi * j / 16
+        c, s_ = math.cos(a) * 1.092, math.sin(a) * 1.092
+        grille.shapes.use((150, 152, 160)).rod(grille.rel((c, 6.15, s_)), grille.rel((c, 7.0, s_)), 0.024)
+    grille.twist, grille.material = "y", "metal"
+    usb = part("usb_board", "USB board", ["body"], lift=(0, 0, 1))
+    usb.box((0, 2.26, 0.62), (0.76, 1.3, 0.1), fixed=PCB_GREEN)  # (in the recess: it comes out through the opening)
+    usb.box((0, 1.8, 0.86), (0.5, 0.2, 0.36), fixed=SILVER, hit=False)  # the USB-C socket, out to the panel
+    usb.box((0, 2.75, 0.85), (0.3, 0.3, 0.36), fixed=BLACK, hit=False)  # the headphone jack, behind its socket
+    usb.box((0, 2.25, 0.72), (0.36, 0.36, 0.1), fixed=BLACK, hit=False)  # its chip
+    usb.material = "board"
+    panel = part("rear_panel", "back panel", ["usb_board"], lift=(0, 0, 1))
+    panel.box((0, 2.35, 1.06), (1.0, 1.8, 0.08), "frame")
+    panel.box((0, 1.8, 1.105), (0.36, 0.12, 0.02), fixed=BLACK, hit=False)  # the USB port's opening
+    panel.box((0, 2.75, 1.105), (0.16, 0.16, 0.02), fixed=BLACK, hit=False)  # the headphone socket
+    panel.target((0, 3.05, 1.1), (0.3, 0.3, 0.12), ("hole", 2))
+    s = part("screw2", "panel screw", ["rear_panel"], lift=(0, 0, 1), screw=True, origin=(0, 3.05, 1.12))
+    s.shapes.use(SILVER).axle(s.rel((0, 3.05, 1.13)), 0.1, 0.05, 12, along="z")
+    s.box((0, 3.05, 1.157), (0.16, 0.03, 0.01), fixed=(108, 110, 120), hit=False)
+    s.grow((0, 3.05, 1.13), (0.2, 0.2, 0.06))
+    s.target((0, 3.05, 1.13), (0.26, 0.26, 0.1))
+    s.spin = "z"
+    cable = part("cable", "USB-C cable", ["rear_panel", "usb_board"], lift=(0, 0, 1))
+    cable.box((0, 1.8, 1.37), (0.34, 0.2, 0.5), "cable")  # its plug: the grip outside,
+    cable.box((0, 1.8, 1.05), (0.3, 0.09, 0.16), fixed=SILVER)  # and its metal tip, in through the panel to the socket
+    route = [(0, 1.8, 1.62), (0, 1.62, 2.3), (0.2, 0.7, 2.85), (0.6, 0.18, 3.5), (1.4, 0.12, 4.3)]
+    for a, b in zip(route, route[1:]):
+        cable.colour("cable", None).rod(a, b, 0.14)
+    cable.grow((0.6, 0.9, 3.0), (1.6, 1.8, 3.0))
+    cable.material = "cable"
+    board.mic["light"] = light  # (meshed onto the body once it's made: see build_mic)
+    board.knob = knob
+    if extras:  # dust on the stand's base, and on the capsule under the grille
+        def on_base():
+            a, r = rnd.uniform(0, 2 * math.pi), rnd.uniform(0.6, 1.9)
+            return math.cos(a) * r, 0.31, math.sin(a) * r
+        board.dirt.append(Dirt(base, specks_on(rnd, 9, on_base, ("dust", "dust", "crumb", "hair"))))
+        board.dirt.append(Dirt(capsule, specks_on(rnd, 4, lambda: (rnd.uniform(-0.4, 0.4), 6.53,
+                                                                    rnd.uniform(-0.4, 0.4)), ("dust",))))
+    board.size = board.inner = (5.0, 5.0)
+    board.height = 7.8
+
+
+def build_wireless_mic(board, part, spec, rnd, extras):
+    """A wireless handheld mic, lying on its side: the body (its little screen, its light and its power switch on
+    top), the ball grille and the capsule under it, and the sleeve that twists off the handle to show the two AA
+    batteries, between their contacts."""
+    cy, gx, R = 1.2, -3.55, 1.15
+    body = part("body", "mic body")
+    body.lathe([(-2.45, 0.0), (-2.45, 0.86), (-2.15, 0.93), (-1.85, 0.86), (0.95, 0.72), (1.0, 0.3), (1.0, 0.0)],
+               "x", (0, cy, 0), "case", hit=False)
+    body.lathe([(5.3, 0.0), (5.3, 0.62), (5.5, 0.6), (5.85, 0.42), (5.85, 0.0)], "x", (0, cy, 0), "case", hit=False)
+    body.box((3.15, cy - 0.44, 0), (4.3, 0.1, 0.56), fixed=(60, 62, 70), hit=False)  # the spine the batteries lie on
+    body.target((-0.75, cy, 0), (3.4, 1.8, 1.8))  # (its head end and its tail: the batteries lie between)
+    body.target((5.58, cy, 0), (0.55, 1.3, 1.3))
+    body.box((-0.55, cy + 0.805, 0), (0.6, 0.04, 0.4), fixed=(24, 28, 34), hit=False)  # its screen, on the handle
+    body.box((0.45, cy + 0.74, 0), (0.34, 0.1, 0.2), fixed=(80, 82, 90), hit=False)  # its power switch
+    body.target((0.45, cy + 0.78, 0), (0.5, 0.3, 0.42), ("power",))
+    light = Shapes().use((255, 255, 255), "light")
+    light.box((-0.55, cy + 0.83, 0), (0.4, 0.016, 0.24))
+    crust = []
+    crusty = rnd.choice(({0}, {1}, {0, 1}, {0, 1}))  # (which of them the leak got to)
+    for k, x in enumerate((1.04, 5.26)):  # the battery contacts, at each end of the bay, crusted green-white
+        body.box((x, cy, 0), (0.05, 0.36, 0.36), fixed=SILVER, hit=False)
+        body.target((x, cy, 0), (0.42, 0.6, 0.6), ("contact", k))
+        if k not in crusty:
+            crust.append(None)
+            continue
+        lumps = Shapes()
+        for _ in range(rnd.randint(4, 10)):
+            s = rnd.uniform(0.06, 0.12)
+            lumps.use(rnd.choice(((196, 218, 196), (150, 196, 168), (226, 232, 214)))).box(
+                (x + (0.04 if k == 0 else -0.04), cy + rnd.uniform(-0.15, 0.15), rnd.uniform(-0.15, 0.15)),
+                (s * 0.6, s, s))
+        crust.append(lumps)
+    capsule = part("capsule", "capsule", ["body"], lift=(-1, 0.3, 0))
+    capsule.lathe([(-4.15, 0.0), (-4.15, 0.55), (-4.0, 0.62), (-2.5, 0.62), (-2.5, 0.0)], "x", (0, cy, 0),
+                  fixed=(44, 44, 50))
+    capsule.material = "board"
+    grille = part("grille", "ball grille", ["capsule", "body"], lift=(-1, 0, 0), origin=(gx, cy, 0))
+    grille.lathe(ball_profile(R, 2.45) + [(0.92, 0.88), (1.12, 0.88)], "x", (gx, cy, 0), fixed=(52, 54, 62))
+    mesh_lines(grille, (gx, cy, 0), R, "x", -1, 2.45, rings=5, spokes=14, colour=(30, 30, 36))
+    grille.twist, grille.material = "x", "metal"
+    # Two AA batteries, end to end, + to -: the second one's + end against the flat contact at the tail, and the
+    # first one's - end against a coil spring on the contact at the head end (it takes up the slack, as in a torch)
+    spring = [(1.065 + 0.17 * j / 30, cy - 0.04 + 0.16 * math.cos(j * math.pi / 5), 0.16 * math.sin(j * math.pi / 5))
+              for j in range(31)]
+    for a, b in zip(spring, spring[1:]):
+        body.shapes.use(SILVER).rod(body.rel(a), body.rel(b), 0.03)
+    for k, bx in enumerate((2.185, 4.135)):
+        b = part(f"battery{k}", "AA battery", ["body"], lift=(0, 1, 0))
+        b.shapes.use((70, 150, 96)).axle(b.rel((bx, cy - 0.04, 0)), 0.34, 1.8, 18)
+        b.shapes.use((212, 176, 90)).axle(b.rel((bx + 0.6, cy - 0.04, 0)), 0.345, 0.4, 18)
+        b.shapes.use(SILVER).axle(b.rel((bx + 0.95, cy - 0.04, 0)), 0.11, 0.1, 10)
+        b.grow((bx, cy, 0), (2.0, 0.7, 0.7))
+        b.target((bx, cy, 0), (2.0, 0.7, 0.7))
+        b.material = "metal"
+    sleeve = part("sleeve", "battery sleeve", ["battery0", "battery1", "body"], lift=(1, 0, 0),
+                  origin=(3.15, cy, 0))
+    sleeve.lathe([(1.0, 0.7), (1.0, 0.74), (5.25, 0.6), (5.25, 0.55)], "x", (0, cy, 0), "case")
+    sleeve.twist = "x"
+    board.mic["light"] = light
+    board.special["crust"] = crust
+    if extras:  # dust on the capsule, and on the handle
+        board.dirt.append(Dirt(capsule, specks_on(rnd, 7, lambda: (rnd.uniform(-3.9, -2.7), cy + 0.63,
+                                                                 rnd.uniform(-0.3, 0.3)))))
+        board.dirt.append(Dirt(body, specks_on(rnd, 5, lambda: (rnd.uniform(-1.6, 0.0), cy + 0.82,
+                                                              rnd.uniform(-0.2, 0.2)), ("dust", "hair"))))
+    board.size = board.inner = (10.6, 3.0)
+    board.height = cy + R
+
+
+def build_studio_mic(board, part, spec, rnd, extras):
+    """A large-diaphragm studio condenser in its spider shock mount, on a little desk stand: the stand, the shock
+    mount (its frame floats the mic on elastic bands), the thumb screw that clamps the mic in, the body, the
+    capsule on top (screwed down, its gold diaphragm under the headbasket), the ring nut at the bottom and the
+    XLR cable."""
+    stand = part("stand", "desk stand")
+    stand.post((0, 0, 1.0), 2.2, 0.28, "inside", segments=28)
+    stand.post((0, 0.28, 2.45), 0.16, 3.3, fixed=SILVER, hit=False)  # its pole, at the back
+    for k in range(4):  # rubber feet underneath
+        a = math.pi / 4 + k * math.pi / 2
+        stand.post((math.cos(a) * 1.7, 0, 1.0 + math.sin(a) * 1.7), 0.26, -0.06, fixed=RUBBER, hit=False)
+    stand.box((0, 3.58, 2.15), (0.3, 0.3, 0.75), fixed=SILVER, hit=False)  # and the arm over to the mount
+    stand.material = "metal"
+    mount = part("shock_mount", "shock mount", ["stand"])
+    for y in (2.7, 4.7):  # two hoops, each holding the mic on elastic bands
+        mount.colour("frame", None).ring(mount.rel((0, y, 0)), 1.85, 0.12)
+        mount.shapes.use((44, 44, 48)).ring(mount.rel((0, y, 0)), 1.24, 0.07)
+        for k in range(4):
+            a = math.pi / 4 + k * math.pi / 2
+            p = (math.cos(a) * 1.24, y, math.sin(a) * 1.24)
+            q = (math.cos(a + 0.6) * 1.85, y, math.sin(a + 0.6) * 1.85)
+            mount.shapes.use((30, 30, 34)).rod(mount.rel(p), mount.rel(q), 0.05)
+    for x in (-1.85, 1.85):
+        mount.box((x, 3.7, 0), (0.12, 2.0, 0.12), "frame", hit=False)
+    mount.box((0, 3.58, 1.84), (0.3, 2.1, 0.14), "frame", hit=False)
+    mount.grow((0, 3.7, 0), (3.84, 2.2, 3.84))
+    for x in (-1.85, 1.85):
+        mount.target((x, 3.7, 0), (0.4, 2.2, 0.6))
+    mount.target((0, 3.7, 1.84), (1.0, 2.2, 0.4))
+    mount.target((0, 2.7, -1.62), (0.6, 0.6, 0.5), ("hole", 2))  # where the clamp's thumb screw goes in
+    mount.material = "metal"
+    body = part("body", "mic body", ["shock_mount"])
+    body.lathe([(2.0, 0.0), (2.0, 1.08), (2.12, 1.15), (6.55, 1.15), (6.6, 1.1), (6.6, 0.0)], "y", (0, 0, 0), "case")
+    body.box((0, 5.6, -1.16), (0.5, 0.3, 0.02), fixed=spec["accent"], hit=False)  # its badge
+    for k, x in enumerate((-0.55, 0.55)):
+        body.target((x, 6.62, 0), (0.3, 0.12, 0.3), ("hole", k))  # where the capsule's screws go in
+    capsule = part("capsule", "capsule", ["body"], lift=(0, 1, 0))
+    capsule.box((0, 6.63, 0), (1.5, 0.06, 0.5), fixed=SILVER)  # its mounting plate
+    capsule.post((0, 6.66, 0), 0.1, 0.3, fixed=SILVER, hit=False)
+    capsule.shapes.use((40, 40, 46)).axle(capsule.rel((0, 7.75, 0)), 0.85, 0.36, 26, along="z")  # its rim
+    for side in (-1, 1):  # and the gold diaphragm, front and back
+        capsule.shapes.use((226, 190, 96)).axle(capsule.rel((0, 7.75, side * 0.19)), 0.72, 0.02, 26, along="z")
+    capsule.grow((0, 7.3, 0), (1.8, 1.4, 0.6))
+    capsule.target((0, 7.75, 0), (1.7, 1.7, 0.5))
+    capsule.material = "board"
+    for k, x in enumerate((-0.55, 0.55)):
+        s = part(f"screw{k}", "capsule screw", ["capsule"], lift=(0, 1, 0), screw=True, origin=(x, 6.66, 0))
+        s.post((x, 6.66, 0), 0.1, 0.05, fixed=SILVER)
+        s.box((x, 6.712, 0), (0.16, 0.01, 0.03), fixed=(108, 110, 120), hit=False)
+    clamp = part("screw2", "thumb screw", ["body"], lift=(0, 0, -1), screw=True, origin=(0, 2.7, -1.62))
+    clamp.shapes.use((54, 56, 62)).axle(clamp.rel((0, 2.7, -1.62)), 0.3, 0.24, 18, along="z")
+    knurl(clamp, (0, 2.7, -1.62), 0.31, 0.22, "z", 12, (40, 42, 48))
+    clamp.shapes.use(SILVER).axle(clamp.rel((0, 2.7, -1.36)), 0.07, 0.4, 8, along="z")
+    clamp.grow((0, 2.7, -1.5), (0.64, 0.64, 0.5))
+    clamp.target((0, 2.7, -1.62), (0.66, 0.66, 0.3))
+    clamp.thumb, clamp.spin = True, "z"
+    basket = part("headbasket", "headbasket", ["capsule", "screw0", "screw1"], lift=(0, 1, 0), origin=(0, 7.7, 0))
+    basket.lathe([(6.55, 1.16), (6.75, 1.2), (8.35, 1.2), (8.7, 0.9), (8.9, 0.4), (8.95, 0.0)], "y", (0, 0, 0),
+                 fixed=(212, 214, 220))
+    for k in range(6):
+        basket.shapes.use((150, 152, 160)).ring(basket.rel((0, 6.95 + k * 0.27, 0)), 1.212, 0.024)
+    for j in range(18):
+        a = 2 * math.pi * j / 18
+        c, s_ = math.cos(a) * 1.212, math.sin(a) * 1.212
+        basket.shapes.use((150, 152, 160)).rod(basket.rel((c, 6.8, s_)), basket.rel((c, 8.32, s_)), 0.024)
+    basket.twist, basket.material = "y", "metal"
+    nut = part("ring_nut", "ring nut", ["body"], lift=(0, -0.25, -1), origin=(0, 1.82, 0))
+    nut.lathe([(1.62, 1.0), (1.62, 1.13), (2.02, 1.13), (2.02, 1.0)], "y", (0, 0, 0), fixed=(176, 178, 186))
+    knurl(nut, (0, 1.82, 0), 1.14, 0.36, "y", 24)
+    nut.twist, nut.material = "y", "metal"
+    cable = part("cable", "XLR cable", ["ring_nut"], lift=(0, -0.2, -1))
+    cable.lathe([(0.9, 0.0), (0.9, 0.4), (1.55, 0.5), (1.6, 0.0)], "y", (0, 0, 0), "cable")
+    route = [(0, 0.9, 0), (0, 0.62, -0.8), (0.3, 0.4, -1.6), (0.8, 0.34, -2.6)]
+    for a, b in zip(route, route[1:]):
+        cable.colour("cable", None).rod(a, b, 0.2)
+    cable.grow((0.4, 0.6, -1.3), (1.2, 0.8, 2.6))
+    cable.material = "cable"
+    if extras:  # dust on the stand; and on the capsule's diaphragm, where only a puff of air may touch it
+        def on_stand():
+            a, r = rnd.uniform(0, 2 * math.pi), rnd.uniform(0.5, 2.0)
+            return math.cos(a) * r, 0.29, 1.0 + math.sin(a) * r
+        board.dirt.append(Dirt(stand, specks_on(rnd, 9, on_stand, ("dust", "dust", "crumb", "hair"))))
+
+        def on_diaphragm():
+            a, r = rnd.uniform(0, 2 * math.pi), rnd.uniform(0.1, 0.6)
+            return math.cos(a) * r, 7.75 + math.sin(a) * r, -0.215
+        board.dirt.append(Dirt(capsule, specks_on(rnd, 7, on_diaphragm, ("dust", "dust", "hair")), delicate=True))
+    board.size = board.inner = (5.4, 5.4)
+    board.height = 8.95
+
+
+# ---- webcams ----
+
+def capsule(r, half, center):
+    """A capsule lying along x (a pill: round in section, with round ends) as a surface f(u, v), u along it from end
+    to end and v round it (0 at the top, pi/2 at the back, pi underneath, 3pi/2 at the front)."""
+    cx, cy, cz = center
+    total = half + r
+
+    def f(u, v):
+        s = -total + 2 * total * u
+        rad = r if abs(s) <= half else math.sqrt(max(0.0, r * r - (abs(s) - half) ** 2))
+        return cx + s, cy + math.cos(v) * rad, cz + math.sin(v) * rad
+    return f
+
+
+def plank(shapes, a, b, width, thick):
+    """A flat bar from a to b, `width` across x and `thick` the other way: a clip's leg, a ribbon cable."""
+    A, B = Vec3(*a), Vec3(*b)
+    d = (B - A).normalized()
+    w = Vec3(width / 2, 0, 0)
+    n = d.cross(Vec3(1, 0, 0)).normalized() * (thick / 2)
+    ca, cb = [A + w + n, A - w + n, A - w - n, A + w - n], [B + w + n, B - w + n, B - w - n, B + w - n]
+    for i in range(4):
+        j = (i + 1) % 4
+        shapes.quad(tuple(ca[i]), tuple(ca[j]), tuple(cb[j]), tuple(cb[i]), tuple(((ca[i] + ca[j]) / 2 - A).normalized()))
+    shapes.quad(*[tuple(p) for p in ca], tuple(-d))
+    shapes.quad(*[tuple(p) for p in reversed(cb)], tuple(d))
+
+
+def ribbon(shapes, pts, y0, y1, thick):
+    """A band standing on its edge along a path in x and z (from y0 up to y1, `thick` across): a headband lying on
+    its side on the desk, or the pad along it."""
+    sides = []
+    for i, (x, z) in enumerate(pts):
+        (ax, az), (bx, bz) = pts[max(0, i - 1)], pts[min(len(pts) - 1, i + 1)]
+        tx, tz = bx - ax, bz - az
+        length = math.hypot(tx, tz) or 1
+        sides.append((tz / length, -tx / length))
+    h = thick / 2
+    out = [(x + nx * h, z + nz * h) for (x, z), (nx, nz) in zip(pts, sides)]
+    inn = [(x - nx * h, z - nz * h) for (x, z), (nx, nz) in zip(pts, sides)]
+    for i in range(len(pts) - 1):
+        nx, nz = (sides[i][0] + sides[i + 1][0]) / 2, (sides[i][1] + sides[i + 1][1]) / 2
+        (a, b), (c, d) = out[i], out[i + 1]
+        shapes.quad((a, y0, b), (c, y0, d), (c, y1, d), (a, y1, b), (nx, 0, nz))
+        (a, b), (c, d) = inn[i], inn[i + 1]
+        shapes.quad((c, y0, d), (a, y0, b), (a, y1, b), (c, y1, d), (-nx, 0, -nz))
+        shapes.quad((out[i][0], y1, out[i][1]), (out[i + 1][0], y1, out[i + 1][1]), (inn[i + 1][0], y1, inn[i + 1][1]),
+                    (inn[i][0], y1, inn[i][1]), (0, 1, 0))
+        shapes.quad((inn[i][0], y0, inn[i][1]), (inn[i + 1][0], y0, inn[i + 1][1]), (out[i + 1][0], y0, out[i + 1][1]),
+                    (out[i][0], y0, out[i][1]), (0, -1, 0))
+    for k, sign in ((0, -1), (len(pts) - 1, 1)):  # its two ends
+        (a, b), (c, d) = out[k], inn[k]
+        tx, tz = sides[k][1] * -sign, sides[k][0] * sign
+        shapes.quad((a, y0, b), (c, y0, d), (c, y1, d), (a, y1, b), (tx, 0, tz))
+
+
+def screw_head_z(part, x, y, z, toward=-1):
+    """A small screw's head facing along z (toward the front, or the back), with its cross."""
+    part.shapes.use(SILVER).axle(part.rel((x, y, z)), 0.13, 0.05, 12, along="z")
+    face = z + toward * 0.027
+    for size in ((0.2, 0.035, 0.008), (0.035, 0.2, 0.008)):
+        part.box((x, y, face), size, fixed=(108, 110, 120), hit=False)
+    part.grow((x, y, z), (0.26, 0.26, 0.05))
+    part.target((x, y, z), (0.3, 0.3, 0.07))
+    part.spin = "z"
+
+
+def build_clip_cam(board, part, spec, rnd, extras):
+    """A webcam that clips onto a monitor: a pill-shaped body (the back shell, and the front cover with the lens
+    window), the circuit board inside (the sensor under its lens mount, two mics, a light, the USB socket on its
+    back) held by two screws, the lens that screws into its mount, the USB cable, the privacy shutter on its rails,
+    and the hinged clip underneath."""
+    cy, r, half = 2.2, 0.8, 2.4
+    f = capsule(r, half, (0, cy, 0))
+
+    def inside(p):
+        return max(-half, min(half, p[0])), cy, 0
+    back = part("back_shell", "back shell")
+    back.colour("case", None).surface(f, 0, 1, 40, 0, math.pi, 12, inside)
+    back.grow((0, cy, 0.4), (2 * (half + r), 2 * r, r))
+    back.target((0, cy, 0.42), (2 * (half + r) - 0.1, 2 * r - 0.06, 0.8))
+    for x in (-2.0, 2.0):  # the posts its board screws into
+        back.shapes.use(shade(spec["case"], 0.7)).axle((x, cy, 0.43), 0.14, 0.64, 10, along="z")
+    for x in (-0.7, 0.7):  # the lugs the clip hinges on
+        back.box((x, 1.27, 0.12), (0.22, 0.34, 0.36), fixed=shade(spec["case"], 0.8), hit=False)
+    back.shapes.use(BLACK).axle((0, cy, 0.8), 0.17, 0.08, 12, along="z")  # the cable's grommet
+    cable = part("cable", "USB cable", ["back_shell"], lift=(0, 0, 1))
+    cable.box((0, cy, 0.38), (0.42, 0.22, 0.26), fixed=(40, 40, 44))  # its plug, inside, for the board's socket
+    cable.box((0, cy, 0.22), (0.34, 0.1, 0.08), fixed=SILVER, hit=False)
+    cable.colour("cable", None).rod((0, cy, 0.5), (0, cy, 0.8), 0.12)
+    cable.lathe([(0.8, 0.16), (1.3, 0.1)], "z", (0, cy, 0), "cable")  # its strain relief, out of the back
+    route = [(0, cy, 1.3), (0, cy - 0.35, 1.85), (0.25, 1.0, 2.5), (0.7, 0.25, 3.1), (1.5, 0.08, 3.8)]
+    for a, b in zip(route, route[1:]):
+        cable.colour("cable", None).rod(a, b, 0.12)
+        cable.target(tuple((a[i] + b[i]) / 2 for i in range(3)), (0.4, 0.4, 0.4))
+    cable.grow((0.7, 1.2, 2.5), (1.8, 2.4, 2.6))
+    cable.material = "cable"
+    pcb = part("cam_board", "circuit board", ["back_shell", "cable"], lift=(0, 0, -1))
+    pcb.box((0, cy, 0.05), (4.9, 1.1, 0.1), fixed=PCB_GREEN)
+    pcb.shapes.use((40, 40, 46)).axle((0, cy, -0.17), 0.36, 0.34, 20, along="z")  # the lens mount, over the sensor
+    for x in (-1.6, 1.6):  # its two mics
+        pcb.shapes.use(SILVER).axle((x, cy + 0.25, -0.05), 0.13, 0.1, 12, along="z")
+    pcb.box((-0.75, cy + 0.3, -0.02), (0.14, 0.1, 0.04), fixed=WHITE, hit=False)  # its light
+    pcb.box((-0.9, cy - 0.25, -0.025), (0.45, 0.4, 0.05), fixed=BLACK, hit=False)  # its chip
+    pcb.box((0, cy, 0.17), (0.5, 0.2, 0.14), fixed=SILVER, hit=False)  # the USB socket, on its back
+    for i, x in enumerate((-2.0, 2.0)):
+        pcb.shapes.use(GOLDEN).axle((x, cy, -0.003), 0.16, 0.006, 12, along="z")
+        pcb.target((x, cy, -0.01), (0.34, 0.34, 0.02), ("hole", i))
+    pcb.material = "board"
+    for i, x in enumerate((-2.0, 2.0)):
+        s = part(f"screw{i}", "screw", ["cam_board"], lift=(0, 0, -1), screw=True, origin=(x, cy, -0.035))
+        screw_head_z(s, x, cy, -0.035)
+    lens = part("lens", "lens", ["cam_board"], lift=(0, 0, -1), origin=(0, cy, -0.5))
+    lens.lathe([(-0.3, 0.0), (-0.3, 0.3), (-0.6, 0.3), (-0.64, 0.25), (-0.64, 0.0)], "z", (0, cy, 0),
+               fixed=(36, 36, 42))
+    lens.lathe([(-0.645, 0.0), (-0.645, 0.2)], "z", (0, cy, 0), fixed=(50, 70, 104), hit=False)  # its glass
+    knurl(lens, (0, cy, -0.45), 0.305, 0.2, "z", 12, (60, 60, 68))
+    lens.twist, lens.material = "z", "cable"
+    front = part("front_cover", "front cover", ["cam_board", "lens", "back_shell"], lift=(0, 0, -1))
+    front.shapes.use((30, 30, 34)).surface(f, 0, 1, 40, math.pi, 2 * math.pi, 12, inside)
+    front.shapes.use(spec["accent"]).axle((0, cy, -0.69), 0.5, 0.28, 24, along="z")  # the bezel round the window
+    front.shapes.use((24, 26, 34)).axle((0, cy, -0.845), 0.42, 0.04, 24, along="z")  # the glass window
+    for x in (-1.6, 1.6):  # the holes for its mics
+        front.shapes.use(BLACK).axle((x, cy + 0.25, -0.765), 0.07, 0.02, 10, along="z")
+    for y in (cy + 0.56, cy - 0.56):  # the shutter's rails
+        front.box((0.575, y, -0.74), (2.35, 0.06, 0.32), fixed=(36, 36, 40), hit=False)
+    front.grow((0, cy, -0.42), (2 * (half + r), 2 * r, 0.86))
+    front.target((0, cy, -0.42), (2 * (half + r) - 0.1, 2 * r - 0.06, 0.8))
+    front.target((0, cy, -0.84), (0.9, 0.9, 0.06), ("lens",))
+    light = Shapes().use((255, 255, 255), "light")
+    light.box((-0.75, cy + 0.3, -0.746), (0.14, 0.09, 0.02))
+    smudge = Shapes()  # a greasy thumbprint on the window (or two), somewhere on it
+    for _ in range(rnd.choice((1, 1, 2))):
+        a0, d0, spread = rnd.uniform(0, 2 * math.pi), rnd.uniform(0, 0.12), rnd.uniform(0.12, 0.22)
+        x0, y0 = math.cos(a0) * d0, math.sin(a0) * d0
+        for _ in range(rnd.randint(6, 11)):
+            a, d = rnd.uniform(0, 2 * math.pi), rnd.uniform(0, spread)
+            smudge.use(rnd.choice(((122, 118, 112), (138, 132, 124), (108, 106, 104)))).box(
+                (x0 + math.cos(a) * d, cy + y0 + math.sin(a) * d, -0.867),
+                (rnd.uniform(0.08, 0.18), rnd.uniform(0.06, 0.12), 0.004))
+    shutter = part("shutter", "privacy shutter", ["front_cover"], lift=(0, 0, -1), origin=(1.15, cy, -0.88))
+    shutter.box((1.15, cy, -0.88), (0.95, 1.04, 0.05), "frame")
+    for k in range(3):  # its grip
+        shutter.box((1.45 + k * 0.08, cy, -0.91), (0.03, 0.6, 0.02), fixed=(80, 82, 90), hit=False)
+    clip = part("clip", "monitor clip", ["back_shell"], lift=(0, -1, 0))
+    clip.shapes.use((40, 40, 46)).axle((0, 1.22, 0.12), 0.13, 1.1, 14)  # its hinge, between the lugs
+    clip.shapes.use(SILVER).axle((0, 1.22, 0.12), 0.05, 1.8, 8)  # and the pin, through them
+    plank(clip.shapes.use((40, 40, 46)), (0, 1.15, 0.02), (0, 0.08, -0.55), 1.0, 0.12)  # its front lip
+    plank(clip.shapes.use((40, 40, 46)), (0, 1.15, 0.22), (0, 0.08, 1.9), 1.5, 0.12)  # and its back flap
+    clip.box((0, 0.04, -0.57), (1.0, 0.08, 0.22), fixed=RUBBER, hit=False)
+    clip.box((0, 0.04, 1.88), (1.5, 0.08, 0.3), fixed=RUBBER, hit=False)
+    clip.grow((0, 0.65, 0.65), (1.5, 1.35, 2.75))
+    clip.target((0, 1.22, 0.12), (1.2, 0.3, 0.3))
+    clip.target((0, 0.6, -0.27), (1.0, 1.0, 0.45))
+    clip.target((0, 0.6, 1.05), (1.5, 1.0, 1.6))
+    board.mic["light"], board.mic["light_host"] = light, "front_cover"
+    board.attach.append((smudge, "front_cover", "smudge", False))
+    if extras:  # dust along the top of its body
+        def on_top():
+            x, zz = rnd.uniform(-2.3, 2.3), rnd.uniform(0.05, 0.35)
+            return x, cy + math.sqrt(r * r - zz * zz) + 0.005, zz
+        board.dirt.append(Dirt(back, specks_on(rnd, 9, on_top, ("dust", "dust", "hair"))))
+    board.size = board.inner = spec["size"]
+    board.height = cy + r
+
+
+def build_ball_cam(board, part, spec, rnd, extras):
+    """A round webcam on a stand: the stand (a hollow base, a steel weight inside it, a base plate held by three
+    screws underneath) and its neck; the ball's back half on the neck, with its snapshot button on top; the round
+    circuit board inside, held by a screw; the USB cable; the front half, held to the back by two screws; and the
+    focus ring, the lens barrel that threads through the front into its mount."""
+    R, cy = 1.6, 3.4
+    profile = [(0.0, 1.95), (0.25, 2.0), (0.42, 1.7), (0.5, 1.0), (0.52, 0.3), (0.52, 0.0)]
+
+    def base_top(radius):  # how high the stand's dome is, that far out
+        for (y0, r0), (y1, r1) in zip(profile[1:], profile[2:]):
+            if r1 <= radius <= r0:
+                return y0 + (y1 - y0) * (r0 - radius) / (r0 - r1)
+        return 0.52
+    stand = part("stand", "stand")
+    stand.lathe(profile, "y", (0, 0, 0), "case", hit=False, segments=32)
+    neck_top = cy - math.sqrt(R * R - 0.09) + 0.08
+    stand.post((0, 0.5, 0.3), 0.22, neck_top - 0.5, fixed=shade(spec["case"], 0.82), hit=False)  # the neck
+    screws_at = [(math.cos(a) * 1.2, math.sin(a) * 1.2) for a in (math.pi / 2, math.pi * 7 / 6, math.pi * 11 / 6)]
+    for x, z in screws_at:  # the posts the base plate's screws go up into
+        stand.post((x, 0.0, z), 0.12, base_top(1.2) - 0.02, fixed=shade(spec["case"], 0.7), hit=False)
+    stand.target((0, 0.42, 0), (3.6, 0.2, 3.6))  # (by its top: from underneath, what's inside it comes first)
+    stand.target((0, (0.5 + neck_top) / 2, 0.3), (0.5, neck_top - 0.5, 0.5))
+    stand.material = "metal"
+    weight = part("weight", "steel weight", ["stand"], lift=(0, -1, 0))
+    weight.post((0, 0.06, 0), 1.0, 0.22, fixed=(150, 154, 162))
+    weight.material = "metal"
+    plate = part("base_plate", "base plate", ["stand", "weight"], lift=(0, -1, 0))
+    plate.post((0, 0, 0), 1.95, -0.06, "inside", hit=False, segments=32)
+    plate.lathe([(-0.06, 1.55), (-0.1, 1.58), (-0.1, 1.82), (-0.06, 1.85)], "y", (0, 0, 0), fixed=RUBBER, hit=False,
+                segments=32)  # a rubber ring, so it doesn't slide
+    plate.target((0, -0.04, 0), (3.8, 0.08, 3.8))
+    for i, (x, z) in enumerate(screws_at):
+        plate.target((x, -0.07, z), (0.34, 0.04, 0.34), ("hole", i))
+    for i, (x, z) in enumerate(screws_at):
+        s = part(f"screw{i}", "screw", ["base_plate"], lift=(0, -1, 0), screw=True, origin=(x, -0.06, z))
+        s.post((x, -0.06, z), 0.13, -0.04, fixed=SILVER)
+        for size in ((0.2, 0.006, 0.035), (0.035, 0.006, 0.2)):
+            s.box((x, -0.102, z), size, fixed=(108, 110, 120), hit=False)
+    back = part("back_half", "back half", ["stand"])
+    back.lathe([(R * math.cos(t), R * math.sin(t)) for t in [math.pi / 2 * k / 12 for k in range(13)]], "z",
+               (0, cy, 0), "case", hit=False, segments=32)
+    back.post((0, cy + 1.45, 0.35), 0.28, 0.2, fixed=spec["accent"], hit=False)  # its snapshot button
+    back.target((0, cy + 1.62, 0.35), (0.62, 0.14, 0.62), ("snap",))
+    zb = math.sqrt(R * R - 0.64)
+    for k, x in enumerate((-0.8, 0.8)):  # where the shell's screws go in, at the back
+        back.target((x, cy, zb), (0.3, 0.3, 0.06), ("hole", 4 + k))
+    back.shapes.use(BLACK).axle((0, cy - 0.9, 1.32), 0.17, 0.08, 12, along="z")  # the cable's grommet
+    back.target((0, cy, 0.65), (2 * R, 2 * R, 1.3))
+    cable = part("cable", "USB cable", ["back_half"], lift=(0, -0.3, 1))
+    cable.box((0, cy - 0.75, 0.12), (0.36, 0.14, 0.2), fixed=(40, 40, 44))  # its plug, for the board's socket
+    cable.colour("cable", None).rod((0, cy - 0.75, 0.22), (0, cy - 0.9, 1.3), 0.1)
+    route = [(0, cy - 0.9, 1.3), (0, cy - 1.05, 1.75), (0, 1.6, 2.35), (0.3, 0.55, 2.85), (0.9, 0.1, 3.5),
+             (1.8, 0.08, 4.3)]
+    for k, (a, b) in enumerate(zip(route, route[1:])):
+        cable.colour("cable", None).rod(a, b, 0.2 if k == 0 else 0.13)
+        cable.target(tuple((a[i] + b[i]) / 2 for i in range(3)), (0.4, 0.4, 0.4))
+    cable.grow((0.9, 1.4, 2.8), (1.8, 2.8, 3.0))
+    cable.material = "cable"
+    pcb = part("cam_board", "circuit board", ["back_half", "cable"], lift=(0, 0, -1))
+    pcb.shapes.use(PCB_GREEN).axle((0, cy, -0.12), 1.35, 0.08, 28, along="z")
+    pcb.shapes.use((40, 40, 46)).axle((0, cy, -0.4), 0.42, 0.48, 20, along="z")  # the lens mount, over the sensor
+    pcb.shapes.use(SILVER).axle((0.75, cy + 0.6, -0.2), 0.12, 0.08, 12, along="z")  # its mic
+    pcb.box((-0.75, cy + 0.55, -0.18), (0.14, 0.1, 0.04), fixed=WHITE, hit=False)  # its light
+    pcb.box((0.6, cy - 0.55, -0.18), (0.4, 0.4, 0.04), fixed=BLACK, hit=False)  # its chip
+    pcb.box((0, cy - 0.75, -0.02), (0.4, 0.16, 0.12), fixed=SILVER, hit=False)  # the USB socket, on its back
+    pcb.shapes.use(GOLDEN).axle((-0.85, cy - 0.7, -0.163), 0.15, 0.006, 12, along="z")
+    pcb.target((-0.85, cy - 0.7, -0.17), (0.32, 0.32, 0.02), ("hole", 3))
+    pcb.grow((0, cy, -0.3), (2.7, 2.7, 0.6))
+    pcb.target((0, cy, -0.12), (2.7, 2.7, 0.08))
+    pcb.material = "board"
+    s = part("screw3", "screw", ["cam_board"], lift=(0, 0, -1), screw=True, origin=(-0.85, cy - 0.7, -0.19))
+    screw_head_z(s, -0.85, cy - 0.7, -0.19)
+    front = part("front_half", "front half", ["cam_board", "back_half"], lift=(0, 0, -1))
+    t0 = math.asin(0.55 / R)
+    front.lathe([(-R * math.cos(t), R * math.sin(t)) for t in [t0 + (math.pi / 2 - t0) * k / 12 for k in range(13)]],
+                "z", (0, cy, 0), "case", hit=False, segments=32)
+    front.lathe([(-1.505, 0.55), (-1.455, 0.66)], "z", (0, cy, 0), fixed=spec["accent"], hit=False)  # round the hole
+    front.shapes.use(BLACK).axle((0.75, cy + 0.6, -1.29), 0.07, 0.02, 10, along="z")  # the hole for its mic
+    front.target((0, cy, -0.75), (2 * R, 2 * R, 1.5))
+    light = Shapes().use((255, 255, 255), "light")
+    light.box((-0.75, cy + 0.55, -1.31), (0.14, 0.1, 0.03))
+    for k, x in enumerate((-0.8, 0.8)):  # the screws holding the halves together, in from the back
+        s = part(f"screw{4 + k}", "screw", ["front_half"], lift=(0, 0, 1), screw=True, origin=(x, cy, zb + 0.04))
+        screw_head_z(s, x, cy, zb + 0.04, toward=1)
+    ring = part("focus_ring", "focus ring", ["cam_board", "front_half"], lift=(0, 0, -1), origin=(0, cy, -1.68))
+    ring.lathe([(-0.6, 0.0), (-0.6, 0.38), (-1.5, 0.38), (-1.5, 0.62), (-1.86, 0.62), (-1.89, 0.5), (-1.89, 0.0)], "z",
+               (0, cy, 0), fixed=(40, 40, 46))
+    knurl(ring, (0, cy, -1.68), 0.625, 0.3, "z", 18, (70, 70, 78))
+    ring.lathe([(-1.895, 0.0), (-1.895, 0.34)], "z", (0, cy, 0), fixed=(50, 70, 104), hit=False)  # its glass
+    ring.twist, ring.spin, ring.material = "z", "z", "cable"
+    board.knob = ring
+    board.mic["light"], board.mic["light_host"] = light, "front_half"
+    if extras:  # dust on the stand, and on top of the ball
+        def on_stand():
+            a, rr = rnd.uniform(0, 2 * math.pi), rnd.uniform(1.1, 1.6)
+            return math.cos(a) * rr, base_top(rr) + 0.005, math.sin(a) * rr
+        board.dirt.append(Dirt(stand, specks_on(rnd, 8, on_stand, ("dust", "dust", "crumb"))))
+
+        def on_ball():
+            x, zz = rnd.choice((-1, 1)) * rnd.uniform(0.4, 0.8), rnd.uniform(0.1, 0.7)
+            return x, cy + math.sqrt(R * R - x * x - zz * zz) + 0.005, zz
+        board.dirt.append(Dirt(back, specks_on(rnd, 6, on_ball, ("dust", "dust", "hair"))))
+    board.size = board.inner = spec["size"]
+    board.height = cy + R + 0.1
+
+
+def build_stream_cam(board, part, spec, rnd, extras):
+    """A streaming webcam with a ring light, on a little tripod: the tripod and the thumb screw that holds the
+    camera on it; the round housing; the main board inside (lens mount, mics, the ribbon's socket) held by two
+    screws; the lens; the LED ring on its standoffs; the ribbon cable between them; and the front panel, its glossy
+    rim and the frosted diffuser that the LEDs shine through, which twists off."""
+    cy, R = 2.6, 1.9
+    tripod = part("tripod", "tripod")
+    tripod.post((0, 0.55, 0), 0.34, 0.15, fixed=(40, 40, 46), hit=False)  # its head
+    for a in (90, 210, 330):  # three legs, splayed out
+        ra = math.radians(a)
+        top, foot = (math.cos(ra) * 0.28, 0.58, math.sin(ra) * 0.28), (math.cos(ra) * 1.7, 0.06, math.sin(ra) * 1.7)
+        tripod.shapes.use((40, 40, 46)).rod(top, foot, 0.13)
+        tripod.box(foot, (0.24, 0.1, 0.24), fixed=RUBBER, hit=False)
+        tripod.target(tuple(top[i] * 0.4 + foot[i] * 0.6 for i in range(3)), (0.45, 0.35, 0.45))
+    tripod.grow((0, 0.35, 0), (3.6, 0.7, 3.6))
+    tripod.target((0, 0.625, 0), (0.75, 0.15, 0.75))
+    tripod.target((0, 0.53, 0), (0.4, 0.06, 0.4), ("hole", 0))
+    tripod.material = "metal"
+    housing = part("housing", "housing", ["tripod"])
+    housing.lathe([(-0.25, 1.75), (-0.25, 1.9), (0.3, 1.9), (0.6, 1.75), (0.8, 1.3), (0.88, 0.0)], "z", (0, cy, 0),
+                  "case", hit=False, segments=36)
+    housing.post((0, 0.68, 0), 0.26, 0.14, fixed=(40, 40, 46), hit=False)  # its mount, for the tripod screw
+    bx = math.sqrt(R * R - 0.36)
+    housing.post((0.6, cy + bx - 0.04, 0.25), 0.26, 0.14, fixed=spec["accent"], hit=False)  # the light's button
+    housing.target((0.6, cy + bx + 0.07, 0.25), (0.56, 0.18, 0.56), ("light",))
+    housing.box((0, cy, 0.866), (0.5, 0.16, 0.03), fixed=BLACK, hit=False)  # its USB-C socket, round the back
+    for x in (-1.1, 1.1):  # the posts its board screws into
+        housing.shapes.use(shade(spec["case"], 0.7)).axle((x, cy - 0.6, 0.6), 0.14, 0.36, 10, along="z")
+    housing.target((0, cy, 0.665), (3.8, 3.8, 0.43))  # (its back, and round the rim: not over the opening)
+    for x, y, w, h in ((0, cy + 1.82, 2.4, 0.16), (0, cy - 1.82, 2.4, 0.16), (1.82, cy, 0.16, 2.4),
+                       (-1.82, cy, 0.16, 2.4)):
+        housing.target((x, y, 0.1), (w, h, 0.7))
+    s = part("screw0", "tripod screw", ["housing"], lift=(0, -1, 0), screw=True, origin=(0, 0.45, 0))
+    s.post((0, 0.3, 0), 0.3, 0.16, fixed=(54, 56, 62))
+    knurl(s, (0, 0.38, 0), 0.31, 0.14, "y", 14, (40, 42, 48))
+    s.post((0, 0.46, 0), 0.07, 0.34, fixed=SILVER, hit=False)  # its thread, up through the head into the camera
+    s.thumb = True
+    pcb = part("cam_board", "main board", ["housing"], lift=(0, 0, -1))
+    pcb.shapes.use(PCB_GREEN).axle((0, cy, 0.38), 1.62, 0.08, 32, along="z")
+    pcb.shapes.use((40, 40, 46)).axle((0, cy, 0.18), 0.4, 0.32, 20, along="z")  # the lens mount, over the sensor
+    for x in (-1.2, 1.2):  # its mics
+        pcb.shapes.use(SILVER).axle((x, cy + 0.75, 0.3), 0.12, 0.08, 12, along="z")
+    pcb.box((0.7, cy - 0.9, 0.32), (0.4, 0.4, 0.04), fixed=BLACK, hit=False)  # its chip
+    pcb.box((1.5, cy, 0.31), (0.12, 0.5, 0.06), fixed=WHITE, hit=False)  # the ribbon's socket, at its edge
+    for i, x in enumerate((-1.1, 1.1)):
+        pcb.shapes.use(GOLDEN).axle((x, cy - 0.6, 0.337), 0.15, 0.006, 12, along="z")
+        pcb.target((x, cy - 0.6, 0.33), (0.32, 0.32, 0.02), ("hole", 1 + i))
+    pcb.grow((0, cy, 0.25), (3.3, 3.3, 0.35))
+    pcb.target((0, cy, 0.38), (3.2, 3.2, 0.08))
+    pcb.material = "board"
+    for i, x in enumerate((-1.1, 1.1)):
+        s = part(f"screw{1 + i}", "screw", ["cam_board"], lift=(0, 0, -1), screw=True, origin=(x, cy - 0.6, 0.31))
+        screw_head_z(s, x, cy - 0.6, 0.31)
+    lens = part("lens", "lens", ["cam_board"], lift=(0, 0, -1), origin=(0, cy, -0.1))
+    lens.lathe([(0.04, 0.0), (0.04, 0.32), (-0.27, 0.32), (-0.3, 0.26), (-0.3, 0.0)], "z", (0, cy, 0),
+               fixed=(36, 36, 42))
+    lens.lathe([(-0.305, 0.0), (-0.305, 0.2)], "z", (0, cy, 0), fixed=(50, 70, 104), hit=False)
+    lens.twist, lens.material = "z", "cable"
+    leds = part("led_ring", "LED ring", ["cam_board"], lift=(0, 0, -1))
+    leds.lathe([(0.0, 0.62), (0.0, 1.56), (0.06, 1.56), (0.06, 0.62), (0.0, 0.62)], "z", (0, cy, 0),
+               fixed=(236, 236, 230), hit=False, segments=36)
+    for k in range(16):  # its LEDs
+        a = 2 * math.pi * k / 16
+        leds.box((math.cos(a) * 1.1, cy + math.sin(a) * 1.1, -0.015), (0.16, 0.16, 0.03), fixed=(255, 224, 150),
+                 hit=False)
+    for k in range(4):  # its standoffs, back to the main board
+        a = math.pi / 4 + k * math.pi / 2
+        leds.shapes.use(SILVER).axle((math.cos(a) * 1.35, cy + math.sin(a) * 1.35, 0.2), 0.07, 0.28, 8, along="z")
+    leds.grow((0, cy, 0.1), (3.12, 3.12, 0.3))
+    leds.target((0, cy, 0.03), (3.12, 3.12, 0.06))
+    leds.material = "board"
+    # The ribbon: from the LED ring's edge into the gap beside it, and back to the main board's socket (on the
+    # right, between the ring and the housing's wall, where you can see it with the front panel off)
+    rib = part("ribbon", "ribbon cable", ["cam_board", "led_ring"], lift=(0, 0, -1))
+    amber = (214, 160, 70)
+    rib.box((1.62, cy, 0.05), (0.13, 0.4, 0.02), fixed=amber)
+    rib.box((1.68, cy, 0.14), (0.02, 0.4, 0.18), fixed=amber)
+    rib.grow((1.62, cy, 0.17), (0.2, 0.4, 0.34))
+    rib.target((1.64, cy, 0.1), (0.22, 0.5, 0.2))
+    rib.target((1.66, cy, 0.27), (0.26, 0.5, 0.14), ("ribbon",))
+    rib.material = "cable"
+    loose, seated = Shapes(), Shapes()  # its end: worked loose, sticking up out of its socket; or pressed home
+    loose.use(amber).box((1.71, cy, 0.27), (0.02, 0.4, 0.08))
+    loose.use(amber).box((1.74, cy, 0.31), (0.06, 0.4, 0.02))
+    seated.use(amber).box((1.6, cy, 0.25), (0.18, 0.4, 0.02))
+    front = part("front_panel", "front panel", ["led_ring", "lens", "ribbon", "housing"], lift=(0, 0, -1),
+                 origin=(0, cy, -0.32))
+    front.lathe([(-0.33, 1.56), (-0.36, 1.62), (-0.36, 1.88), (-0.31, 1.95), (-0.25, 1.95)], "z", (0, cy, 0),
+                fixed=(28, 28, 32), hit=False, segments=36)
+    front.lathe([(-0.33, 0.62), (-0.33, 1.56)], "z", (0, cy, 0), "glow", hit=False, segments=36)  # the diffuser
+    front.lathe([(-0.33, 0.33), (-0.36, 0.4), (-0.36, 0.58), (-0.33, 0.62)], "z", (0, cy, 0), fixed=(28, 28, 32),
+                hit=False, segments=24)
+    front.lathe([(-0.345, 0.0), (-0.345, 0.33)], "z", (0, cy, 0), fixed=(30, 40, 60), hit=False)  # its glass
+    front.target((0, cy, -0.3), (3.9, 3.9, 0.12))
+    front.twist = "z"
+    board.mic["glow"] = "front_panel"
+    board.attach.append((loose, "ribbon", "loose", False))
+    board.attach.append((seated, "ribbon", "seated", True))
+    if extras:  # dust on top of the housing
+        def on_top():
+            x, zz = rnd.uniform(-0.9, 0.9), rnd.uniform(-0.1, 0.3)
+            return x, cy + math.sqrt(R * R - x * x) + 0.005, zz
+        board.dirt.append(Dirt(housing, specks_on(rnd, 8, on_top, ("dust", "dust", "hair", "crumb"))))
+    board.size = board.inner = spec["size"]
+    board.height = cy + R + 0.14
+
+
+# ---- headsets ----
+
+def build_headset(board, part, spec, rnd, extras):
+    """A headset lying flat with its cushions up: the headband (its steel sliders at the ends) and its pad; a yoke
+    at each end, holding a cup on two pivot pins; in each cup, the driver on its baffle, screwed down, and over the
+    screws an ear cushion that twists off. The office one has a boom mic with a foam windscreen, and a cable with
+    a volume remote on it; the gaming one, lights round its cups, a little board in the left cup that its boom mic
+    plugs into, and a braided cable; the wireless one, a board, a battery and its lead in the right cup, and buttons
+    on the cup's edge."""
+    form = spec["form"]
+    gaming, wireless = form == "gaming_hs", form == "wireless_hs"
+    R = 1.8 if gaming else 1.65 if wireless else 1.55
+    X = 3.5 if gaming else 3.3 if wireless else 3.2
+    cz, top = -0.5, 1.7 if gaming else 1.55
+    zb, depth = cz + R + 0.65, 2.4
+    angles = (45, 135, 225, 315) if gaming else (30, 150, 270)
+    cushion_col = spec["bottom"]
+    path = [(-X * math.cos(math.pi * k / 30), zb + 0.5 + depth * math.sin(math.pi * k / 30)) for k in range(31)]
+    band = part("headband", "headband")
+    ribbon(band.colour("case", None), path, 0.06, 0.84, 0.22)
+    for x in (-X, X):  # its steel sliders, out to the yokes
+        band.box((x, 0.45, zb + 0.27), (0.08, 0.5, 0.6), fixed=SILVER, hit=False)
+    for k in range(0, 31, 3):
+        band.target((path[k][0], 0.45, path[k][1]), (0.6, 0.8, 0.6))
+    band.grow((0, 0.45, zb + 0.5 + depth / 2), (2 * X + 0.4, 0.8, depth + 0.4))
+    inner = [(x * 0.92, zb + 0.5 + (z - zb - 0.5) * 0.89) for x, z in path[6:25]]
+    pad = part("headband_pad", "headband pad", ["headband"])
+    ribbon(pad.colour("inside", None), inner, 0.12, 0.78, 0.3)
+    for k in range(0, len(inner), 3):
+        pad.target((inner[k][0], 0.45, inner[k][1]), (0.5, 0.7, 0.5))
+    pad.grow((0, 0.45, zb + 0.5 + depth * 0.7), (2 * X, 0.7, depth))
+    pad.material = "foam"
+    hole = 0
+    for side, cx in (("left", -X), ("right", X)):
+        yoke = part(f"{side}_yoke", f"{side} yoke", ["headband"])
+        arc = [(cx - math.cos(math.pi * k / 12) * (R + 0.22), 0.45, cz + math.sin(math.pi * k / 12) * (R + 0.22))
+               for k in range(13)]
+        for a, b in zip(arc, arc[1:]):
+            yoke.colour("frame", None).rod(a, b, 0.2)
+        for k in range(0, 13, 3):
+            yoke.target(arc[k], (0.36, 0.36, 0.36))
+        yoke.colour("frame", None).rod((cx, 0.45, cz + R + 0.22), (cx, 0.45, zb + 0.1), 0.2)  # up into the slider
+        yoke.target((cx, 0.45, (cz + R + zb) / 2 + 0.15), (0.3, 0.3, zb - cz - R))
+        for sx in (-1, 1):  # its pivot pins, into the cup's sides
+            yoke.shapes.use(SILVER).axle((cx + sx * (R + 0.11), 0.45, cz), 0.09, 0.24, 8)
+        yoke.grow((cx, 0.45, cz + R / 2), (2 * R + 0.6, 0.3, R + 1.2))
+        yoke.material = "plastic"
+        cup = part(f"{side}_cup", f"{side} cup", [f"{side}_yoke"])
+        cup.lathe([(0.05, 0.0), (0.0, R - 0.3), (0.1, R - 0.05), (0.35, R + 0.02), (0.85, R + 0.05), (0.85, R - 0.14)],
+                  "y", (cx, 0, cz), "case", hit=False, segments=36)
+        for a in angles:  # the posts its screws go down into
+            ra = math.radians(a)
+            cup.post((cx + math.cos(ra) * (R - 0.3), 0.03, cz + math.sin(ra) * (R - 0.3)), 0.12, 0.82,
+                     fixed=shade(spec["case"], 0.7), hit=False)
+        cup.target((cx, 0.05, cz), (2 * R, 0.1, 2 * R))  # (its floor, and round its rim: not over the inside)
+        back_half = (R - 0.3) / 2  # (its sides from the back round to the pivots; the front, just its middle: clear of
+        for dx, dz, w, d in ((0, R - 0.1, 2 * R, 0.25), (0, -R + 0.1, 1.6, 0.25),  # the buttons on its edge)
+                             (R - 0.1, back_half, 0.25, R + 0.3), (-R + 0.1, back_half, 0.25, R + 0.3)):
+            cup.target((cx + dx, 0.45, cz + dz), (w, 0.85, d))
+        if gaming:  # its lights, a glowing band round the cup
+            rgb = Shapes().use((255, 255, 255), "glow")
+            rgb.lathe([(0.32, R + 0.04), (0.5, R + 0.045)], "y", (cx, 0, cz), 36)
+            board.attach.append((rgb, f"{side}_cup", "rgb", False))
+        cup.material = "plastic"
+        under = [f"{side}_cup"]
+        if side == "left" and gaming:  # the little board its boom plugs into, and its controls
+            ctl = part("control_board", "control board", ["left_cup"])
+            ctl.post((cx, 0.1, cz), 0.95, 0.06, fixed=PCB_GREEN)
+            ctl.box((cx - 0.3, 0.19, cz + 0.3), (0.4, 0.06, 0.4), fixed=BLACK, hit=False)  # its chip
+            ctl.box((cx, 0.3, cz - R + 0.35), (0.3, 0.3, 0.6), fixed=(30, 30, 34), hit=False)  # the mic's socket
+            ctl.box((cx + 0.6, 0.18, cz + 0.2), (0.22, 0.04, 0.22), fixed=GOLDEN, hit=False)  # the pad the wire's off
+            ctl.box((cx + 0.1, 0.18, cz + 0.65), (0.2, 0.04, 0.2), fixed=GOLDEN, hit=False)  # and the one it's on
+            ctl.target((cx + 0.55, 0.26, cz + 0.3), (0.55, 0.3, 0.55), ("joint",))
+            ctl.material = "board"
+            loose, fixed_ = Shapes(), Shapes()  # the red wire from the driver's plug: off its pad, or soldered on
+            loose.use((210, 60, 55)).rod(ctl.rel((cx + 0.1, 0.2, cz + 0.65)), ctl.rel((cx + 0.35, 0.36, cz + 0.45)), 0.05)
+            loose.use((210, 60, 55)).rod(ctl.rel((cx + 0.35, 0.36, cz + 0.45)), ctl.rel((cx + 0.62, 0.42, cz + 0.32)),
+                                         0.05)
+            fixed_.use((210, 60, 55)).rod(ctl.rel((cx + 0.1, 0.2, cz + 0.65)), ctl.rel((cx + 0.6, 0.2, cz + 0.2)), 0.05)
+            fixed_.use((200, 202, 208)).box(ctl.rel((cx + 0.6, 0.21, cz + 0.2)), (0.16, 0.04, 0.16))  # the solder
+            board.attach.append((loose, "control_board", "loose", False))
+            board.attach.append((fixed_, "control_board", "soldered", True))
+            under.append("control_board")
+        if side == "left" and not wireless:  # the cable, in through the back of the left cup
+            cable = part("cable", "USB cable", ["left_cup"] + (["control_board"] if gaming else []), lift=(-1, 0, 0.6))
+            ex, ez = cx - (R - 0.05) * 0.72, cz + (R - 0.05) * 0.72
+            cable.shapes.use((40, 40, 44)).rod((ex + 0.2, 0.15, ez - 0.2), (cx - 0.55, 0.3, cz + 0.55), 0.08)
+            cable.box((cx - 0.5, 0.3, cz + 0.5), (0.3, 0.14, 0.22), fixed=WHITE, hit=False)  # the driver plugs in here
+            route = [(ex, 0.15, ez), (ex - 0.45, 0.12, ez + 0.4), (cx - 2.0, 0.1, cz + 2.1), (cx - 2.1, 0.1, cz + 3.4),
+                     (cx - 2.0, 0.08, cz + 4.6)]
+            for k, (a, b) in enumerate(zip(route, route[1:])):
+                col = shade(spec["cable"], 1.6) if gaming and k % 2 else None
+                (cable.shapes.use(col) if col else cable.colour("cable", None)).rod(a, b, 0.17 if k == 0 else 0.12)
+                cable.target(tuple((a[i] + b[i]) / 2 for i in range(3)), (0.45, 0.35, 0.45))
+            if not gaming:  # its volume remote, on the way
+                cable.box((cx - 2.08, 0.2, cz + 2.9), (0.5, 0.24, 0.9), fixed=(44, 44, 50))
+                cable.shapes.use((80, 82, 90)).axle((cx - 1.83, 0.2, cz + 2.9), 0.14, 0.08, 14)  # its wheel
+            cable.grow((cx - 1.2, 0.15, cz + 2.4), (2.6, 0.3, 4.6))
+            cable.material = "cable"
+            under.append("cable")
+        if side == "right" and wireless:  # its board, and the battery with its lead
+            mb = part("main_board", "main board", ["right_cup"])
+            mb.box((cx, 0.13, cz - 0.55), (1.6, 0.06, 0.9), fixed=PCB_GREEN)
+            mb.box((cx - 0.3, 0.18, cz - 0.6), (0.45, 0.05, 0.45), fixed=BLACK, hit=False)  # its Bluetooth chip
+            mb.box((cx + 0.45, 0.2, cz - 0.2), (0.3, 0.1, 0.16), fixed=WHITE, hit=False)  # the battery's socket
+            mb.material = "board"
+            bat = part("battery", "battery", ["right_cup"])
+            bat.box((cx, 0.16, cz + 0.92), (1.25, 0.24, 0.6), fixed=(176, 184, 198))
+            bat.box((cx, 0.36, cz + 0.92), (1.15, 0.18, 0.5), fixed=(170, 178, 192), hit=False)  # puffed up, swollen
+            bat.box((cx, 0.455, cz + 0.92), (0.8, 0.02, 0.3), fixed=(96, 140, 196), hit=False)  # its label
+            bat.target((cx, 0.24, cz + 0.92), (1.25, 0.42, 0.6))
+            new = Shapes()  # the new one, flat as a battery should be
+            new.use((176, 184, 198)).box(bat.rel((cx, 0.16, cz + 0.92)), (1.25, 0.24, 0.6))
+            new.use((96, 140, 196)).box(bat.rel((cx, 0.285, cz + 0.92)), (0.8, 0.02, 0.3))
+            board.attach.append((new, "battery", "fresh", True))
+            lead = part("battery_lead", "battery lead", ["battery", "main_board"])
+            for k, col in ((-0.05, WIRES[0]), (0.05, WIRES[1])):
+                lead.wire([(cx + 0.4 + k, 0.2, cz + 0.6), (cx + 0.4 + k, 0.2, cz - 0.15)], 0.04, col)
+            lead.box((cx + 0.45, 0.27, cz - 0.2), (0.32, 0.08, 0.18), fixed=WHITE)
+            lead.target((cx + 0.45, 0.25, cz + 0.2), (0.4, 0.2, 0.9))
+            lead.material = "cable"
+            under += ["main_board", "battery", "battery_lead"]
+        baffle = part(f"{side}_baffle", f"{side} driver", under)
+        baffle.post((cx, 0.85, cz), R - 0.03, 0.1, fixed=(40, 40, 46), hit=False)
+        baffle.post((cx, 0.45, cz), 0.5, 0.4, fixed=(70, 72, 80), hit=False)  # its magnet, down in the cup
+        baffle.post((cx, 0.95, cz), 1.0, 0.012, fixed=(26, 26, 30), hit=False)  # the cloth over the driver
+        baffle.post((cx, 0.962, cz), 0.3, 0.02, fixed=(46, 46, 52), hit=False)
+        baffle.post((cx, 0.95, cz + 1.12 * (R - 0.3) / 1.25), 0.09, 0.012,
+                    fixed=(90, 140, 220) if side == "left" else (220, 90, 90), hit=False)  # L blue, R red
+        screws = []
+        for a in angles:
+            ra = math.radians(a)
+            x, z = cx + math.cos(ra) * (R - 0.3), cz + math.sin(ra) * (R - 0.3)
+            baffle.target((x, 0.94, z), (0.3, 0.04, 0.3), ("hole", hole))
+            screws.append((x, z, hole))
+            hole += 1
+        for w, d in ((0.92, 0.55), (0.55, 0.92)):  # (round rather than square, like the cushion)
+            baffle.target((cx, 0.9, cz), (2 * (R - 0.03) * w, 0.1, 2 * (R - 0.03) * d))
+        baffle.material = "board"
+        keys = []
+        for x, z, i in screws:
+            s = part(f"screw{i}", "screw", [f"{side}_baffle"], screw=True, origin=(x, 0.95, z))
+            s.post((x, 0.95, z), 0.11, 0.04, fixed=SILVER)
+            for size in ((0.18, 0.008, 0.03), (0.03, 0.008, 0.18)):
+                s.box((x, 0.992, z), size, fixed=(108, 110, 120), hit=False)
+            keys.append(s.key)
+        cushion = part(f"{side}_cushion", f"{side} ear cushion", [f"{side}_baffle"] + keys, origin=(cx, 1.2, cz))
+        ri, ro = 0.95, R + 0.03
+        cushion.lathe([(0.95, ri + 0.05), (1.03, ri), (top - 0.12, ri - 0.02), (top, ri + 0.12), (top + 0.02, (ri + ro) / 2),
+                       (top, ro - 0.12), (top - 0.12, ro + 0.02), (1.03, ro), (0.95, ro - 0.05), (0.95, ri + 0.05)],
+                      "y", (cx, 0, cz), "inside", hit=False, segments=36)
+        for w, d in ((0.92, 0.55), (0.55, 0.92)):  # (clicked by a cross, round rather than square: so what's
+            cushion.target((cx, (0.95 + top) / 2, cz), (2 * ro * w, top - 0.95, 2 * ro * d))  # beside it isn't hidden)
+        cushion.twist, cushion.material = "y", "foam"
+        if spec.get("special") == "cushions":  # flaking: bits of the old leatherette peeling off
+            flakes = Shapes()
+            for _ in range(rnd.randint(7, 24)):
+                a, rr = rnd.uniform(0, 2 * math.pi), rnd.uniform(ri + 0.15, ro - 0.12)
+                flakes.use(rnd.choice(((150, 146, 140), (176, 172, 164), (120, 118, 116)))).box(
+                    cushion.rel((cx + math.cos(a) * rr, top + 0.025, cz + math.sin(a) * rr)),
+                    (rnd.uniform(0.1, 0.22), 0.012, rnd.uniform(0.08, 0.18)))
+            board.attach.append((flakes, f"{side}_cushion", "flakes", False))
+        if extras:  # dust on the driver's cloth, under the cushion
+            def on_cloth(cx=cx):
+                a, rr = rnd.uniform(0, 2 * math.pi), rnd.uniform(0.35, 0.9)
+                return cx + math.cos(a) * rr, 0.97, cz + math.sin(a) * rr
+            board.dirt.append(Dirt(baffle, specks_on(rnd, 6, on_cloth, ("dust", "dust", "hair"))))
+    lx = -X
+    if not wireless:  # its boom mic, from the front of the left cup
+        if gaming:  # plugged into its socket, through the cup's wall
+            boom = part("boom", "boom mic", ["left_cup", "control_board"], lift=(0, 0, -1))
+            boom.shapes.use((30, 30, 34)).axle((lx, 0.3, cz - R - 0.15), 0.14, 0.7, 14, along="z")
+            start = (lx, 0.3, cz - R - 0.5)
+        else:
+            boom = part("boom", "boom mic", ["left_cup"])
+            boom.post((lx + 0.35, 0.25, cz - R - 0.12), 0.26, 0.45, fixed=(40, 40, 46))  # its pivot, on the cup
+            start = (lx + 0.35, 0.5, cz - R - 0.3)
+        arm = [start, (lx + 0.9, start[1], cz - R - 1.3), (lx + 1.8, start[1], cz - R - 2.0),
+               (lx + 2.6, start[1], cz - R - 2.25)]
+        for a, b in zip(arm, arm[1:]):
+            boom.shapes.use((36, 36, 40)).rod(a, b, 0.12)
+            boom.target(tuple((a[i] + b[i]) / 2 for i in range(3)), (0.4, 0.3, 0.4))
+        tip = (lx + 2.75, start[1], cz - R - 2.3)
+        boom.shapes.use((44, 44, 50)).axle(tip, 0.16, 0.3, 14)  # the mic, at its tip
+        boom.target(tip, (0.4, 0.4, 0.4))
+        boom.grow((lx + 1.4, start[1], cz - R - 1.2), (3.0, 0.5, 2.6))
+        boom.material = "cable"
+        if not gaming:
+            foam = part("boom_foam", "foam windscreen", ["boom"])
+            foam.lathe(ball_profile(0.3, math.pi), "x", tip, fixed=(40, 40, 44))
+            foam.material = "foam"
+    if wireless:  # its buttons and its light on the right cup's edge, and the mics' holes on the left one
+        rx = X
+        rc = next(p for p in board.parts if p.key == "right_cup")
+        def rim(deg, out=0.04):  # a point on the cup's edge, round the front (clear of the yoke, round the back)
+            a = math.radians(deg)
+            return rx + math.cos(a) * (R + out), cz + math.sin(a) * (R + out)
+        x, z = rim(-28)
+        rc.box((x, 0.45, z), (0.2, 0.22, 0.2), fixed=(70, 66, 62), hit=False)  # its power button
+        rc.target((x, 0.45, z), (0.32, 0.3, 0.32), ("power",))
+        for deg in (-52, -64):  # volume up and down
+            x, z = rim(deg)
+            rc.box((x, 0.45, z), (0.17, 0.2, 0.17), fixed=(70, 66, 62), hit=False)
+        x, z = rim(-85, 0.0)
+        rc.box((x, 0.3, z), (0.3, 0.12, 0.1), fixed=BLACK, hit=False)  # its USB-C socket
+        light = Shapes().use((255, 255, 255), "light")
+        x, z = rim(-12, 0.06)
+        light.box(rc.rel((x, 0.62, z)), (0.08, 0.08, 0.08))
+        board.mic["light"], board.mic["light_host"] = light, "right_cup"
+        lc = next(p for p in board.parts if p.key == "left_cup")
+        for dx in (-0.25, 0.25):
+            lc.shapes.use(BLACK).axle(lc.rel((lx + dx, 0.5, cz - R - 0.04)), 0.06, 0.02, 10, along="z")
+    if extras:  # dust and a hair or two on the headband's pad
+        def on_pad():
+            x, z = inner[rnd.randrange(len(inner))]
+            return x, 0.79, z
+        board.dirt.append(Dirt(pad, specks_on(rnd, 7, on_pad, ("dust", "hair", "hair"))))
+    board.size = board.inner = spec["size"]
+    board.height = top + 0.05
+
+
+# ---- computers ----
+
+# A tower lies on its right side on the bench, the way you'd work on one, with its glass side panel up: its bottom to
+# the left (-x), its top to the right, its front towards you (-z) and its back away. (A computer is drawn at 30 mm a
+# unit, not a key width's 19, so it fits on the bench.)
+PC_X = PC_Z = 6.7  # half its height (along x) and half its depth (along z)
+PC_T = 0.08  # its steel
+PC_TRAY = 0.7  # the top of its motherboard tray (the right side panel is under it, with room for cables between)
+PC_GLASS = 6.72  # the top of its walls, where the glass side panel sits
+PC_SHROUD = -3.51  # the top of the shroud over the power supply
+PC_SLOTS = (0.6, -0.08, -0.76, -1.44)  # its expansion slots, down the back (the first is the graphics card's)
+PC_FANS = ((3.6, 3.71), (-0.6, 3.71))  # its front fans' middles (x, y); they're 4 units (120 mm) square
+PC_REAR_FAN = (4.1, 4.42)
+MB_HOLES = ((6.05, -1.35), (6.05, 4.2), (1.3, -1.35), (1.3, 4.5), (-1.5, -1.35), (-1.5, 6.1))  # x, z
+PC_GROMMETS = ((6.34, 6.58, 4.6, 5.4), (6.34, 6.58, -5.6, -5.0), (-2.9, -2.1, -1.6, -0.4), (3.0, 4.4, -2.55, -2.05))
+PC_CPU_CUT, PC_PSU_CUT = (2.9, 5.1, 1.8, 4.0), (-6.4, -5.2, 0.9, 1.7)  # the tray's cut-outs (x0, x1, z0, z1)
+FILTER_DIRTY, FILTER_CLEAN = (150, 140, 122), (40, 40, 44)
+CABLE_BLACK, COPPER = (30, 30, 34), (200, 124, 82)
+
+
+def sheet(part, axis, at, thick, u, v, tint="case", fixed=SILVER, hit=True):
+    """A flat piece of sheet across axis, at `at`: spanning u (x for a sheet across y or z, z across x) and v (z
+    across y, y across x or z)."""
+    cu, cv, su, sv = (u[0] + u[1]) / 2, (v[0] + v[1]) / 2, u[1] - u[0], v[1] - v[0]
+    if axis == "y":
+        c, s = (cu, at, cv), (su, thick, sv)
+    elif axis == "z":
+        c, s = (cu, cv, at), (su, sv, thick)
+    else:
+        c, s = (at, cv, cu), (thick, sv, su)
+    part.box(c, s, tint, fixed, hit)
+
+
+def holed(part, axis, at, thick, u, v, holes, tint="case", fixed=SILVER, hit=True):
+    """A sheet of steel with holes in it (each u0, u1, v0, v1), made of the pieces round them."""
+    us = sorted({u[0], u[1]} | {e for h in holes for e in h[:2] if u[0] < e < u[1]})
+    vs = sorted({v[0], v[1]} | {e for h in holes for e in h[2:] if v[0] < e < v[1]})
+    for v0, v1 in zip(vs, vs[1:]):
+        run = None
+        for u0, u1 in zip(us, us[1:]):
+            cu, cv = (u0 + u1) / 2, (v0 + v1) / 2
+            solid = not any(h[0] < cu < h[1] and h[2] < cv < h[3] for h in holes)
+            if solid and run is None:
+                run = u0
+            elif not solid and run is not None:
+                sheet(part, axis, at, thick, (run, u0), (v0, v1), tint, fixed, hit)
+                run = None
+        if run is not None:
+            sheet(part, axis, at, thick, (run, us[-1]), (v0, v1), tint, fixed, hit)
+
+
+def fan_hole(cx, cy, r=1.8):
+    """The opening a fan blows through, nearly round (so the corners, where its screws go, stay solid): bands
+    across it, each as wide as the circle is at its edge."""
+    holes = []
+    for y0, y1 in ((0.0, 0.3), (0.3, 0.55), (0.55, 0.75), (0.75, 0.88), (0.88, 0.97)):
+        w = r * math.sqrt(1 - y1 * y1)
+        holes += [(cx - w, cx + w, cy + y0 * r, cy + y1 * r), (cx - w, cx + w, cy - y1 * r, cy - y0 * r)]
+    return holes
+
+
+def face(shapes, a, b, c, d):
+    """A quad, its normal worked out from its corners (wound the way Shapes.box winds them)."""
+    A, B, C = Vec3(*a), Vec3(*b), Vec3(*c)
+    n = (B - A).cross(C - A)
+    shapes.quad(tuple(a), tuple(b), tuple(c), tuple(d), tuple(n.normalized()) if n.length() > 1e-9 else (0, 1, 0))
+
+
+def fan_blades(board, part, c, r0, r1, depth, axis="z", n=7, colour=(48, 48, 54)):
+    """A fan's blades round its hub, swept and pitched: a mesh of their own, on a hub that spins (about z for a fan
+    facing along z; about x for a graphics card's, facing down)."""
+    def way(u, v, w):
+        return (u, v, w) if axis == "z" else (w, v, u)
+    s = Shapes().use(colour)
+    s.axle(way(0, 0, 0), r0, depth * 0.5, 18, along=axis)  # its hub's cap
+    for k in range(n):
+        a = 2 * math.pi * k / n
+        edges = []
+        for r, sweep, chord in ((r0 * 0.95, 0.0, 0.55), (r1, 0.42, 1.0)):
+            b = a + sweep
+            d, t = (math.cos(b), math.sin(b)), (-math.sin(b), math.cos(b))
+            w = chord * 2 * math.pi * r1 / n * 0.42
+            lead = way(d[0] * r + t[0] * w / 2, d[1] * r + t[1] * w / 2, depth * 0.3)
+            trail = way(d[0] * r - t[0] * w / 2, d[1] * r - t[1] * w / 2, -depth * 0.3)
+            edges.append((lead, trail))
+        (l0, t0), (l1, t1) = edges
+        face(s, l0, l1, t1, t0)  # (both sides of it)
+        face(s, t0, t1, l1, l0)
+    hub = part.root.attachNewNode(f"{part.key} hub")
+    hub.setPos(*part.rel(c))
+    s.mesh(hub, f"{part.key} blades")
+    board.special.setdefault("fans", []).append((hub, axis, part.key))
+
+
+def fan_frame(part, c, size=4.0, depth=0.83, colour=(34, 34, 38)):
+    """A square fan's frame, facing along z: its four sides, its corners (each with a screw hole through it) filled
+    in round the opening, and the motor's hub held on three struts at the back."""
+    x, y, z = c
+    h, b = size / 2, 0.2
+    for dy in (h - b / 2, -h + b / 2):
+        part.box((x, y + dy, z), (size, b, depth), fixed=colour)
+    for dx in (h - b / 2, -h + b / 2):
+        part.box((x + dx, y, z), (b, size - 2 * b, depth), fixed=colour)
+    for sx in (-1, 1):
+        for sy in (-1, 1):
+            part.box((x + sx * (h - 0.42), y + sy * (h - 0.42), z), (0.44, 0.44, depth), fixed=colour, hit=False)
+            for f in (-1, 1):
+                part.shapes.use((14, 14, 16)).axle(part.rel((x + sx * (h - 0.32), y + sy * (h - 0.32),
+                                                             z + f * depth / 2)), 0.09, 0.014, 10, along="z")
+    hub = size * 0.17
+    part.shapes.use(colour).axle(part.rel((x, y, z + depth * 0.3)), hub, depth * 0.36, 18, along="z")  # its motor
+    for k in range(3):  # its struts, out to the frame
+        a = math.pi / 2 + k * 2 * math.pi / 3
+        part.shapes.use(colour).rod(part.rel((x + math.cos(a) * hub, y + math.sin(a) * hub, z + depth * 0.42)),
+                                    part.rel((x + math.cos(a) * (h - 0.1), y + math.sin(a) * (h - 0.1),
+                                              z + depth * 0.42)), 0.07)
+    part.target(c, (size, size, depth))
+
+
+def case_fan(board, part, c, colour=(34, 34, 38)):
+    """A 120 mm case fan facing along z, with its blades."""
+    fan_frame(part, c, 4.0, 0.83, colour)
+    fan_blades(board, part, c, 0.62, 1.7, 0.83)
+
+
+def thumb_z(part, x, y, z, toward):
+    """A thumb screw going in along z (from the front, or the back): a knurled head you can turn by hand."""
+    hz = z + toward * 0.07
+    part.shapes.use((44, 44, 50)).axle(part.rel((x, y, hz)), 0.2, 0.14, 16, along="z")
+    knurl(part, (x, y, hz), 0.205, 0.12, "z", 14, (30, 30, 34))
+    part.shapes.use(SILVER).axle(part.rel((x, y, z - toward * 0.12)), 0.06, 0.24, 8, along="z")  # its thread
+    part.grow((x, y, hz), (0.42, 0.42, 0.16))
+    part.target((x, y, hz), (0.46, 0.46, 0.2))
+    part.spin, part.thumb = "z", True
+
+
+def fixed_screw_z(part, x, y, z, toward):
+    """A screw head that stays put (holding something that isn't a part of its own), facing along z."""
+    part.shapes.use(SILVER).axle(part.rel((x, y, z)), 0.12, 0.05, 12, along="z")
+    for size in ((0.18, 0.03, 0.008), (0.03, 0.18, 0.008)):
+        part.box((x, y, z + toward * 0.027), size, fixed=(108, 110, 120), hit=False)
+
+
+def pc_chassis(board, part, spec, full):
+    """The case's steel: its walls (with openings for its fans, its I/O shield, its slots and its power supply), the
+    motherboard tray (its brass standoffs, its grommets, the cut-out behind the CPU), the shroud over the power
+    supply, its feet underneath, and the front I/O across the top of its front. A complete PC has its fans, filters,
+    front panel and right side panel fixed on too (a case on its own has them as parts)."""
+    X, Z, T, top = PC_X, PC_Z, PC_T, PC_GLASS
+    y0 = 0.08  # (the right side panel is under the walls)
+    ch = part("chassis", "chassis")
+    ch.material = "metal"
+    io = (1.0, 6.1, 0.76, 2.3)
+    rear_fan = fan_hole(*PC_REAR_FAN)
+    psu_hole = (-6.2, -4.05, 1.3, 5.5)
+    slots = [(c - 0.25, c + 0.25, 1.15, 4.45) for c in PC_SLOTS]
+    holed(ch, "z", Z - T / 2, T, (-X, X), (y0, top), [io, psu_hole] + rear_fan + slots)  # its back
+    fronts = [h for x, y in PC_FANS for h in fan_hole(x, y)]
+    holed(ch, "z", -Z + T / 2, T, (-X, X), (y0, top), fronts)  # its front
+    holed(ch, "x", X - T / 2, T, (-Z + T, Z - T), (y0, top), [(-4.6, 4.6, 1.0, 5.8)])  # its top
+    holed(ch, "x", -X + T / 2, T, (-Z + T, Z - T), (y0, top), [(1.9, 6.3, 1.0, 5.8)])  # its bottom
+    grille = (60, 62, 68)  # (stamped grilles over the openings: thin bars)
+    for k in range(1, 6):
+        ch.box((PC_REAR_FAN[0] - 1.8 + k * 0.6, PC_REAR_FAN[1], Z - T / 2), (0.05, 3.6, T * 0.6), fixed=grille,
+               hit=False)
+    for k in range(1, 8):
+        ch.box((X - T / 2, 1.0 + k * 0.6, 0), (T * 0.6, 0.05, 9.2), fixed=grille, hit=False)
+        ch.box((-X + T / 2, 1.0 + k * 0.6, 4.1), (T * 0.6, 0.05, 4.4), fixed=grille, hit=False)
+    # the motherboard tray, with its cut-outs, and rubber grommets for the cables to pass through
+    holed(ch, "y", PC_TRAY - T / 2, T, (-X + T, X - T), (-Z + T, Z - T),
+          [PC_CPU_CUT, PC_PSU_CUT] + list(PC_GROMMETS))
+    for x0, x1, z0, z1 in PC_GROMMETS:
+        ch.box(((x0 + x1) / 2, PC_TRAY - T / 2, (z0 + z1) / 2), (x1 - x0, T * 0.6, z1 - z0), fixed=RUBBER, hit=False)
+        wide = x1 - x0 > z1 - z0  # (and its slit)
+        ch.box(((x0 + x1) / 2, PC_TRAY - T * 0.2, (z0 + z1) / 2),
+               ((x1 - x0) * 0.8 if wide else 0.03, T * 0.7, 0.03 if wide else (z1 - z0) * 0.8), fixed=(10, 10, 12),
+               hit=False)
+    for x, z in MB_HOLES:  # the brass standoffs the motherboard screws onto
+        ch.post((x, PC_TRAY, z), 0.1, 0.28, fixed=GOLDEN, hit=False)
+    # the shroud over the power supply (its cover is a part of its own), with holes for the power cables
+    sx = PC_SHROUD
+    holed(ch, "x", sx, T, (-5.6, Z - T), (PC_TRAY, 6.62), [(-2.6, -1.8, 1.9, 5.6), (0.2, 1.0, 1.9, 5.6)])
+    sheet(ch, "z", -5.64, T, (-X + T, sx + T / 2), (PC_TRAY, 6.62))  # its front end
+    ch.box(((-X + T + sx + T / 2) / 2, 6.58, 6.29), (sx + T / 2 - (-X + T), 0.08, 0.66), "case", hit=False)
+    for z in (2.5, 5.8):  # rubber pads on the floor, for the power supply to sit on
+        ch.box((-6.59, 3.4, z), (0.06, 4.4, 0.4), fixed=RUBBER, hit=False)
+    for z in (-5.9, 5.9):  # its feet, underneath (the side towards the bench's left, as it lies)
+        for y in (0.5, 6.3):
+            ch.shapes.use(RUBBER).axle(ch.rel((-X - 0.17, y, z)), 0.3, 0.34, 16, along="x")
+    ch.grow((-X - 0.17, 3.4, 0), (0.34, 6.4, 12.4))
+    for x in (-6.35, 6.35):  # brackets in the corners, for the glass panel's thumb screws
+        for z in (-6.35, 6.35):
+            ch.box((x, 6.66, z), (0.5, 0.08, 0.5), "case", hit=False)
+            ch.post((x, 6.7, z), 0.18, 0.02, fixed=RUBBER, hit=False)
+    # the slot covers in the back, where no card is (each held by a screw at its end), and the I/O shield's frame
+    for i, c in enumerate(PC_SLOTS):
+        if full and i < 2:  # (the graphics card's bracket is there)
+            continue
+        ch.box((c, 2.95, Z + 0.02), (0.62, 3.9, 0.04), "case", hit=False)
+        for k in range(4):
+            ch.box((c, 1.5 + k * 0.7, Z + 0.042), (0.3, 0.45, 0.01), fixed=(20, 20, 24), hit=False)
+        fixed_screw_z(ch, c, 4.72, Z + 0.065, 1)
+    # the front I/O, a strip across the top of its front, flush with the front panel: the power button, the reset
+    # button, two USB ports, a USB-C, a headphone jack (and on a complete PC, its power light)
+    fz = -Z - 0.45
+    ch.box((6.3, (y0 + top) / 2, -Z - 0.225), (0.84, top - y0, 0.45), "inside")
+    ch.shapes.use(SILVER).axle(ch.rel((6.29, 5.0, fz - 0.03)), 0.27, 0.06, 20, along="z")
+    ch.shapes.use(spec["accent"]).axle(ch.rel((6.29, 5.0, fz - 0.06)), 0.21, 0.06, 20, along="z")
+    ch.target((6.29, 5.0, fz - 0.06), (0.62, 0.62, 0.2), ("power",))
+    ch.shapes.use((24, 24, 28)).axle(ch.rel((6.29, 4.3, fz - 0.03)), 0.1, 0.06, 12, along="z")
+    ch.target((6.29, 4.3, fz - 0.04), (0.36, 0.36, 0.16), ("reset",))
+    for y in (2.2, 2.9):
+        ch.box((6.29, y, fz - 0.004), (0.2, 0.5, 0.012), fixed=(12, 12, 14), hit=False)
+        ch.box((6.29, y, fz - 0.007), (0.06, 0.4, 0.012), fixed=(60, 110, 210), hit=False)
+    ch.target((6.29, 2.55, fz - 0.03), (0.44, 1.3, 0.12), ("usb",))
+    ch.box((6.29, 3.55, fz - 0.004), (0.1, 0.32, 0.012), fixed=(12, 12, 14), hit=False)  # USB-C
+    ch.shapes.use((12, 12, 14)).axle(ch.rel((6.29, 1.5, fz - 0.004)), 0.08, 0.012, 10, along="z")  # the jack
+    if full:
+        light = Shapes().use((255, 255, 255), "light")
+        light.box((6.29, 5.7, fz - 0.005), (0.07, 0.36, 0.012))
+        board.mic["light"], board.mic["light_host"] = light, "chassis"
+    # the front I/O's cables: in from the strip, along the top of the tray, through a grommet and along behind it,
+    # and back out of the grommet by the bottom of the motherboard
+    ch.wire([(6.3, 0.8, -6.6), (6.3, 0.8, -5.3), (6.46, 0.8, -5.3), (6.46, 0.35, -5.3), (-2.5, 0.35, -5.3),
+             (-2.5, 0.35, -1.0), (-2.5, 0.66, -1.0)], 0.12, CABLE_BLACK)
+    ch.box((2.6, 0.3, -4.2), (1.2, 0.14, 0.8), fixed=(40, 40, 46), hit=False)  # a fan hub, behind the tray
+    ch.box((2.6, 0.38, -4.2), (1.0, 0.03, 0.6), fixed=PCB_GREEN, hit=False)
+    if not full:  # a case on its own: the front I/O's plugs, bundled up on the tray with a tie, ready for a board
+        ch.wire([(-2.5, 0.66, -1.0), (-2.5, 0.76, -1.0), (-2.5, 0.76, 0.6)], 0.12, CABLE_BLACK)
+        ch.box((-2.5, 0.78, -0.3), (0.2, 0.18, 0.08), fixed=(26, 26, 30), hit=False)
+        ch.box((-2.5, 0.77, 0.86), (0.36, 0.14, 0.5), fixed=(60, 90, 200), hit=False)  # the USB 3 plug
+        ch.wire([(-2.5, 0.76, 0.2), (-2.0, 0.76, 0.2), (-2.0, 0.76, 0.5)], 0.08, CABLE_BLACK)
+        for k, col in enumerate(((220, 70, 60), (240, 240, 236), (70, 160, 90), (236, 200, 80))):
+            ch.box((-2.12 + k * 0.08, 0.75, 0.6), (0.07, 0.08, 0.2), fixed=col, hit=False)  # the switch and light pins
+    else:  # a complete PC: its fans and filters, its front panel and right side panel, all on for good, and the
+        # fans' cables through the grommets to the hub
+        for x, y in PC_FANS:
+            case_fan(board, ch, (x, y, -6.205))
+            for sx in (-1, 1):
+                for sy in (-1, 1):
+                    fixed_screw_z(ch, x + sx * 1.68, y + sy * 1.68, -Z - 0.025, -1)
+            ch.wire([(x - 1.7, y - 1.9, -5.85), (x - 1.7, 0.85, -5.85), (x - 1.7, 0.85, -5.3), (6.4, 0.85, -5.3),
+                     (6.4, 0.25, -5.3), (3.2, 0.25, -5.3), (3.2, 0.25, -4.2)], 0.08, CABLE_BLACK)
+        case_fan(board, ch, (PC_REAR_FAN[0], PC_REAR_FAN[1], 6.205))
+        for sx in (-1, 1):
+            for sy in (-1, 1):
+                fixed_screw_z(ch, PC_REAR_FAN[0] + sx * 1.68, PC_REAR_FAN[1] + sy * 1.68, Z + 0.025, 1)
+        ch.wire([(6.05, 6.0, 5.85), (6.46, 6.0, 5.85), (6.46, 0.8, 5.85), (6.46, 0.8, 5.25), (6.46, 0.25, 5.25),
+                 (6.3, 0.25, 5.25), (6.3, 0.25, -4.2), (3.2, 0.25, -4.2)], 0.08, CABLE_BLACK)
+        pc_filters(board, part, spec, ch)
+        pc_front_panel(ch, spec)
+        ch.box((0, 0.04, 0), (2 * X, 0.08, 2 * Z), "case", hit=False)  # the right side panel, underneath
+        ch.box((0, 0.3, Z + 0.03), (2 * X, 0.6, 0.06), "case", hit=False)
+        for x in (-4.5, 4.5):
+            ch.shapes.use((44, 44, 50)).axle(ch.rel((x, 0.32, Z + 0.13)), 0.2, 0.14, 16, along="z")
+    return ch
+
+
+def filter_sheet(part, axis, at, u, v):
+    """A dust filter: fine mesh (clogged, or clean) in a thin frame."""
+    frame = (34, 34, 38)
+    sheet(part, axis, at, 0.05, u, v, "filter")
+    m = 0.14
+    for uu, vv in (((u[0], u[0] + m), v), ((u[1] - m, u[1]), v), (u, (v[0], v[0] + m)), (u, (v[1] - m, v[1]))):
+        sheet(part, axis, at, 0.062, uu, vv, None, frame, False)
+
+
+def pc_filters(board, part, spec, host=None):
+    """Its three dust filters: behind the front panel, on the top (it holds on by magnets), and under the power
+    supply (it slides out to the front). On a case of its own, they're parts; on a complete PC, part of it."""
+    made = []
+    for key, name, axis, at, u, v, lift in (
+            ("front_filter", "front dust filter", "z", -6.81, (-6.5, 5.75), (0.5, 6.3), (0, 0, -1)),
+            ("top_filter", "top dust filter", "x", 6.73, (-4.9, 4.9), (0.7, 6.1), (1, 0, 0)),
+            ("bottom_filter", "bottom dust filter", "x", -6.73, (1.7, 6.5), (0.9, 5.9), (0, 0, -1))):
+        p = host or part(key, name, ["chassis"], lift=lift)
+        filter_sheet(p, axis, at, u, v)
+        if host is None:
+            p.material = "plastic"
+            made.append(p)
+    return made
+
+
+def pc_front_panel(p, spec):
+    """The front panel: a frame round a fine mesh (you see the dust filter and the fans through it), with clips on
+    its back that push into the chassis."""
+    z0, z1 = -7.15, -6.86
+    x0, x1, y0, y1 = -6.72, 5.86, 0.08, 6.72
+    zc, d, m = (z0 + z1) / 2, z1 - z0, 0.36
+    for x, y, w, h in (((x0 + x1) / 2, y0 + m / 2, x1 - x0, m), ((x0 + x1) / 2, y1 - m / 2, x1 - x0, m),
+                       (x0 + m / 2, (y0 + y1) / 2, m, y1 - y0 - 2 * m), (x1 - m / 2, (y0 + y1) / 2, m, y1 - y0 - 2 * m)):
+        p.box((x, y, zc), (w, h, d), "inside")
+    mesh = (62, 62, 68)
+    k = x0 + m + 0.3
+    while k < x1 - m:
+        p.box((k, (y0 + y1) / 2, z0 + 0.03), (0.04, y1 - y0 - 2 * m, 0.04), fixed=mesh, hit=False)
+        k += 0.3
+    k = y0 + m + 0.3
+    while k < y1 - m:
+        p.box(((x0 + x1) / 2, k, z0 + 0.03), (x1 - x0 - 2 * m, 0.04, 0.04), fixed=mesh, hit=False)
+        k += 0.3
+    for x, y in ((-6.45, 0.28), (-6.45, 6.52), (5.6, 0.28), (5.6, 6.52)):  # its clips, into the chassis
+        p.box((x, y, -6.79), (0.3, 0.16, 0.14), fixed=(28, 28, 32), hit=False)
+    p.target(((x0 + x1) / 2, (y0 + y1) / 2, zc), (x1 - x0, y1 - y0, d))
+
+
+def pc_dust(rnd, n, x, z, y, keep_out=(), margin=0.14):
+    """n specks of dust (as a dusty one has) on a flat top at height y, inside x and z, but not on what's in
+    keep_out (x0, x1, z0, z1 each)."""
+    def where():
+        for _ in range(60):
+            px, pz = rnd.uniform(*x), rnd.uniform(*z)
+            if not any(a - margin < px < b + margin and c - margin < pz < d + margin for a, b, c, d in keep_out):
+                return px, y, pz
+        return (x[0] + x[1]) / 2, y, z[0]
+    return specks_on(rnd, n, where, ("dust", "dust", "dust", "hair"))  # (no crumbs in a computer)
+
+
+def build_pc(board, part, spec, rnd, extras):
+    """A computer, lying on its side, glass up. A case on its own: the chassis, its right side panel (two thumb
+    screws at the back), two front fans and a rear fan (four screws each), three dust filters, the front panel, the
+    cover over the power supply's shroud, and the glass side panel on four thumb screws. A complete desktop PC: the
+    chassis with its fans, filters and panels on for good, and inside it the power supply (four screws at the back),
+    the motherboard (six screws), the CPU in its socket, the cooler on it (two screws, and its fan clipped on), two
+    memory sticks, an M.2 SSD (a screw), the graphics card (two screws at its bracket), and their power cables and
+    the front panel's; then the shroud's cover, and the glass."""
+    full = spec["form"] == "pc_tower"
+    X, Z = PC_X, PC_Z
+    screws = [0]
+
+    def screw(name, below, origin, lift):
+        s = part(f"screw{screws[0]}", name, below, screw=True, origin=origin, lift=lift)
+        screws[0] += 1
+        return s, screws[0] - 1
+
+    ch = pc_chassis(board, part, spec, full)
+    inside = []  # (what the glass goes on over)
+    if not full:
+        right = part("right_panel", "right side panel", ["chassis"], lift=(0, -1, 0))
+        right.box((0, 0.04, 0), (2 * X, 0.08, 2 * Z), "case")
+        right.box((0, 0.3, Z + 0.03), (2 * X, 0.6, 0.06), "case")  # its flange, round the back
+        right.material = "metal"
+        for x in (-4.5, 4.5):
+            s, i = screw("thumb screw", ["right_panel"], (x, 0.32, Z + 0.13), (0, 0, 1))
+            thumb_z(s, x, 0.32, Z + 0.06, 1)
+            right.target((x, 0.32, Z + 0.065), (0.3, 0.3, 0.02), ("hole", i))
+        fans = []
+        for k, (x, y) in enumerate(PC_FANS):
+            fan = part(f"front_fan{k}", "front fan", ["chassis"])
+            case_fan(board, fan, (x, y, -6.205))
+            fan.wire([(x - 1.7, y - 1.9, -5.85), (x - 1.7, 0.78, -5.85), (x - 1.7, 0.78, -5.55)], 0.08,
+                     CABLE_BLACK)  # its cable, and the plug on its end, lying on the tray for a board to come
+            fan.box((x - 1.7, 0.76, -5.38), (0.26, 0.12, 0.34), fixed=(26, 26, 30), hit=False)
+            fan.material = "plastic"
+            fans.append(fan)
+            for sx in (-1, 1):
+                for sy in (-1, 1):
+                    px, py = x + sx * 1.68, y + sy * 1.68
+                    s, i = screw("fan screw", [fan.key], (px, py, -Z - 0.025), (0, 0, -1))
+                    screw_head_z(s, px, py, -Z - 0.025, -1)
+                    ch.target((px, py, -Z - 0.004), (0.3, 0.3, 0.012), ("hole", i))
+        front_screws = [f"screw{n}" for n in range(2, screws[0])]
+        rear = part("rear_fan", "rear fan", ["chassis"])
+        rx, ry = PC_REAR_FAN
+        case_fan(board, rear, (rx, ry, 6.205))
+        rear.wire([(rx - 1.85, ry - 1.8, 5.85), (rx - 1.85, 0.78, 5.85), (rx - 1.85, 0.78, 5.55)], 0.08, CABLE_BLACK)
+        rear.box((rx - 1.85, 0.76, 5.38), (0.26, 0.12, 0.34), fixed=(26, 26, 30), hit=False)
+        rear.material = "plastic"
+        fans.append(rear)
+        for sx in (-1, 1):
+            for sy in (-1, 1):
+                px, py = rx + sx * 1.68, ry + sy * 1.68
+                s, i = screw("fan screw", ["rear_fan"], (px, py, Z + 0.025), (0, 0, 1))
+                screw_head_z(s, px, py, Z + 0.025, 1)
+                ch.target((px, py, Z + 0.004), (0.3, 0.3, 0.012), ("hole", i))
+        filters = pc_filters(board, part, spec)
+        filters[0].below += front_screws  # (the front filter goes on over the front fans' screws)
+        bezel = part("front_panel", "front panel", ["chassis", "front_filter"], lift=(0, 0, -1))
+        pc_front_panel(bezel, spec)
+        bezel.material = "plastic"
+        clogged = rnd.sample(filters, rnd.choice((1, 2, 2, 3)))  # (how many have clogged: it's never the same)
+        for f in clogged:
+            f.grimy = True
+        board.special["clogged"] = len(clogged)
+        inside = [f.key for f in fans]
+    else:
+        psu = part("psu", "power supply", ["chassis"])
+        px0, px1, py0, py1, pz0, pz1 = -6.56, -3.69, 0.95, 5.85, 1.95, 6.62
+        psu.box(((px0 + px1) / 2, (py0 + py1) / 2, (pz0 + pz1) / 2), (px1 - px0, py1 - py0, pz1 - pz0),
+                fixed=(36, 36, 40))
+        psu.box((-5.12, py1 + 0.005, 4.4), (2.2, 0.01, 2.8), fixed=(206, 206, 200), hit=False)  # its label
+        for k in range(5):
+            psu.box((-5.12, py1 + 0.011, 3.3 + k * 0.5), (1.6 - (k % 2) * 0.5, 0.004, 0.08), fixed=(120, 120, 120),
+                    hit=False)
+        for r in (2.0, 1.5, 1.0, 0.5):  # its fan's grille, underneath (it breathes in through the bottom filter)
+            psu.shapes.use((150, 150, 156)).axle(psu.rel((px0 - 0.005, 3.4, 4.3)), r, 0.012, 28, along="x")
+            psu.shapes.use((24, 24, 28)).axle(psu.rel((px0 - 0.006, 3.4, 4.3)), r - 0.07, 0.012, 28, along="x")
+        psu.box((-5.12, 4.5, pz1 + 0.005), (2.0, 1.6, 0.01), fixed=(20, 20, 22), hit=False)  # its back: a grille,
+        for k in range(6):
+            psu.box((-6.0 + k * 0.36, 4.5, pz1 + 0.011), (0.04, 1.5, 0.006), fixed=(70, 70, 76), hit=False)
+        psu.box((-5.5, 2.0, pz1 + 0.02), (0.5, 0.7, 0.04), fixed=(14, 14, 16), hit=False)  # the mains socket
+        for dx, dy in ((-0.12, 0.12), (0.12, 0.12), (0, -0.16)):
+            psu.box((-5.5 + dx, 2.0 + dy, pz1 + 0.042), (0.06, 0.12, 0.01), fixed=SILVER, hit=False)
+        psu.box((-4.5, 2.0, pz1 + 0.03), (0.3, 0.46, 0.06), fixed=(54, 54, 58), hit=False)  # and the switch
+        for sx, sy, w, h in ((-5.0, 2.2, 0.8, 0.6), (-4.3, 4.4, 0.6, 0.6), (-5.8, 1.4, 0.6, 0.5), (-5.9, 3.6, 0.6, 0.5),
+                             (-5.0, 3.6, 0.6, 0.5), (-4.3, 3.0, 0.6, 0.5)):  # its modular sockets, on its front
+            psu.box((sx, sy, pz0 - 0.01), (w, h, 0.02), fixed=(14, 14, 16), hit=False)
+        psu.material = "metal"
+        for x, y in ((-6.36, 1.12), (-6.36, 5.68), (-3.89, 1.12), (-3.89, 5.68)):
+            s, i = screw("screw", ["psu"], (x, y, Z + 0.025), (0, 0, 1))
+            screw_head_z(s, x, y, Z + 0.025, 1)
+            ch.target((x, y, Z + 0.004), (0.3, 0.3, 0.012), ("hole", i))
+        # the motherboard, on its standoffs
+        mb = part("motherboard", "motherboard", ["chassis"])
+        X0, X1, Z0, Z1, Y0, Y1 = -1.8, 6.3, -1.65, 6.45, 0.98, 1.04
+        mb.box(((X0 + X1) / 2, (Y0 + Y1) / 2, (Z0 + Z1) / 2), (X1 - X0, Y1 - Y0, Z1 - Z0), fixed=(36, 40, 48))
+        mb.material = "board"
+        dark, white = (28, 28, 32), (236, 236, 230)
+
+        def on(c, s, col):
+            mb.box(c, s, fixed=col, hit=False)
+        on((4.0, 0.935, 2.9), (2.4, 0.05, 2.4), (40, 40, 44))  # the cooler's backplate, behind it
+        on((4.0, 1.07, 2.9), (1.7, 0.06, 1.7), (70, 72, 80))  # the CPU socket, and its lever
+        on((4.95, 1.11, 2.9), (0.05, 0.05, 1.6), SILVER)
+        for z in (0.35, 0.75):  # the memory slots, with a latch at each end
+            on((3.8, 1.17, z), (4.7, 0.26, 0.2), dark)
+            for x in (1.5, 6.1):
+                on((x, 1.24, z), (0.1, 0.4, 0.2), (210, 210, 204))
+        on((0.6, 1.2, 4.0), (0.3, 0.32, 3.0), dark)  # the graphics card's slot (PCIe x16), and a little one
+        on((-0.76, 1.2, 4.95), (0.3, 0.32, 1.1), dark)
+        on((1.185, 1.1, 4.02), (0.78, 0.12, 0.25), dark)  # the M.2 socket, and the standoff its end screws to
+        mb.post((1.185, Y1, 1.23), 0.08, 0.09, fixed=GOLDEN, hit=False)
+        on((3.5, 1.27, -1.33), (1.8, 0.46, 0.36), white)  # the 24-pin power socket
+        on((6.0, 1.22, 5.0), (0.28, 0.36, 0.62), white)  # the CPU's 8-pin
+        on((6.1, 1.12, 1.35), (0.12, 0.16, 0.3), white)  # the CPU fan's header
+        on((5.15, 1.37, 4.72), (1.1, 0.66, 1.45), (80, 84, 92))  # the power stages' heatsink, with fins
+        for k in range(5):
+            on((4.7 + k * 0.22, 1.71, 4.72), (0.05, 0.02, 1.4), (110, 114, 122))
+        on((-1.15, 1.2, 3.1), (0.6, 0.32, 1.0), (80, 84, 92))  # the chipset's heatsink
+        on((-1.62, 1.1, -0.7), (0.2, 0.12, 0.5), dark)  # the front panel's header, and the USB 3 one
+        on((-1.6, 1.12, 0.65), (0.25, 0.16, 0.7), (60, 90, 200))
+        mb.post((2.2, Y1, -0.6), 0.32, 0.05, fixed=SILVER, hit=False)  # its little coin battery
+        for z in (2.0, 2.5, 3.0, 3.5):  # capacitors
+            mb.post((5.6, Y1, z), 0.1, 0.3, fixed=(60, 62, 70), hit=False)
+        on((3.55, 1.62, 6.12), (5.1, 1.16, 1.0), (150, 152, 158))  # the ports at the back, through the I/O shield
+        for y, col in ((1.25, (60, 110, 210)), (1.6, (60, 110, 210)), (1.95, (12, 12, 14))):
+            for k in range(4):
+                on((1.6 + k * 0.5, y, 6.625), (0.4, 0.18, 0.02), col)
+        on((4.1, 1.45, 6.625), (0.5, 0.5, 0.02), (12, 12, 14))  # the network socket
+        for k, col in enumerate(((120, 200, 120), (230, 120, 190), (90, 160, 230))):
+            mb.shapes.use(col).axle(mb.rel((5.0 + k * 0.32, 1.7, 6.625)), 0.09, 0.02, 10, along="z")  # audio
+        holed(mb, "z", 6.66, 0.02, (1.0, 6.1), (0.76, 2.3), [(1.3, 5.8, 1.05, 2.15)], None, (176, 178, 186), False)
+        mb.target(((X0 + X1) / 2, (Y0 + Y1) / 2, (Z0 + Z1) / 2), (X1 - X0, 0.1, Z1 - Z0))
+        mb_holes = []
+        for x, z in MB_HOLES:
+            mb.post((x, Y1, z), 0.15, 0.004, fixed=GOLDEN, hit=False)
+            mb_holes.append((x, z))
+        for x, z in mb_holes:
+            s, i = screw("screw", ["motherboard"], (x, 1.1, z), (0, 1, 0))
+            s.post((x, Y1, z), 0.13, 0.08, fixed=SILVER)
+            for size in ((0.18, 0.008, 0.03), (0.03, 0.008, 0.18)):
+                s.box((x, Y1 + 0.084, z), size, fixed=(108, 110, 120), hit=False)
+            mb.target((x, Y1 + 0.02, z), (0.3, 0.04, 0.3), ("hole", i))
+        # the CPU, in its socket: old paste dried on it
+        cpu = part("cpu", "CPU", ["motherboard"])
+        cpu.box((4.0, 1.12, 2.9), (1.25, 0.04, 1.25), fixed=(40, 110, 70))
+        cpu.box((4.0, 1.17, 2.9), (1.05, 0.06, 1.05), fixed=SILVER)
+        cpu.material = "board"
+        old, fresh = Shapes(), Shapes()
+        for _ in range(rnd.randint(9, 15)):  # dried out, crumbly and patchy, where the cooler pressed it flat
+            s_ = rnd.uniform(0.14, 0.34)
+            old.use(rnd.choice(((150, 150, 146), (128, 128, 126), (170, 168, 160)))).box(
+                (4.0 + rnd.uniform(-0.38, 0.38), 1.2 + rnd.uniform(0.003, 0.008), 2.9 + rnd.uniform(-0.38, 0.38)),
+                (s_, 0.012, s_ * rnd.uniform(0.6, 1.2)))
+        fresh.use((176, 176, 172)).cylinder((4.0, 1.2, 2.9), 0.2, 0.05, 16)  # a fresh, pea-sized dot
+        board.attach.append((old, "cpu", "paste_old", False))
+        board.attach.append((fresh, "cpu", "paste_new", True))
+        # the cooler: a copper base on the CPU, heat pipes up through a tower of fins, a crossbar its two spring
+        # screws hold down; and its fan, clipped on the front of the fins
+        cooler = part("cooler", "CPU cooler", ["cpu"])
+        cooler.box((4.0, 1.3, 2.9), (1.2, 0.2, 1.2), fixed=COPPER)
+        cooler.box((4.0, 1.45, 2.9), (0.32, 0.1, 3.1), fixed=(60, 62, 70))
+        for x in (3.45, 3.82, 4.18, 4.55):
+            cooler.shapes.use(COPPER).rod(cooler.rel((x, 1.38, 2.9)), cooler.rel((x, 5.76, 2.9)), 0.08)
+        for k in range(28):
+            cooler.box((4.0, 2.22 + k * 0.122, 2.9), (4.0, 0.025, 1.7), fixed=(196, 198, 206), hit=False)
+        cooler.box((4.0, 5.68, 2.9), (4.04, 0.06, 1.74), fixed=(40, 40, 46), hit=False)  # its top cap
+        cooler.box((4.0, 5.72, 2.9), (2.0, 0.02, 0.3), fixed=spec["accent"], hit=False)
+        cooler.grow((4.0, 3.5, 2.9), (4.04, 4.5, 1.74))
+        cooler.target((4.0, 3.9, 2.9), (4.04, 3.6, 1.74))
+        cooler.target((4.0, 1.4, 2.9), (1.3, 0.3, 3.1))
+        cooler.material = "metal"
+        cooler_screws = []
+        for z in (1.5, 4.3):
+            s, i = screw("spring screw", ["cooler"], (4.0, 1.58, z), (0, 1, 0))
+            s.post((4.0, 1.5, z), 0.13, 0.14, fixed=SILVER)
+            s.post((4.0, 1.5, z), 0.07, 0.02, fixed=SILVER, hit=False)
+            for size in ((0.18, 0.008, 0.03), (0.03, 0.008, 0.18)):
+                s.box((4.0, 1.644, z), size, fixed=(108, 110, 120), hit=False)
+            cooler.target((4.0, 1.51, z), (0.3, 0.03, 0.3), ("hole", i))
+            cooler_screws.append(s.key)
+        cfan = part("cooler_fan", "cooler fan", ["cooler", cooler_screws[0]])
+        case_fan(board, cfan, (4.0, 3.6, 1.615))
+        for x in (2.1, 5.9):  # its wire clips, hooked into the fins
+            for y in (2.4, 5.45):
+                cfan.shapes.use(SILVER).rod(cfan.rel((x, y, 1.9)), cfan.rel((x, y, 2.3)), 0.03)
+        cfan.wire([(5.85, 1.75, 1.5), (6.12, 1.75, 1.5), (6.12, 1.3, 1.5), (6.12, 1.3, 1.36)], 0.06, CABLE_BLACK)
+        cfan.box((6.1, 1.26, 1.35), (0.15, 0.12, 0.3), fixed=WHITE, hit=False)  # its plug, on the header
+        cfan.material = "plastic"
+        rams = []
+        for k, z in enumerate((0.35, 0.75)):
+            r = part(f"ram{k}", "memory stick", ["motherboard"])
+            r.box((3.8, 1.27, z), (4.4, 0.24, 0.06), fixed=PCB_GREEN, hit=False)
+            r.box((3.8, 1.85, z), (4.36, 0.9, 0.15), fixed=spec["accent"])
+            r.box((3.8, 2.31, z), (4.3, 0.02, 0.06), fixed=(50, 50, 56), hit=False)
+            r.material = "board"
+            rams.append(r.key)
+        ssd = part("ssd", "M.2 SSD", ["motherboard"], lift=(0, 0.5, -1))
+        ssd.box((1.185, 1.15, 2.6), (0.73, 0.04, 2.67), fixed=(30, 30, 34))
+        ssd.box((1.185, 1.175, 2.45), (0.6, 0.01, 1.7), fixed=(220, 220, 214), hit=False)
+        ssd.box((1.185, 1.15, 3.97), (0.6, 0.03, 0.12), fixed=GOLDEN, hit=False)
+        ssd.material = "board"
+        s, i = screw("screw", ["ssd"], (1.185, 1.2, 1.23), (0, 1, 0))
+        s.post((1.185, 1.17, 1.23), 0.1, 0.05, fixed=SILVER)
+        mb.target((1.185, 1.175, 1.23), (0.24, 0.05, 0.24), ("hole", i))  # (under the screw's head)
+        # the graphics card: its board standing in its slot, the cooler and its two fans facing down the case, a
+        # backplate, its power socket on the top edge, and the bracket at the back, held by two screws
+        gpu = part("gpu", "graphics card", ["motherboard"])
+        gpu.box((0.6, 2.85, 3.26), (0.06, 3.4, 6.72), fixed=(30, 60, 40), hit=False)
+        gpu.box((0.6, 1.25, 4.0), (0.05, 0.2, 2.8), fixed=GOLDEN, hit=False)
+        gpu.box((0.665, 3.0, 3.15), (0.05, 3.1, 6.5), fixed=(48, 50, 58))
+        shroud = (34, 36, 42)
+        g_fans = ((4.55, 3.0), (1.75, 3.0))
+        holed(gpu, "x", -0.725, 0.05, (-0.1, 6.55), (1.45, 4.6), [h for z, y in g_fans for h in fan_hole(z, y, 1.3)],
+              None, shroud)
+        for y, h in ((1.475, 0.05), (4.575, 0.05)):
+            gpu.box((-0.1, y, 3.225), (1.3, h, 6.65), fixed=shroud)
+        gpu.box((-0.1, 3.025, -0.075), (1.3, 3.1, 0.05), fixed=shroud)
+        gpu.box((-0.72, 1.6, 3.225), (0.02, 0.06, 6.6), fixed=spec["accent"], hit=False)
+        for k in range(42):  # its heatsink's fins, behind the fans
+            gpu.box((-0.05, 3.0, 0.05 + k * 0.155), (0.9, 3.0, 0.03), fixed=(150, 152, 160), hit=False)
+        for z, y in g_fans:
+            fan_blades(board, gpu, (-0.62, y, z), 0.42, 1.2, 0.16, "x", 9)
+        gpu.box((0.42, 4.725, 0.6), (0.28, 0.25, 0.6), fixed=BLACK, hit=False)  # its power socket, by its board
+        gpu.box((0.26, 2.975, 6.72), (1.32, 3.95, 0.04), fixed=SILVER)  # its bracket
+        for y in (1.6, 2.3, 3.0, 3.7):
+            gpu.box((0.6, y, 6.745), (0.16, 0.5, 0.02), fixed=BLACK, hit=False)  # its screen sockets
+        for k in range(4):
+            gpu.box((-0.08, 1.6 + k * 0.75, 6.745), (0.3, 0.5, 0.012), fixed=(20, 20, 24), hit=False)
+        gpu.material = "board"
+        for x in (0.6, -0.08):
+            s, i = screw("screw", ["gpu"], (x, 4.72, Z + 0.065), (0, 0, 1))
+            screw_head_z(s, x, 4.72, Z + 0.065, 1)
+            gpu.target((x, 4.72, Z + 0.042), (0.28, 0.28, 0.012), ("hole", i))
+        # the power supply's cables: the 24-pin to the motherboard, the 8-pin up behind the tray to the CPU's, and
+        # the card's; and the front panel's plugs on their headers
+        atx = part("atx_cable", "24-pin power cable", ["motherboard", "psu"])
+        atx.box((3.5, 1.68, -1.33), (1.82, 0.36, 0.4), fixed=BLACK)
+        atx.wire([(3.5, 1.86, -1.33), (3.5, 2.2, -1.33), (3.5, 2.2, -2.2), (-5.0, 2.2, -2.2), (-5.0, 2.2, 1.6)],
+                 0.42, CABLE_BLACK, hit=True)
+        atx.box((-5.0, 2.2, 1.82), (0.82, 0.62, 0.26), fixed=BLACK)
+        eps = part("cpu_cable", "CPU power cable", ["motherboard", "psu"])
+        eps.box((6.0, 1.58, 5.0), (0.3, 0.36, 0.64), fixed=BLACK)
+        eps.wire([(6.0, 1.76, 5.0), (6.0, 1.92, 5.0), (6.46, 1.92, 5.0), (6.46, 0.42, 5.0), (6.46, 0.42, 1.3),
+                  (-5.8, 0.42, 1.3), (-5.8, 1.4, 1.3), (-5.8, 1.4, 1.6)], 0.24, CABLE_BLACK, hit=True)
+        eps.box((-5.8, 1.4, 1.82), (0.62, 0.52, 0.26), fixed=BLACK)
+        pcie = part("gpu_cable", "graphics card power cable", ["gpu", "psu"])
+        pcie.box((0.42, 4.975, 0.6), (0.32, 0.25, 0.64), fixed=BLACK)
+        pcie.wire([(0.42, 5.1, 0.6), (0.42, 5.25, 0.6), (-4.3, 5.25, 0.6), (-4.3, 4.4, 0.6), (-4.3, 4.4, 1.6)],
+                  0.3, CABLE_BLACK, hit=True)
+        pcie.box((-4.3, 4.4, 1.82), (0.62, 0.62, 0.26), fixed=BLACK)
+        fp = part("front_cables", "front panel cables", ["motherboard"])
+        fp.box((-1.62, 1.24, -0.7), (0.24, 0.16, 0.54), fixed=BLACK)
+        fp.box((-1.6, 1.29, 0.65), (0.3, 0.18, 0.74), fixed=(60, 90, 200))
+        fp.wire([(-1.62, 1.3, -0.7), (-2.5, 1.3, -0.7), (-2.5, 0.72, -0.7)], 0.1, CABLE_BLACK, hit=True)
+        fp.wire([(-1.6, 1.38, 0.65), (-2.5, 1.38, 0.65), (-2.5, 1.38, -0.5), (-2.5, 0.72, -0.5)], 0.18, CABLE_BLACK,
+                hit=True)
+        for p in (atx, eps, pcie, fp):
+            p.material = "cable"
+        inside = ["psu", "cooler", "cooler_fan", "ssd", "gpu", "atx_cable", "cpu_cable", "gpu_cable",
+                  "front_cables"] + rams
+    cover = part("shroud_cover", "shroud cover", ["chassis"] + (["psu", "atx_cable", "cpu_cable", "gpu_cable"]
+                                                                  if full else []))
+    cover.box(((-X + PC_T + PC_SHROUD + PC_T / 2) / 2, 6.58, 0.175), (PC_SHROUD + PC_T / 2 - (-X + PC_T), 0.08, 11.55),
+              "case")
+    for k in range(7):  # vents, at its front end
+        cover.box((-5.05, 6.622, -5.0 + k * 0.38), (2.3, 0.006, 0.14), fixed=(20, 20, 24), hit=False)
+    cover.box((-5.05, 6.622, 3.6), (1.6, 0.006, 0.5), fixed=spec["accent"], hit=False)
+    cover.material = "metal"
+    glass = part("glass_panel", "glass side panel", ["chassis", "shroud_cover"] + inside)
+    glass.box((0, 6.76, 0), (2 * X, 0.08, 2 * Z), fixed=(110, 126, 140))
+    glass.material = "glass"
+    board.special["glass"] = "glass_panel"
+    for x in (-6.35, 6.35):
+        for z in (-6.35, 6.35):
+            s, i = screw("thumb screw", ["glass_panel"], (x, 6.86, z), (0, 1, 0))
+            s.post((x, 6.8, z), 0.22, 0.11, fixed=(44, 44, 50))
+            knurl(s, (x, 6.855, z), 0.225, 0.09, "y", 14, (30, 30, 34))
+            s.post((x, 6.6, z), 0.06, 0.2, fixed=SILVER, hit=False)
+            s.thumb = True
+            glass.target((x, 6.81, z), (0.4, 0.03, 0.4), ("hole", i))
+    if extras:  # dust: on the tray (or the motherboard and what's on it), on the shroud, on the fans' frames
+        by_key = {p.key: p for p in board.parts}
+        if not full:
+            keep = [PC_CPU_CUT, (-2.95, -1.75, -1.65, 1.25), (6.1, 6.7, -6.7, 6.7)] + list(PC_GROMMETS) + [
+                (x - 0.15, x + 0.15, z - 0.15, z + 0.15) for x, z in MB_HOLES] + [
+                (x - 1.9, x - 1.5, -6.0, -5.1) for x, _ in PC_FANS] + [(2.0, 2.5, 5.1, 6.0)]
+            board.dirt.append(Dirt(ch, pc_dust(rnd, 14, (-3.2, 6.4), (-5.6, 6.3), PC_TRAY + 0.004, keep)))
+            for key, (x, y), z in (("front_fan0", PC_FANS[0], -6.205), ("front_fan1", PC_FANS[1], -6.205),
+                                   ("rear_fan", PC_REAR_FAN, 6.205)):  # (on the top edge of each fan's frame)
+                board.dirt.append(Dirt(by_key[key], pc_dust(rnd, 3, (x - 1.8, x + 1.8), (z - 0.32, z + 0.32),
+                                                            y + 2.004)))
+        else:
+            keep = [(2.9, 5.1, 1.8, 4.0), (3.8, 4.2, 1.3, 4.5), (1.4, 6.2, 0.2, 0.9), (-0.8, 0.8, -0.15, 6.5),
+                    (-0.95, -0.55, 4.35, 5.6), (0.78, 1.6, 1.1, 4.2), (2.55, 4.45, -1.55, -1.1), (5.8, 6.3, 4.6, 5.4),
+                    (4.55, 5.75, 3.95, 5.5), (0.95, 6.15, 5.55, 6.5), (-1.5, -0.8, 2.55, 3.65), (-1.8, -1.4, -1.0, 1.05),
+                    (5.98, 6.3, 1.15, 1.55), (1.85, 2.55, -0.95, -0.25), (1.95, 6.05, 1.15, 2.1), (5.45, 5.75, 1.85, 3.65)
+                    ] + [(x - 0.2, x + 0.2, z - 0.2, z + 0.2) for x, z in MB_HOLES]
+            board.dirt.append(Dirt(mb, pc_dust(rnd, 12, (-1.7, 6.2), (-1.55, 6.35), 1.044, keep)))
+            board.dirt.append(Dirt(cooler, pc_dust(rnd, 5, (2.2, 5.8), (2.15, 3.65), 5.71, [(3.0, 5.0, 2.75, 3.05)])))
+            board.dirt.append(Dirt(gpu, pc_dust(rnd, 4, (-0.6, 0.45), (1.0, 6.3), 4.601)))
+            board.dirt.append(Dirt(psu, pc_dust(rnd, 5, (-6.3, -3.95), (2.2, 6.4), 5.852, [(-6.25, -3.98, 2.95, 5.85)])))
+        board.dirt.append(Dirt(cover, pc_dust(rnd, 5, (-6.35, -3.75), (-5.3, 5.7), 6.624,
+                                              [(-6.25, -3.85, -5.1, -2.5), (-5.9, -4.2, 3.3, 3.9)])))
+    board.size = board.inner = spec["size"]
+    board.height = 6.95
+
+
+def build_mic(kb, spec, extras=True, seed=None):
+    """A microphone of this kind, in its own colours (or a webcam, or a headset: they're made the same way)."""
+    board = Board(spec)
+    rnd = random.Random(seed)
+    parts = board.parts
+
+    def part(*args, **kwargs):
+        parts.append(Part3D(kb, *args, **kwargs))
+        return parts[-1]
+    {"stage": build_stage_mic, "lav": build_lav_mic, "podcast": build_podcast_mic, "wireless": build_wireless_mic,
+     "studio": build_studio_mic, "clipcam": build_clip_cam, "ballcam": build_ball_cam, "streamcam": build_stream_cam,
+     "office_hs": build_headset, "gaming_hs": build_headset, "wireless_hs": build_headset, "pc_case": build_pc,
+     "pc_tower": build_pc}[spec["form"]](
+        board, part, spec, rnd, extras)
+    for p in parts:
+        p.finish()
+        if p.paintable:
+            p.repaint(part_colours(spec, None))
+    by_key = {p.key: p for p in parts}
+    if "foam" in by_key and by_key["foam"].grimy:  # grubby from years of singing: lipstick and breath
+        by_key["foam"].mesh.paint(0, "foam", (150, 128, 104))
+    if "light" in board.mic:
+        host = board.mic.pop("light_host", "body")
+        board.mic["light"] = board.mic["light"].mesh(by_key[host].root, "light", shadow=False)
+        board.mic["light"].paint(0, "light", (46, 48, 54))
+    for shapes, host, store, hidden in board.attach:  # bits that come and go with a part: a smudge, a loose end...
+        mesh = shapes.mesh(by_key[host].root, store, shadow=False)
+        if hidden:
+            mesh.np.stash()
+        if store in ("rgb", "flakes"):  # (one on each side)
+            board.special.setdefault(store, []).append(mesh)
+        else:
+            board.special[store] = mesh
+    for p in parts:  # dust filters: clogged grey with fluff, or clean
+        if "filter" in p.tags:
+            p.mesh.paint(0, "filter", FILTER_DIRTY if p.grimy else FILTER_CLEAN)
+    if "glass" in board.special:  # a glass side panel: you see in through it
+        np = by_key[board.special.pop("glass")].mesh.np
+        np.setTransparency(TransparencyAttrib.M_alpha)
+        np.setAlphaScale(0.2)
+        np.setDepthWrite(False)
+        np.hide(SHADOW_MASK)
+    if "glow" in board.mic:  # a ring light's diffuser: unlit, until it's switched on
+        board.mic["glow"] = by_key[board.mic["glow"]].mesh
+        board.mic["glow"].paint(0, "glow", (196, 194, 188))
+    for mesh in board.special.get("rgb", []):
+        mesh.paint(0, "glow", (60, 62, 70))
+    if "knots" in board.special:
+        board.special["knots"] = [k.mesh(by_key["cable"].root, "knot").np for k in board.special["knots"]]
+    if "crust" in board.special:
+        board.special["crust"] = [c and c.mesh(by_key["body"].root, "crust").np for c in board.special["crust"]]
+    board.caps, board.switches = KeySet("keycap", kb, Shapes()), KeySet("switch", kb, Shapes())
+    return board
+
+
 def build_product(kb, spec, extras=True, seed=None):
-    """A keyboard or a mouse, whichever spec is."""
-    return (build_mouse if kind_of(spec) == "mouse" else build_keyboard)(kb, spec, extras, seed)
+    """A keyboard, a mouse or a mic, whichever spec is: in a mess of its own."""
+    level = random.Random(seed).choices(MESS_LEVELS, weights=(2, 3, 4, 3, 2))[0]
+    _mess["level"] = level[0]
+    build = {"mouse": build_mouse, "mic": build_mic, "webcam": build_mic, "headset": build_mic,
+             "computer": build_mic}.get(kind_of(spec), build_keyboard)
+    board = build(kb, spec, extras, seed)
+    board.mess = level[1]  # (its name, for the job card)
+    return board
 
 
 # ---- the desk ----
@@ -2172,6 +4373,8 @@ class Sounds:
 
 def material(part):
     """What a big part is made of, for the sound it makes coming off and going on."""
+    if getattr(part, "material", None):
+        return part.material
     key = part.key
     if "foam" in key:
         return "foam"
@@ -2241,6 +4444,10 @@ class Workshop(Entity):
         self.state, self.phase = "menu", "apart"
         self.lit = self.held = None
         self.turning = {}  # screws turning out (or in): screw -> how far along, 0 to 1
+        self.twisting = {}  # grilles and caps unscrewing by hand: part -> [how far along, coming off?, then]
+        self.later = []  # things to say in a moment: (when, what)
+        self.special, self.done = None, {}  # this one's own job, and how it's going
+        self.knob_music = None  # the music's volume before a knob took it over, to put it back
         self.dragging = self.help_open = self.confirming = False
         self.frames, self.frame_clock, self.show_fps = 0, 0.0, False
         self.clock = 0.0
@@ -2249,7 +4456,7 @@ class Workshop(Entity):
         self.ui_hovered = None
         self.volumes, self.volume_drag = {}, None  # the volume pop-ups, and the one being dragged
         self.said = set()
-        self.next_tick = 0.0
+        self.next_tick = self.next_warn = 0.0
         self.brushing, self.brush_from, self.brush_travel = False, None, 0.0  # the brush, held down and moving
         self.next_brush = 0.0
         self.corners, self.desk_lift = [], 0.0  # the keyboard's box, and how far it's lifted to clear the desk
@@ -2365,9 +4572,12 @@ class Workshop(Entity):
             np.removeNode()
         cw, cd = board.size
         wu, hu = board.inner
-        if kind_of(board.spec) == "mouse":  # nothing to lay out but its screws: just the dish, in front
+        if kind_of(board.spec) != "keyboard":  # nothing to lay out but its screws: just the dish, in front
             self.bowl = None
             dish_at = (0, -cd / 2 - 1.7)
+            if board.spec.get("special") in ("foam", "filters"):  # and the wash bowl, for its foam (or filters)
+                dish_at = (1.6, -cd / 2 - 1.7)
+                self.bowl = Bowl(self.tray_root, (-2.4, DESK_Y + 0.05, -cd / 2 - 1.8))
         else:
             tw, td = wu * TRAY_SCALE + 0.8, hu * TRAY_SCALE + 0.8
             gap, dish_w, bowl_w = 0.9, 2.6, 3.6
@@ -2460,12 +4670,15 @@ class Workshop(Entity):
 
     def view(self, spec, where):
         cw, cd = footprint(spec)
-        if kind_of(spec) == "mouse":  # (small: seen from a little further off, so it doesn't fill the screen)
-            cw = max(cw, 10.5)
+        tall = spec.get("height", 0) if kind_of(spec) in HEARS + ("computer",) else 0  # (a mic on a stand stands tall)
+        if kind_of(spec) != "keyboard":  # (small: seen from a little further off, so it doesn't fill the screen)
+            cw = max(cw, 10.5, tall * 1.25)
+        if kind_of(spec) == "computer":  # (big and boxy: further off still, so it stays under the title)
+            cw *= 1.6
         if where == "menu":
-            target, elevation, distance, width = Vec3(0, 0.5, 0), 24, 34, cw / 0.6
+            target, elevation, distance, width = Vec3(0, 0.5 + tall * 0.3, 0), 24, 34, cw / 0.6
         elif where == "result":
-            target, elevation, distance, width = Vec3(cw * 0.24, 0.6, 0), 30, 34, cw / 0.52
+            target, elevation, distance, width = Vec3(cw * 0.24, 0.6 + tall * 0.3, 0), 30, 34, cw / 0.52
         else:
             target, elevation, distance, width = Vec3(cw * 0.05, -0.3, -cd * 0.45 - 1.6), 54, 40, cw / 0.56
         fov = math.degrees(2 * math.atan(width / 2 / distance))
@@ -2891,6 +5104,8 @@ class Workshop(Entity):
         self.show_root.enabled = True
         self.show_root.position = (0, 1.4, 0)
         self.arrange_desk(self.spec, trays=False)
+        for holder in self.showcase.values():  # (whatever was on show before, put away)
+            holder.stash()
         self.shown = None
         self.preview(self.spec)
         self.aim("menu", 0 if instant else 1.0)
@@ -2982,8 +5197,19 @@ class Workshop(Entity):
         self.screws = [p for p in self.parts if p.screw]
         self.caps, self.switches = self.board.caps.items, self.board.switches.items
         self.kind = kind_of(spec)
-        # (a mouse needs no keycap or switch pullers, and has no stabilisers to lube)
-        self.tools = TOOLS if self.kind == "keyboard" else [t for t in TOOLS if t[0] in ("hand", "driver", "brush")]
+        self.special = spec.get("special")
+        # (a mouse or a mic needs no keycap or switch pullers, and has no stabilisers to lube; and some jobs want
+        # a tool of their own)
+        self.tools = list(TOOLS) if self.kind == "keyboard" else [t for t in TOOLS if t[0] in ("hand", "driver",
+                                                                                                "brush")]
+        if self.special in ("sticky", "contacts", "smudge", "paste"):
+            self.tools.append(SWAB)
+        elif self.special == "blower":
+            self.tools.append(BLOWER)
+        elif self.special == "solder":
+            self.tools.append(SOLDER)
+        self.done = {"swabs": {}, "knots": set(), "dpi": {0}, "shaken": 0}
+        self.twisting, self.later = {}, []
         self.make_trays(self.board)
         self.arrange_desk(spec, trays=True)
         self.phase, self.tool, self.paint = "apart", "puller" if self.kind == "keyboard" else "hand", 0
@@ -3004,8 +5230,12 @@ class Workshop(Entity):
         self.aim("play", 0.9)
         self.build_ui()
         self.say(spec.get("intro", "Click a keycap with the keycap puller to pull it off."))
+        if self.special:  # and a moment later, its own job
+            self.soon(4.5, "Its own job: " + self.how())
 
     def clear_play(self):
+        self.give_back_music()
+        self.twisting, self.later = {}, []
         for np in self.kb.getChildren():
             np.removeNode()
         for np in self.tray_root.getChildren():
@@ -3027,7 +5257,7 @@ class Workshop(Entity):
         L, R = -window.aspect_ratio / 2, window.aspect_ratio / 2
         test = self.phase == "test"
         # the job card, top left
-        self.card((L + 0.31, 0.38), (0.56, 0.18))
+        self.card((L + 0.31, 0.37 if self.special else 0.38), (0.56, 0.2 if self.special else 0.18))
         self.icon("game", (L + 0.072, 0.43), 0.06, col=(255, 255, 255))
         self.text(short_name(self.spec), (L + 0.112, 0.458), 1.45, COCOA, bold=True)
         self.steps, x = [], L + 0.112
@@ -3042,6 +5272,10 @@ class Workshop(Entity):
                                    scale=(0.001, 0.018), color=rgb(HONEY)))
         self.bar_text = self.text("", (L + 0.575, 0.366), 0.85, MUTED, origin=(0.5, 0.5))
         self.clean_text = self.text("", (L + 0.07, 0.334), 0.85, MUTED)
+        self.special_star = self.special_text = None
+        if self.special:  # its own job, with a star that lights up once it's done
+            self.special_star = self.icon("star", (L + 0.082, 0.293), 0.026, PAPER_DARK)
+            self.special_text = self.text("", (L + 0.1, 0.293), 0.85, MUTED, origin=(-0.5, 0))
         self.corner_buttons()
         # the tools, down the left
         rail = L + 0.072
@@ -3055,6 +5289,8 @@ class Workshop(Entity):
         # the parts box, top right
         bx = R - 0.21
         chips = (["keycaps", "switches"] if self.kind == "keyboard" else []) + self.big
+        if self.special in FRESH:
+            chips.append(FRESH[self.special])
         rows = (len(chips) + 1) // 2
         top = 0.405
         height = 0.07 + rows * 0.034
@@ -3096,29 +5332,66 @@ class Workshop(Entity):
             self.switch_swatches.append(b)
         # testing it, at the end
         self.check_rows = []
-        if self.kind == "mouse":  # a row for each thing to try, with a dot that lights up once it works
-            checks = self.mouse_checks()
-            height = 0.17 + len(checks) * 0.034
+        self.test_special = self.meter = self.cam_pic = None
+        extra = 0.07 if self.special else 0.0  # (room for its own job's line)
+        if self.kind != "keyboard":  # a row for each thing to try, with a dot that lights up once it works
+            mic = self.kind in HEARS
+            checks = self.test_checks()
+            pic = 0.2 if self.kind == "webcam" else 0.0  # (a webcam's picture, what it sees)
+            height = 0.17 + len(checks) * 0.034 + extra + (0.06 if mic else 0.0) + pic
             self.card((R - 0.21, 0.39 - height / 2), (0.38, height), group="test")
             self.text("Test it", (R - 0.382, 0.37), 1.1, COCOA, bold=True, group="test")
-            self.text("Use your own mouse:", (R - 0.382, 0.335), 0.82, MUTED, group="test")
+            self.text({"mic": "Tap it, and talk into it:", "webcam": "Smile! Try it out:",
+                       "headset": "Put it on, and listen:",
+                       "computer": "Plug it in, and switch it on:" if self.spec.get("form") == "pc_tower" else
+                       "Try its buttons, and its fans:"}.get(self.kind, "Use your own mouse:"), (R - 0.382, 0.335),
+                      0.82, MUTED, group="test")
+            self.cam_pic = self.cam_flash = None
+            if pic:
+                self.card((R - 0.21, 0.225), (0.31, 0.179), COCOA, corner=0.008, z=0.15, shadow=False, collider=False,
+                          group="test")
+                self.cam_pic = self.add(Entity(parent=camera.ui, model="quad", position=(R - 0.21, 0.225, 0.12),
+                                               scale=(0.3, 0.169)), "test")
+                self.cam_flash = self.add(Entity(parent=camera.ui, model="quad", position=(R - 0.21, 0.225, 0.11),
+                                             scale=(0.3, 0.169), color=color.rgba32(255, 255, 255, 0)), "test")
+                self.cam_flash.setTransparency(TransparencyAttrib.M_alpha)
+                self.preview_key = None
             for k, (check, label) in enumerate(checks):
-                y = 0.29 - k * 0.034
+                y = 0.29 - pic - k * 0.034
                 dot = self.icon("dot", (R - 0.37, y), 0.024, PAPER_DARK, group="test")
                 text = self.text(label, (R - 0.35, y), 0.9, MUTED, origin=(-0.5, 0), group="test")
                 self.check_rows.append((check, dot, text))
+            y = 0.29 - pic - len(checks) * 0.034 - 0.012
+            if mic:  # its level meter: green is just right, honey is loud, and the red end is too loud (it clips)
+                self.text("Level", (R - 0.382, y), 0.82, MUTED, origin=(-0.5, 0), group="test")
+                x0, w = R - 0.31, 0.26
+                self.card((x0 + w / 2, y), (w, 0.02), PAPER_DARK, corner=0.01, z=0.15, shadow=False, collider=False,
+                          group="test")
+                for at in (0.45, 0.75, 0.9):  # the zones' edges
+                    self.card((x0 + w * at, y), (0.003, 0.03), MUTED, corner=0.001, z=0.12, shadow=False,
+                              collider=False, group="test")
+                self.meter = self.add(Entity(parent=camera.ui, model="quad", origin=(-0.5, 0), position=(x0, y, 0.13),
+                                             scale=(0.001, 0.016), color=rgb(SAGE)), "test")
+                self.meter.width, self.meter.tinted = w, SAGE
+                y -= 0.05
+            if self.special:
+                self.test_special = self.text("", (R - 0.382, y + 0.01), 0.82, HONEY_DARK, group="test",
+                                              wordwrap=31)
             self.test_count = self.knob_text = None
             self.button("Finish", (R - 0.21, 0.39 - height + 0.045), (0.2, 0.055), self.finish_test, HONEY, CREAM,
                         text_size=1.1, group="test", z=-0.05)
         else:
-            self.card((R - 0.21, 0.24), (0.38, 0.3), group="test")
+            self.card((R - 0.21, 0.24 - extra / 2), (0.38, 0.3 + extra), group="test")
             self.text("Test every key", (R - 0.382, 0.37), 1.1, COCOA, bold=True, group="test")
             self.text("Type on your own keyboard, or click the keys. Each one lights up and clicks, the way its "
                       "switch feels.", (R - 0.382, 0.335), 0.82, MUTED, group="test", wordwrap=34)
             self.test_count = self.text("", (R - 0.382, 0.235), 0.95, HONEY_DARK, group="test")
             self.knob_text = self.text("", (R - 0.382, 0.205), 0.85, MUTED, group="test")
-            self.button("Finish", (R - 0.21, 0.135), (0.2, 0.055), self.finish_test, HONEY, CREAM, text_size=1.1,
-                        group="test", z=-0.05)
+            if self.special:
+                self.test_special = self.text("", (R - 0.382, 0.205 if self.knob is None else 0.175), 0.82,
+                                              HONEY_DARK, group="test", wordwrap=31)
+            self.button("Finish", (R - 0.21, 0.135 - extra), (0.2, 0.055), self.finish_test, HONEY, CREAM,
+                        text_size=1.1, group="test", z=-0.05)
         # the message line, the tooltip, and what's in your hand
         self.toast = self.add(Entity(parent=camera.ui, model=Quad(radius=0.5, aspect=12), scale=(0.6, 0.05),
                                      position=(0, -0.44, 0.05), color=rgb(CREAM)))
@@ -3133,7 +5406,7 @@ class Workshop(Entity):
         self.badge_icon = self.add(Entity(parent=camera.ui, model="quad", texture=self.art["hand"], scale=0.027,
                                           color=rgb(CREAM), z=-0.31))
         # help, and leaving
-        self.card((0, 0.02), (0.78, 0.62), CREAM, group="help")
+        self.card((0, 0.0), (0.8, 0.7), CREAM, group="help")
         self.text("How to play", (-0.36, 0.315), 1.6, COCOA, bold=True, group="help")
         if self.kind == "mouse":
             lines = ["Take it all apart, into the box. Then build it back up in",
@@ -3148,6 +5421,64 @@ class Workshop(Entity):
                      "Right-click: put back what you hold.   Drag: turn it round.",
                      "Scroll: zoom.   F: flip over.   R: level.   M: music.",
                      "F11: full screen or window.   Esc: back."]
+        elif self.kind in ("webcam", "headset"):
+            lines = ["Take it all apart, into the box. Then build it back up in",
+                     "any colour, and test it: " + ("smile, and talk (hold Space)." if self.kind == "webcam" else
+                                                    "an ear at a time, and talk."),
+                     "",
+                     "One click, one part. Pick the tool for it first:",
+                     "1  Hand: lift parts off. Lenses, rings, front panels and",
+                     "    ear cushions unscrew by hand, and so do thumb screws.",
+                     "    Click a part in the box to hold it, then click where it goes.",
+                     "2  Screwdriver: click a screw. Some hide underneath.",
+                     "3  Brush: hold it down and drag it over the dust."]
+            if self.special == "smudge":
+                lines.append("4  Alcohol swab: click the smudged lens window.")
+            elif self.special == "solder":
+                lines.append("4  Soldering iron: click the loose wire, inside the left cup.")
+            lines += ["",
+                      "Right-click: put back what you hold.   Drag: turn it round.",
+                      "Scroll: zoom.   F: flip over.   R: level.   M: music.",
+                      "F11: full screen or window.   Esc: back."]
+        elif self.kind == "computer":
+            lines = ["Take it all apart, into the box. Then build it back up in",
+                     "any colour, and test it: " + ("switch it on, and try it." if self.spec["form"] == "pc_tower"
+                                                    else "its buttons, and its fans."),
+                     "",
+                     "One click, one part. Pick the tool for it first:",
+                     "1  Hand: lift parts off. Panels, filters and cables come off",
+                     "    by hand, and so do thumb screws. Click a part in the",
+                     "    box to hold it, then click where it goes.",
+                     "2  Screwdriver: click a screw. Some are round the back.",
+                     "3  Brush: hold it down and drag it over the dust."]
+            if self.special == "paste":
+                lines.append("4  Alcohol swab: click the CPU, once its cooler is off.")
+            if self.bowl is not None:
+                lines.append("Wash bowl: click it while you hold a dust filter, to wash it.")
+            lines += ["",
+                      "Right-click: put back what you hold.   Drag: turn it round.",
+                      "Scroll: zoom.   F: flip over.   R: level.   M: music.",
+                      "F11: full screen or window.   Esc: back."]
+        elif self.kind == "mic":
+            lines = ["Take it all apart, into the box. Then build it back up in",
+                     "any colour, and test it: tap it, and talk (hold Space).",
+                     "",
+                     "One click, one part. Pick the tool for it first:",
+                     "1  Hand: lift parts off. Grilles, caps and collars unscrew",
+                     "    by hand, and so do thumb screws. Click a part in the",
+                     "    box to hold it, then click where it goes.",
+                     "2  Screwdriver: click a screw. Some hide underneath.",
+                     "3  Brush: hold it down and drag it over the dust."]
+            if self.special == "blower":
+                lines.append("4  Air blower: click to puff dust off the capsule.")
+            elif self.special == "contacts":
+                lines.append("4  Alcohol swab: click a crusty battery contact.")
+            if self.bowl is not None:
+                lines.append("Wash bowl: click it while you hold the foam, to wash it.")
+            lines += ["",
+                      "Right-click: put back what you hold.   Drag: turn it round.",
+                      "Scroll: zoom.   F: flip over.   R: level.   M: music.",
+                      "F11: full screen or window.   Esc: back."]
         else:
             lines = ["Take it all apart, into the box and the trays. Then build it",
                      "back up in any colours, and test every key.",
@@ -3159,14 +5490,19 @@ class Workshop(Entity):
                      "3  Keycap puller: click a keycap.",
                      "4  Switch puller: click a switch, once its keycap is off.",
                      "5  Brush: hold it down and drag it over the crumbs.",
-                     "6  Lube: click a stabiliser, so its long key won't rattle.",
-                     "Wash bowl: click it to wash the grimy keycaps in the tray.",
-                     "",
-                     "Right-click: put back what you hold.   Drag: turn it round.",
-                     "Scroll: zoom.   F: flip over.   R: level.   M: music.",
-                     "F11: full screen or window.   Esc: back."]
+                     "6  Lube: click a stabiliser, so its long key won't rattle."]
+            if self.special == "sticky":
+                lines.append("7  Alcohol swab: click the sticky switch, keycap off.")
+            lines += ["Wash bowl: click it to wash the grimy keycaps in the tray.",
+                      "",
+                      "Right-click: put back what you hold.   Drag: turn it round.",
+                      "Scroll: zoom.   F: flip over.   R: level.   M: music.",
+                      "F11: full screen or window.   Esc: back."]
         self.text("\n".join(lines), (-0.36, 0.255), 0.95, COCOA, group="help")
-        self.button("Got it", (0, -0.24), (0.16, 0.055), self.toggle_help, HONEY, CREAM, group="help")
+        if self.special:  # and its own job, at the bottom
+            self.text(SPECIALS[self.special][0] + ": " + self.how(), (-0.36, -0.18), 0.85, HONEY_DARK, group="help",
+                      wordwrap=62)
+        self.button("Got it", (0, -0.29), (0.16, 0.055), self.toggle_help, HONEY, CREAM, group="help")
         self.card((0, 0.02), (0.56, 0.2), CREAM, group="leave")
         self.text(f"Leave this {self.kind}?", (0, 0.08), 1.4, COCOA, origin=(0, 0), bold=True, group="leave")
         self.text("It goes back on the shelf as it was.", (0, 0.035), 0.95, MUTED, origin=(0, 0), group="leave")
@@ -3193,16 +5529,23 @@ class Workshop(Entity):
         self.state = "result"
         self.held = None
         self.unhighlight()
-        spotless = all(not d.left for d in self.board.dirt) and not any(c.grimy for c in self.caps)
+        spotless = all(not d.left for d in self.board.dirt if not d.delicate) and not any(c.grimy for c in self.caps)
         smooth = all(s.lubed for s in self.stabs)
         if not self.offscreen:
             key = self.spec["key"]
             self.save["fixed"][key] = self.save["fixed"].get(key, 0) + 1
+            if self.special and self.special_ok():
+                self.save.setdefault("specials", [])
+                if key not in self.save["specials"]:
+                    self.save["specials"].append(key)
             write_save(self.save)
-        if self.kind == "mouse":
-            self.stars = [(True, "Built"), (spotless, "Spotless"), (self.all_tested(), "All tested")]
-        else:
+        if self.kind == "keyboard":
             self.stars = [(True, "Built"), (spotless, "Spotless"), (smooth, "Smooth"), (self.all_tested(), "All tested")]
+        else:
+            self.stars = [(True, "Built"), (spotless, "Spotless"), (self.all_tested(), "All tested")]
+        if self.special:
+            self.stars.append((self.special_ok(), SPECIALS[self.special][1]))
+        self.give_back_music()
         self.aim("result", 1.0)
         self.result_ui()
 
@@ -3215,7 +5558,7 @@ class Workshop(Entity):
         self.text("Good as new!", (cx, 0.32), 2.6, COCOA, origin=(0, 0), bold=True)
         self.text(f"{short_name(self.spec)}, taken apart and built your way", (cx, 0.255), 0.95, MUTED, origin=(0, 0))
         for i, (got, what) in enumerate(self.stars):
-            x = cx + (i - (len(self.stars) - 1) / 2) * (0.14 if len(self.stars) > 3 else 0.18)
+            x = cx + (i - (len(self.stars) - 1) / 2) * {5: 0.112, 4: 0.14}.get(len(self.stars), 0.18)
             self.icon("star", (x, 0.165), 0.08, HONEY if got else PAPER_DARK)
             self.text(what, (x, 0.105), 0.85, COCOA if got else MUTED, origin=(0, 0))
         crumbs = sum(len(d.points) - len(d.left) for d in self.board.dirt)
@@ -3224,21 +5567,25 @@ class Workshop(Entity):
             lines.append(f"{self.washed} keycaps washed")
         if self.stabs:
             lines.append(f"{sum(s.lubed for s in self.stabs)} of {len(self.stabs)} stabilisers lubed")
-        if self.kind == "mouse":
-            checks = self.mouse_checks()
+        if self.kind != "keyboard":
+            checks = self.test_checks()
             lines.append(f"{sum(c in self.checks for c, _ in checks)} of {len(checks)} things tested")
         else:
             lines.append(f"{len(self.tested)} of {len(self.caps)} keys tested" +
                          ("" if not self.knob else ", and the knob" if self.knob_turned else " (not the knob)"))
+        if self.special:
+            lines.append(SPECIALS[self.special][0] + (": done!" if self.special_ok() else ": not this time"))
         if self.found:
             lines.append(f"Found inside: a {self.found}")
-        found = len(set(self.save.get("found", [])))
-        lines.append(f"Things found so far: {found} of {len(TRINKETS)}")
+        if self.kind in ("keyboard", "mouse"):  # (only keyboards and mice hide lost things)
+            found = len(set(self.save.get("found", [])))
+            lines.append(f"Things found so far: {found} of {len(TRINKETS)}")
         self.text("\n".join(lines), (cx - 0.25, 0.04), 1.0, COCOA)
-        tip = ("Real repairers photograph every step, and keep each part's screws together. Keycaps in different "
-               "rows are shaped differently, so they go back in the rows they came from." if self.kind == "keyboard"
-               else "A mouse's screws nearly always hide under its feet, and the feet don't stick as well once "
-                    "they're peeled: repairers keep spare ones.")
+        tip = TIPS.get(self.special) or (
+            "Real repairers photograph every step, and keep each part's screws together. Keycaps in different rows "
+            "are shaped differently, so they go back in the rows they came from." if self.kind == "keyboard" else
+            "A mouse's screws nearly always hide under its feet, and the feet don't stick as well once they're "
+            "peeled: repairers keep spare ones.")
         self.text(tip, (cx - 0.25, -0.17), 0.82, MUTED, wordwrap=50)
         self.button("Fix another", (cx - 0.13, -0.32), (0.22, 0.065), self.show_menu, HONEY, CREAM, text_size=1.1)
         self.button("Again", (cx + 0.13, -0.32), (0.22, 0.065), lambda: self.start(self.spec), PAPER, COCOA,
@@ -3283,6 +5630,18 @@ class Workshop(Entity):
 
     def pick_up(self, item):
         """A click on the parts box: pick something up to put on."""
+        if item == "fresh battery":  # (whenever the old one's out)
+            self.fresh_battery()
+            return
+        if item == "fresh cushions":
+            self.fresh_cushions()
+            return
+        if item == "new battery":
+            self.new_battery()
+            return
+        if item == "thermal paste":
+            self.thermal_paste()
+            return
         if self.phase == "apart":
             self.say("Take everything apart first, into the box and the trays. Then build it back up.")
             self.nope()
@@ -3292,10 +5651,11 @@ class Workshop(Entity):
             self.say("Click a switch to put a keycap on it, in the colour you've picked."
                      if item == "keycaps" else "Click a hole in the plate to press a switch in.")
         elif item.placed:
-            self.say(f"The {item.name} is on the keyboard.")
+            self.say(f"The {item.name} is on the {self.kind}.")
         else:
             self.held = item
-            self.say(f"Click the keyboard where the {item.name} goes. Right-click puts it back.")
+            more = " Or click the wash bowl to wash it first." if item.grimy else ""
+            self.say(f"Click the {self.kind} where the {item.name} goes. Right-click puts it back.{more}")
 
     def above(self, part):
         """The parts still on that sit on this one."""
@@ -3304,7 +5664,21 @@ class Workshop(Entity):
     def blocker_message(self, part, above):
         first = next((q for q in above if not q.screw), None)
         if first is None:
-            return "It's still screwed on from underneath: flip it over (F) and undo the screws (2)."
+            screw = above[0]
+            if screw.thumb and screw.lift.z > 0.5:
+                return (f"Its thumb screws round the back still hold it: flip it over (F), and turn them out by hand "
+                        f"({self.tool_no('hand')}).")
+            if screw.thumb:
+                return f"Its {screw.name} still holds it: turn it out by hand ({self.tool_no('hand')})."
+            if abs(screw.lift.z) > 0.5 and self.kind == "computer":
+                return (f"The {screw.name}s {'round the back' if screw.lift.z > 0 else 'on the front'} still hold it: "
+                        f"undo them with the screwdriver ({self.tool_no('driver')})" +
+                        (". Flip it over (F) to reach them." if screw.lift.z > 0 else "."))
+            if screw.lift.y < -0.5:
+                return "It's still screwed on from underneath: flip it over (F) and undo the screws (2)."
+            return f"The {screw.name} still holds it: undo it with the screwdriver (2)."
+        if first.key.startswith("battery") and self.kind == "mic":
+            return "Take the batteries out first: never open a wireless mic with its batteries in."
         if first.key == "battery_lead":
             return "Unplug the battery lead first: never work on a circuit board with its battery connected."
         if first.key == "mouse_battery":
@@ -3319,13 +5693,40 @@ class Workshop(Entity):
 
     def take_off(self, part):
         """The hand on a big part."""
+        if part in self.twisting:
+            return  # (already unscrewing)
         above = self.above(part)
         if above:
             self.say(self.blocker_message(part, above))
             self.nope()
             self.jiggle(part.root)
             return
+        if part.twist:  # a grille or a cap: it unscrews first, a couple of turns by hand, then lifts off
+            self.unhighlight(part)
+            self.twirl(part, True, lambda: part.placed and self.lift_off(part))
+            return
         self.lift_off(part)
+
+    def twirl(self, part, out, then=None):
+        """A part that screws on by hand, turning: off (out), or back on."""
+        self.twisting[part] = [0.0, out, then]
+        self.sounds.play("screw_out" if out else "screw_in", 0.45, pitch=0.7)
+
+    def update_twists(self):
+        for part, tw in list(self.twisting.items()):
+            if part.root.isEmpty():
+                del self.twisting[part]
+                continue
+            tw[0] = min(1.0, tw[0] + time.dt / 0.55)
+            turn(part.root, part.twist, (1 if tw[1] else -1) * 720 * smooth(tw[0]))
+            if tw[0] < 1:
+                continue
+            del self.twisting[part]
+            turn(part.root, part.twist, 0)
+            if tw[2]:
+                tw[2]()
+            if not tw[1]:
+                self.after_change()
 
     def lift_off(self, part):
         part.placed = False
@@ -3355,7 +5756,12 @@ class Workshop(Entity):
             part.repaint(part_colours(self.spec, PAINTS[self.paint][1]))
         part.root.unstash()
         part.root.setPos(part.origin + part.lift * self.lift_distance(part))
-        self.tween(part.root, part.origin, 0.3, then=lambda: self.sounds.play(f"put_{material(part)}", 0.65))
+
+        def landed():
+            self.sounds.play(f"put_{material(part)}", 0.65)
+            if part.twist and part.placed:  # and it screws home, by hand
+                self.twirl(part, False)
+        self.tween(part.root, part.origin, 0.3, then=landed)
         self.after_change()
 
     def fit(self, part, hit):
@@ -3374,7 +5780,7 @@ class Workshop(Entity):
         if part.below:
             on, _, p = hit
             if on is None:
-                self.say("Click on the keyboard, where it goes.")
+                self.say(f"Click on the {self.kind}, where it goes.")
                 return
             lo, hi = part.lo - Vec3(0.7, 1.3, 0.7), part.hi + Vec3(0.7, 1.3, 0.7)
             if not (lo.x <= p.x <= hi.x and lo.y <= p.y <= hi.y and lo.z <= p.z <= hi.z):
@@ -3505,7 +5911,8 @@ class Workshop(Entity):
         if screw.placed:
             cover = self.above(screw)
             if cover:
-                self.say(f"The {cover[0].name} covers it: peel that off first, with the hand (1).")
+                peel = "peel" if cover[0].key.startswith("foot") else "take"
+                self.say(f"The {cover[0].name} covers it: {peel} that off first, with the hand (1).")
                 self.nope()
                 return
         elif self.phase == "apart":
@@ -3527,7 +5934,7 @@ class Workshop(Entity):
         for screw, progress in list(self.turning.items()):
             undoing = screw.placed
             progress = min(1.0, progress + time.dt / TURN_TIME)
-            screw.root.setH(screw.root.getH() + (-1 if undoing else 1) * 720 * time.dt)
+            turn(screw.root, screw.spin, turned(screw.root, screw.spin) + (-1 if undoing else 1) * 720 * time.dt)
             rise = smooth(progress if undoing else 1 - progress)
             screw.root.setPos(screw.origin + screw.lift * 0.35 * rise)
             if progress < 1:
@@ -3553,6 +5960,13 @@ class Workshop(Entity):
         swept = 0
         for dirt in self.board.dirt:
             if not dirt.host.placed or not dirt.left:
+                continue
+            if dirt.delicate:  # a capsule's diaphragm: the brush would tear it
+                if any((dirt.points[i] - point).length() < 1.0 for i in dirt.left) and self.clock >= self.next_warn:
+                    self.next_warn = self.clock + 2.0
+                    self.say(f"Never brush a capsule: its diaphragm is thinner than a hair. Puff it clean with the "
+                             f"air blower ({self.tool_no('blower')}).", ROSE)
+                    self.nope()
                 continue
             for i in list(dirt.left):
                 p = dirt.points[i]
@@ -3601,8 +6015,30 @@ class Workshop(Entity):
     # -- the wash bowl, the lube, the knob --
 
     def wash(self):
-        """A click on the wash bowl: the grimy keycaps in the tray go in for a soak."""
+        """A click on the wash bowl: the grimy keycaps in the tray go in for a soak (or the foam in your hand)."""
         if self.washing > 0:
+            return
+        if self.kind in ("mic", "computer"):
+            foam = self.held if isinstance(self.held, Part3D) else None
+            if foam is None or not foam.grimy:
+                grubby = next((p for p in self.big if p.grimy), None)
+                if self.kind == "computer":
+                    self.say("That filter's clean already." if foam is not None else
+                             "The bowl is for the clogged dust filters: click one in the parts box to hold it, then "
+                             "click the bowl." if grubby and not grubby.placed else
+                             "Take the clogged dust filters off first: they're what want a wash." if grubby else
+                             "The dust filters are all clean: they're ready to go back on.")
+                    return
+                self.say("The bowl is for the foam: click it in the parts box to hold it, then click the bowl."
+                         if grubby and not grubby.placed else
+                         "Take the grille off and lift the foam out first: it's what wants a wash." if grubby else
+                         "The foam's clean already: it's ready to go back in.")
+                return
+            self.washing = WASH_TIME
+            self.washing_foam = foam
+            self.sounds.play("wash", 0.6)
+            self.say("Into the warm, soapy water with the foam: a good squeeze, and a rinse..." if self.kind == "mic"
+                     else f"Into the warm, soapy water with the {foam.name}: a swish, and a rinse...")
             return
         dirty = [c for c in self.caps if not c.placed and c.grimy]
         if not dirty:
@@ -3619,6 +6055,23 @@ class Workshop(Entity):
         self.say(f"Into the warm, soapy water with {len(dirty)} keycap{'s' if len(dirty) > 1 else ''}...")
 
     def finish_wash(self):
+        foam = getattr(self, "washing_foam", None)
+        if foam is not None:  # a mic's foam: clean, black again
+            self.washing_foam = None
+            foam.grimy = False
+            if self.kind == "computer":  # a dust filter: clean, dark again
+                foam.mesh.paint(0, "filter", FILTER_CLEAN)
+                self.sounds.play("sparkle", 0.5)
+                left = sum(q.grimy for q in self.big)
+                if left:
+                    self.say(f"Clean as new! {left} more clogged filter{'s' if left > 1 else ''} to wash.", HONEY_DARK)
+                else:
+                    self.complete("Every dust filter's clean: the air can flow freely through it again.")
+                return
+            foam.mesh.paint(0, "foam", (58, 58, 64))
+            self.sounds.play("sparkle", 0.5)
+            self.complete("Squeaky clean! The foam's fresh and ready to go back in.")
+            return
         ks = self.board.caps
         n = 0
         for c in self.caps:
@@ -3668,24 +6121,62 @@ class Workshop(Entity):
                  else COCOA)
 
     def turn_knob(self, way):
-        """The knob, in the test: a notch of volume up (or down), with its soft click."""
-        self.knob.root.setH(self.knob.root.getH() - way * 18)
+        """The knob, in the test: a notch of volume up (or down), with its soft click. (A mic's gain knob turns up
+        how loud it hears you.)"""
+        turn(self.knob.root, self.knob.spin, turned(self.knob.root, self.knob.spin) - way * 18)
         self.sounds.play("knob", 0.6)
+        if self.kind == "mic":
+            self.gain = min(1.7, max(0.2, self.gain + way * 0.08))
+            self.mic_try("gain")
+            return
+        if self.kind == "webcam":  # a webcam's focus ring: the lens nearer the sensor, or further off
+            self.focus = min(1.0, max(0.0, self.focus + way * 0.05))
+            if self.special == "focus" and abs(self.focus - FOCUS_AT) < 0.026:
+                self.complete("Pin sharp! Every eyelash in focus.")
+            return
+        if self.special == "volume":  # this knob turns the music, really
+            if self.knob_music is None:
+                self.knob_music = (self.sounds.volume["music"], self.sounds.music_on)
+                self.notch = round(self.sounds.volume["music"] * 10) if self.sounds.music_on else 5
+            self.notch = min(10, max(0, self.notch + way))
+            self.sounds.music_on = True
+            self.sounds.set_volume("music", self.notch / 10)
+            self.done["low"] = self.done.get("low") or self.notch == 0
+            if self.notch == 0:
+                self.say("All the way down: the music's gone quiet. Now all the way up!")
+            elif self.notch == 10 and self.done["low"]:
+                self.complete("All the way down, and all the way up: the knob turns the music. It works!")
         if not self.knob_turned:
             self.knob_turned = True
-            self.say("The knob turns, notch by notch: volume up, volume down. It works!", HONEY_DARK)
+            if self.special != "volume":
+                self.say("The knob turns, notch by notch: volume up, volume down. It works!", HONEY_DARK)
             self.check_all_tested()
+
+    def give_back_music(self):
+        """The music's volume as it was, before the knob had its turn."""
+        if self.knob_music is not None:
+            level, on = self.knob_music
+            self.knob_music = None
+            self.sounds.set_volume("music", level)
+            self.sounds.set_music(on)
+            if hasattr(self, "volumes"):
+                self.show_volume("music")
 
     def all_tested(self):
         if self.kind == "mouse":
             return all(c in self.checks for c, _ in self.mouse_checks())
+        if self.kind != "keyboard":
+            return all(c in self.checks for c, _ in self.test_checks())
         return len(self.tested) >= len(self.caps) and (self.knob is None or self.knob_turned)
 
     def check_all_tested(self):
         if self.all_tested():
             self.sounds.play("fanfare", 0.6)
-            self.say("Everything works! Press Finish when you're done" + (" typing." if self.kind == "keyboard"
-                                                                         else "."), HONEY_DARK)
+            still = self.special and not self.special_ok() and self.special in (
+                "sum", "fn_layer", "pair", "volume", "pangram", "dpi", "gain", "focus")  # (done in the test)
+            self.say("Everything works! " + ("Now its own job: " + self.how() if still else
+                                             "Press Finish when you're done" + (" typing." if self.kind == "keyboard"
+                                                                                 else ".")), HONEY_DARK)
 
     # -- testing a mouse, with your own --
 
@@ -3718,6 +6209,12 @@ class Workshop(Entity):
         if down:
             self.sounds.play("mouse_click", 0.6, pitch=0.85 if name == "middle" else 1.0)
             self.mouse_try(name)
+            if name == "left" and self.special == "double_click" and not self.special_ok():  # its worn switch
+                self.soon(0.07, lambda: self.sounds.play("mouse_click", 0.55, pitch=1.03))
+                if "double" not in self.said:
+                    self.said.add("double")
+                    self.say("Click-click! One click, and it clicked twice: its left switch is worn. Next time, "
+                             "bend its spring back with the top shell off.", ROSE)
         else:
             self.sounds.play("mouse_click", 0.25, pitch=1.15)  # (and a softer one as it comes back up)
 
@@ -3742,6 +6239,134 @@ class Workshop(Entity):
             return True
         return False
 
+    # -- testing a mic: tap it, and talk into it (hold Space) --
+
+    def mic_checks(self):
+        form = self.spec.get("form")
+        checks = [("power", "Switch it on")] if form == "wireless" else []
+        checks += [("tap", "Tap the capsule" if form == "lav" else "Tap the grille"), ("speak", "Talk: hold Space")]
+        if form == "podcast":
+            checks.append(("mute", "Mute it, and back"))
+        return checks
+
+    def mic_try(self, check):
+        """Something tried in a mic's test: the first time it works, it's ticked off."""
+        if check in self.checks or check not in dict(self.test_checks()):
+            return
+        self.checks[check] = True
+        if self.all_tested():
+            self.check_all_tested()
+
+    def live(self):
+        """Can it hear you? It's switched on, and not muted."""
+        return self.mic_on and not self.muted
+
+    def light_mic(self):
+        """A mic's light: green while it can hear you, red when it's muted, dark when it's off."""
+        light = self.board.mic.get("light") if self.board else None
+        if light is not None:
+            light.paint(0, "light", (46, 48, 54) if not self.mic_on else ROSE if self.muted else (110, 210, 120))
+
+    def mic_click(self, part, tag):
+        """A click on a mic in its test: its power switch, its mute button, its knob, or a tap on it."""
+        if part is None:
+            self.dragging = True
+            return
+        what = tag[0] if tag else None
+        if what == "knot":
+            self.untie(tag[1])
+        elif what == "power":
+            self.mic_on = not self.mic_on
+            self.sounds.play("mouse_click", 0.6, pitch=0.8)
+            self.light_mic()
+            self.say("On! Its light glows green." if self.mic_on else "Off: its light goes dark.")
+            if self.mic_on:
+                self.mic_try("power")
+        elif what == "mute":
+            self.muted = not self.muted
+            self.done["mutes"] += 1
+            self.sounds.play("mouse_click", 0.6, pitch=1.1)
+            self.light_mic()
+            self.say("Muted: its light goes red, and it can't hear you." if self.muted else
+                     "Live again: the light's green.")
+            if self.done["mutes"] >= 2:
+                self.mic_try("mute")
+        elif part is self.knob:
+            self.turn_knob(1)
+        else:  # a tap on it: a thump, if it can hear you
+            self.sounds.play("thump", 0.7)
+            if self.live():
+                self.mic_level = max(self.mic_level, min(1.0, 0.95 * self.gain + 0.1))
+                self.mic_try("tap")
+            else:
+                self.say("Nothing on the meter: it's " + ("switched off. Click its power switch." if not self.mic_on
+                                                          else "muted. Press mute again."))
+
+    def mic_input(self, key):
+        """Space, held down: you, talking into the mic."""
+        if key == "space":
+            self.speaking, self.voice_t, self.next_voice = True, 0.0, self.clock
+            return True
+        if key == "space up":
+            self.speaking = False
+            return True
+        return False
+
+    def update_mic_test(self):
+        """Its level meter, following you as you talk (and the taps), through its gain; and its own job's bits."""
+        if not (self.state == "play" and self.kind in HEARS and self.phase == "test") or self.meter is None:
+            return
+        dt = time.dt
+        target = 0.0
+        if self.speaking:
+            self.voice_t += dt
+            if self.clock >= self.next_voice:
+                self.next_voice = self.clock + 0.8
+                self.sounds.play("voice", 0.55, vary=0.04)
+            syllables = abs(math.sin(self.voice_t * 7.5)) ** 0.6
+            target = 0.75 * (0.55 + 0.45 * syllables) * self.gain
+            cut = False
+            if self.special == "contacts" and not self.special_ok() and self.live():  # crusty contacts: it cuts out
+                cut = math.sin(self.clock * 5.3) * math.sin(self.clock * 13.1) > 0.25
+                if cut and self.clock >= self.next_crackle:
+                    self.next_crackle = self.clock + 0.35
+                    self.sounds.play("rattle", 0.4, pitch=0.6, vary=0.2)
+                    if "crackle" not in self.said:
+                        self.said.add("crackle")
+                        self.say("It crackles and cuts out: the crusty contacts. Next time, swab them clean.", ROSE)
+            if not self.live():
+                target = 0.0
+                if "deaf" not in self.said:
+                    self.said.add("deaf")
+                    self.say("Nothing on the meter: it's " + ("switched off. Click its power switch." if not
+                                                              self.mic_on else "muted. Press mute again."))
+            elif not cut:
+                self.talked += dt
+                if self.talked > 0.5:
+                    self.mic_try("speak")
+            if cut:
+                target = 0.0
+        rate = 14 if target > self.mic_level else 3
+        self.mic_level += (target - self.mic_level) * min(1.0, dt * rate)
+        level = min(1.0, self.mic_level)
+        self.meter.scale_x = max(0.001, level * self.meter.width)
+        col = SAGE if level < 0.75 else HONEY if level < 0.9 else ROSE
+        if self.meter.tinted != col:
+            self.meter.color, self.meter.tinted = rgb(col), col
+        if self.special == "gain" and self.speaking and self.live():  # where your voice sits, on average
+            self.mic_avg += (target - self.mic_avg) * min(1.0, dt * 3)
+            zone = "low" if self.mic_avg < 0.42 else "high" if self.mic_avg > 0.78 else "good"
+            self.done["zone"] = zone
+            self.good_time = self.good_time + dt if zone == "good" else 0.0
+            if self.good_time > 1.2:
+                self.complete(f"Gain {self.gain:.1f}: your voice sits right in the green. Not too quiet, never "
+                              "clipping.")
+        if self.special == "contacts" and self.mic_on and not self.special_ok():  # its light flickers, too
+            light = self.board.mic.get("light")
+            if light is not None:
+                flicker = math.sin(self.clock * 17) * math.sin(self.clock * 6.1) > 0.3
+                light.paint(0, "light", (46, 48, 54) if flicker else (110, 210, 120))
+
     def update_mouse_test(self):
         """Moving your own mouse moves this one's sensor: its light shines on the mat under it; and a gaming
         mouse's logo glows round the colours."""
@@ -3759,14 +6384,698 @@ class Workshop(Entity):
         x, z = self.board.mouse["sensor"]
         p = application.base.render.getRelativePoint(self.kb, Point3(x, 0, z))
         self.sensor_light.setPos(p.x, DESK_Y + 0.08, p.z)
-        self.sensor_light.setScale(3.2 + 1.2 * self.glow)
-        self.sensor_light.setColorScale(1.0, 0.25, 0.22, 0.25 + 0.6 * self.glow)
+        reach = 1.0 + 0.35 * getattr(self, "dpi", 0)  # (faster, the higher its DPI: its light reaches further)
+        self.sensor_light.setScale((3.2 + 1.2 * self.glow) * reach)
+        bright = 0.25 + 0.6 * self.glow
+        if self.special == "battery" and not self.special_ok():  # a flat battery: it flickers and stutters
+            bright *= 0.25 if math.sin(self.clock * 23) * math.sin(self.clock * 7.3) > 0.3 else 1.0
+            if speed > 0.002 and "flat" not in self.said:
+                self.said.add("flat")
+                self.say("It stutters and the light flickers: its battery's flat. Next time, swap in a fresh one.",
+                         ROSE)
+        self.sensor_light.setColorScale(1.0, 0.25, 0.22, bright)
         if self.sensor_light.isHidden():
             self.sensor_light.show()
             self.sensor_light.hide(SHADOW_MASK)
         logo = self.board.mouse.get("logo")
         if logo is not None:
             logo.paint(0, "logo", hue(self.clock * 0.2, 0.6))
+
+    DPI = [(400, (226, 92, 80)), (800, (240, 196, 80)), (1600, (110, 200, 120)), (3200, (90, 150, 240))]
+
+    def next_dpi(self):
+        """The gaming mouse's DPI button: the next speed, and its light changes colour to show which."""
+        self.dpi = (getattr(self, "dpi", 0) + 1) % len(self.DPI)
+        speed, col = self.DPI[self.dpi]
+        self.board.mouse["dpi"].paint(0, "light", col)
+        self.sounds.play("mouse_click", 0.5, pitch=1.3)
+        self.done["dpi"].add(self.dpi)
+        if len(self.done["dpi"]) == len(self.DPI) and not self.special_ok():
+            self.complete(f"{speed} DPI: you've tried every speed. Its light shows which it's on.")
+        else:
+            self.say(f"{speed} DPI: the pointer moves {'faster' if self.dpi else 'slower'}. Its light turns "
+                     f"{['red', 'yellow', 'green', 'blue'][self.dpi]}.")
+
+    # -- testing a webcam, or a headset --
+
+    def test_checks(self):
+        """What there is to try in a test, other than a keyboard's keys."""
+        if self.kind == "mouse":
+            return self.mouse_checks()
+        if self.kind == "mic":
+            return self.mic_checks()
+        form = self.spec["form"]
+        if form == "pc_case":
+            return [("power", "Power button: press it"), ("reset", "Reset button: press it"),
+                    ("usb", "Front USB: click a port"), ("fans", "Fans: give each a spin")]
+        if form == "pc_tower":
+            return [("power", "Power: press its button"), ("fans", "Fans spin, and one beep"),
+                    ("usb", "Front USB: click a port"), ("reset", "Restart: press reset")]
+        if form == "clipcam":
+            return [("shutter", "Shutter: shut it, then open it"), ("speak", "Talk: hold Space"),
+                    ("photo", "Photo: press P")]
+        if form == "ballcam":
+            return [("photo", "Photo: click its button"), ("speak", "Talk: hold Space")]
+        if form == "streamcam":
+            return [("light", "Light: click its button"), ("bright", "Brightness: scroll on it"),
+                    ("speak", "Talk: hold Space"), ("photo", "Photo: press P")]
+        checks = [("power", "Power: click its button")] if form == "wireless_hs" else []
+        checks += [("left", "Left ear: click its cup"), ("right", "Right ear: click its cup"),
+                   ("speak", "Talk: hold Space")]
+        if form == "gaming_hs":
+            checks.append(("mute", "Mute: click the mic, twice"))
+        return checks + [("volume", "Volume: scroll on it")]
+
+    def photo(self):
+        """A webcam takes your picture: the card flashes white."""
+        if self.shutter_closed:
+            self.say("All black: its shutter's closed. Slide it open first.")
+            return
+        self.sounds.play("shutter", 0.7)
+        self.flash_t = 0.5
+        self.say("Snap! A lovely one of you.")
+        self.mic_try("photo")
+
+    def cam_click(self, part, tag):
+        """A click on a webcam in its test: its snapshot button, its ring light's button, its shutter, its focus."""
+        if part is None:
+            self.dragging = True
+            return
+        what = tag[0] if tag else None
+        if what == "snap":
+            self.sounds.play("mouse_click", 0.5, pitch=1.1)
+            self.photo()
+        elif what == "light":
+            self.ring_on = not self.ring_on
+            self.sounds.play("mouse_click", 0.5, pitch=0.9)
+            self.say("The ring light's on: a soft, even glow on your face." if self.ring_on else "Ring light off.")
+            if self.ring_on:
+                self.mic_try("light")
+        elif part.key == "shutter":
+            self.shutter_closed = not self.shutter_closed
+            self.tween(part.root, part.origin + Vec3(-1.15 if self.shutter_closed else 0, 0, 0), 0.25)
+            self.sounds.play("snick", 0.5)
+            self.done["shuts"] += 1
+            self.say("Shutter closed: it can't see a thing." if self.shutter_closed else "Open again: there you are!")
+            if self.done["shuts"] >= 2:
+                self.mic_try("shutter")
+        elif part is self.knob:
+            self.turn_knob(1)
+        else:
+            self.dragging = True
+
+    def ear(self, side, part):
+        """A headset's test: a chime, in one ear (if it's on, and that side works)."""
+        if not self.mic_on:
+            self.say("It's switched off: click its power button, on the right cup.")
+            return
+        cup = next((p for p in self.parts if p.key == f"{side}_cushion"), part)
+        self.jiggle(cup.root)
+        if side == "left" and self.special == "solder" and not self.special_ok():
+            self.say("Nothing from the left side: that's the loose wire. Next time, solder it back on.", ROSE)
+            return
+        self.sounds.play(f"ear_{side}", self.hs_volume, vary=0.0)
+        self.say(f"A soft chime, in your {side} ear only.")
+        self.mic_try(side)
+
+    def hs_click(self, part, tag):
+        """A click on a headset in its test: an ear cup, its power button, its mic (to mute it)."""
+        if part is None:
+            self.dragging = True
+            return
+        if tag and tag[0] == "power":
+            self.mic_click(part, tag)
+        elif part.key.startswith(("left", "right")):
+            self.ear("left" if part.key.startswith("left") else "right", part)
+        elif part.key == "boom" and self.spec["form"] == "gaming_hs":
+            self.mic_click(part, ("mute",))
+        else:
+            self.say("Click an ear cup to hear that side.")
+
+    def gadget_input(self, key):
+        """A webcam's or a headset's keys and wheel, in its test. True if that's all the key was for."""
+        if self.kind == "webcam" and key == "p":
+            self.photo()
+            return True
+        if key not in ("scroll up", "scroll down"):
+            return False
+        way = 1 if key == "scroll up" else -1
+        if self.kind == "headset":
+            self.hs_volume = min(1.0, max(0.1, self.hs_volume + way * 0.1))
+            self.sounds.play("knob", 0.5)
+            self.say(f"Volume {round(self.hs_volume * 10)} of 10.")
+            self.mic_try("volume")
+            return True
+        if self.knob is not None and self.pick()[0] is self.knob:  # its focus ring
+            self.turn_knob(way)
+            return True
+        if self.spec["form"] == "streamcam" and self.pick()[0] is not None:
+            if not self.ring_on:
+                self.say("Switch the ring light on first: its button's on top.")
+                return True
+            self.ring_level = min(1.0, max(0.0, self.ring_level + way * 0.1))
+            self.sounds.play("knob", 0.4)
+            self.mic_try("bright")
+            return True
+        return False
+
+    def update_gadget_test(self):
+        """A webcam's picture (and its ring light); a gaming headset's lights, round the colours."""
+        if not (self.state == "play" and self.phase == "test" and self.kind in ("webcam", "headset")):
+            return
+        for k, mesh in enumerate(self.board.special.get("rgb", [])):
+            mesh.paint(0, "glow", hue(self.clock * 0.2 + k * 0.5, 0.6))
+        if self.kind != "webcam" or self.cam_pic is None:
+            return
+        form, ok = self.spec["form"], self.special_ok()
+        flicker = form == "streamcam" and self.ring_on and not ok and \
+            math.sin(self.clock * 19) * math.sin(self.clock * 7.7) > 0.35
+        glow = self.board.mic.get("glow")
+        if glow is not None:
+            level = 0.0 if not self.ring_on or flicker else 0.6 + 0.4 * self.ring_level
+            want = mix((196, 194, 188), (255, 244, 214), level)
+            if getattr(self, "glow_was", None) != want:
+                self.glow_was = want
+                glow.paint(0, "glow", want)
+        if flicker and "flicker" not in self.said:
+            self.said.add("flicker")
+            self.say("See it flicker? That's the loose ribbon cable. Next time, press it home.", ROSE)
+        blur = 0.0
+        if form == "clipcam" and not ok:
+            blur = 3.5  # (through the smudge)
+        elif form == "ballcam":
+            blur = min(9.0, abs(self.focus - FOCUS_AT) * 22)
+        bright = 1.0
+        if form == "streamcam":
+            bright = 0.62 if not self.ring_on or flicker else 0.85 + 0.3 * self.ring_level
+        key = (self.shutter_closed, round(blur * 2) / 2, round(bright, 2))
+        if key != self.preview_key:
+            self.preview_key = key
+            cache = ART.setdefault("previews", {})
+            if key not in cache:
+                cache[key] = Texture(draw_preview(key[1], key[2], key[0]), filtering="bilinear")
+            self.cam_pic.texture = cache[key]
+        t = getattr(self, "flash_t", 0.0)
+        if t > 0:
+            self.flash_t = max(0.0, t - time.dt)
+            self.cam_flash.color = color.rgba32(255, 255, 255, int(255 * min(1.0, self.flash_t * 3)))
+
+    def gadget_hint(self):
+        """A word as a webcam or a headset comes apart, mostly about its own job."""
+        by_key = {p.key: p for p in self.parts}
+        s = self.special
+        if s == "flicker" and "ribbon" not in self.said and not by_key["front_panel"].placed and \
+                not self.special_ok():
+            self.said.add("ribbon")
+            self.say("There's the ribbon cable, at the right, beside the LED ring: its end has lifted out of its "
+                     "socket. Press it home with the hand (1).", ROSE)
+        elif s == "solder" and "joint" not in self.said and not by_key["left_baffle"].placed and \
+                not self.special_ok():
+            self.said.add("joint")
+            self.say(f"See the red wire, off its pad on the little board? Touch the soldering iron "
+                     f"({self.tool_no('solder')}) to it.", ROSE)
+        elif s == "swollen" and "swollen" not in self.said and not by_key["right_baffle"].placed:
+            self.said.add("swollen")
+            self.say("There's the battery, puffed up like a pillow. Unplug its lead first, then lift it out gently: "
+                     "never press on it.", ROSE)
+        elif s == "swollen" and "swapped" not in self.said and not by_key["battery"].placed:
+            self.said.add("swapped")
+            self.say("Out it comes, for recycling. Click New battery in the parts box to fit a new one.")
+        elif s == "cushions" and "cushions" not in self.said and not any(
+                p.placed for p in self.parts if p.key.endswith("cushion")):
+            self.said.add("cushions")
+            self.say("Both old cushions are off: click Fresh cushions in the parts box.")
+
+    def pc_hint(self):
+        """A word as a computer comes apart, mostly about its own job."""
+        by_key = {p.key: p for p in self.parts}
+        s = self.special
+        if "glass" not in self.said and not by_key["glass_panel"].placed:
+            self.said.add("glass")
+            self.say("The glass is off. Some screws are round the back: flip it over (F), or drag it round, to reach "
+                     "them.")
+        elif s == "paste" and "paste" not in self.said and not by_key["cooler"].placed and by_key["cpu"].placed and \
+                not self.special_ok():
+            self.said.add("paste")
+            self.say(f"There's the old thermal paste on the CPU, dried out and crumbly. Wipe it off with the alcohol "
+                     f"swab ({self.tool_no('swab')}), then click Thermal paste in the parts box.", ROSE)
+        elif s == "filters" and "filters" not in self.said and any(not q.placed and q.grimy for q in self.big):
+            self.said.add("filters")
+            self.say("That filter's furry with dust! Once everything's apart, hold it (click it in the parts box), "
+                     "and click the wash bowl.", ROSE)
+
+    # -- testing a computer --
+
+    def pc_click(self, part, tag):
+        """A click on a computer in its test: its power button, its reset button, a front USB port; on a case of its
+        own, a fan, for a spin by hand. (You reach in through the glass.)"""
+        if part is not None and part.key == "glass_panel":
+            part.placed = False
+            try:
+                part, tag, _ = self.pick()
+            finally:
+                next(q for q in self.parts if q.key == "glass_panel").placed = True
+        if part is None:
+            self.dragging = True
+            return
+        what = tag[0] if tag else None
+        full = self.spec["form"] == "pc_tower"
+        if what == "power":
+            self.sounds.play("mouse_click", 0.5, pitch=0.8)
+            if not full:
+                self.say("Click! A good, firm power button. (There's nothing inside it to switch on, yet.)")
+            elif self.mic_on:
+                self.pc_power(False, "A press, and it shuts down: the fans whirr to a stop.")
+            else:
+                self.pc_power(True, "It hums to life: its fans spin up, and its light glows...")
+            self.mic_try("power")
+        elif what == "reset":
+            self.sounds.play("mouse_click", 0.45, pitch=1.2)
+            if not full:
+                self.say("Click! The reset button works, too.")
+                self.mic_try("reset")
+            elif not self.mic_on:
+                self.say("It's off: press the power button first.")
+            else:
+                self.pc_t, self.done["beeped"] = 0.0, False
+                for key in self.fan_speed:
+                    self.fan_speed[key] *= 0.4
+                self.say("It restarts: the fans dip, and spin back up.")
+                self.mic_try("reset")
+        elif what == "usb":
+            if not full:
+                self.sounds.play("snick", 0.6)
+                self.say("A USB stick slides snugly into the front port.")
+                self.mic_try("usb")
+            elif not self.mic_on:
+                self.sounds.play("snick", 0.6)
+                self.say("The stick goes in, but it's off: switch it on, and it'll find it.")
+            else:
+                self.sounds.play("usb_in", 0.6)
+                self.say("Ding-dong! It's found the USB stick.")
+                self.mic_try("usb")
+        elif not full and part.key in ("front_fan0", "front_fan1", "rear_fan"):
+            self.fan_speed[part.key] = 900.0
+            self.sounds.play("fan_spin", 0.5, vary=0.05)
+            spun = self.done["spun"]
+            spun.add(part.key)
+            left = 3 - len(spun)
+            self.say("It spins freely, smooth and quiet: a good bearing." + (f" {left} more to try." if left else ""))
+            if not left:
+                self.mic_try("fans")
+        else:
+            self.say(("The fans are whirring away nicely." if self.mic_on else
+                      "Press the power button, at the top of its front, to switch it on.") if full else
+                     "Click a fan to give it a spin, or try its buttons at the top of its front.")
+            self.dragging = True
+
+    def pc_power(self, on, message=None):
+        """A desktop PC switched on, or off."""
+        self.mic_on = on
+        self.pc_t = 0.0
+        self.done["beeped"] = self.done["temp_said"] = False
+        self.light_mic()
+        self.sounds.play("pc_on" if on else "pc_off", 0.55)
+        if message:
+            self.say(message)
+
+    def update_pc_test(self):
+        """A computer in its test: its fans turning (spun by hand, on a case of its own; on a desktop PC, spinning up
+        once it's on), the beep it starts up with, and how hot its CPU runs."""
+        if not (self.state == "play" and self.phase == "test" and self.kind == "computer"):
+            return
+        dt, full, d = time.dt, self.spec["form"] == "pc_tower", self.done
+        if full and self.mic_on:
+            self.pc_t += dt
+            if self.pc_t >= 1.2 and not d["beeped"]:
+                d["beeped"] = True
+                self.sounds.play("beep", 0.35)
+                self.mic_try("fans")
+            if self.pc_t >= 3.0 and not d["temp_said"]:
+                d["temp_said"] = True
+                if self.special_ok():
+                    self.say("Beep! It's started up. Its CPU sits at 38 degrees: cool and quiet, on fresh paste.",
+                             HONEY_DARK)
+                else:
+                    self.say("Beep! It's started up... but its CPU's at 84 degrees, and climbing.", ROSE)
+            if not self.special_ok() and self.pc_t >= 7.0:
+                self.pc_power(False)
+                self.say("It's shut itself down: its CPU hit 99 degrees! That's the dried-out paste. Next time, wipe "
+                         "it off and put fresh paste on.", ROSE)
+        fans = self.board.special.get("fans", [])
+        for key in {key for _, _, key in fans}:
+            speed = self.fan_speed.get(key, 0.0)
+            if full:
+                want = 1100.0 if self.mic_on else 0.0
+                speed += (want - speed) * min(1.0, dt * (1.5 if want > speed else 0.7))
+            else:
+                speed *= max(0.0, 1 - dt * 0.55)  # (a spin by hand, slowing)
+            self.fan_speed[key] = speed
+        for hub, axis, key in fans:
+            if self.fan_speed[key] > 1:
+                turn(hub, axis, (turned(hub, axis) + self.fan_speed[key] * dt) % 360)
+
+    def thermal_paste(self):
+        """The desktop PC: a fresh dot of thermal paste on its CPU, once the old is wiped off."""
+        by_key = {p.key: p for p in self.parts}
+        if self.special_ok():
+            self.say("It has fresh paste on already.")
+        elif by_key["cooler"].placed:
+            self.say("Take the cooler off first: the paste goes between it and the CPU.")
+            self.nope()
+        elif not by_key["cpu"].placed:
+            self.say("Put the CPU back in its socket first: the paste goes on top of it.")
+            self.nope()
+        elif self.done["swabs"].get("cpu", 0) < SWAB_WORK:
+            self.say(f"Wipe the old, dried paste off first, with the alcohol swab ({self.tool_no('swab')}).")
+            self.nope()
+        else:
+            self.board.special["paste_new"].np.unstash()
+            self.sounds.play("lube", 0.6, pitch=0.9)
+            self.complete("A pea-sized dot of fresh paste, right in the middle: the cooler will spread it thin.")
+
+    # -- its own job --
+
+    def tool_no(self, tool):
+        """The number key for a tool, as it is for this one."""
+        return next((str(i + 1) for i, (t, _) in enumerate(self.tools) if t == tool), "?")
+
+    def how(self):
+        """How its own job is done, in words, with the right tool numbers."""
+        sticky = self.board.special.get("sticky") if self.board else None
+        label = nice_label(self.board.keys[sticky][0]) if sticky is not None else ""
+        return SPECIALS[self.special][2].format(hand=self.tool_no("hand"), swab=self.tool_no("swab"),
+                                                blower=self.tool_no("blower"), solder=self.tool_no("solder"),
+                                                sticky=label)
+
+    def special_ok(self):
+        """Is its own job done?"""
+        if self.special == "swap":  # every switch new, all of one kind, and not the kind it came with
+            styles = {s.style for s in self.switches}
+            return all(s.placed for s in self.switches) and len(styles) == 1 and \
+                styles != {[k[0] for k in SWITCH_KINDS].index(self.spec["switch"])}
+        if self.special == "shake":
+            return self.done["shaken"] >= self.shake_goal()
+        return bool(self.done.get("ok"))
+
+    def complete(self, message):
+        """Its own job, done: its star lights up."""
+        if self.done.get("ok"):
+            return
+        self.done["ok"] = True
+        self.sounds.play("chime", 0.7)
+        self.say(message + "  (A star for it!)", HONEY_DARK)
+
+    def special_status(self):
+        """A word on how its own job is going, for the cards."""
+        s, d = self.special, self.done
+        if self.special_ok():
+            return "Done!"
+        if s == "sum" and self.phase == "test":
+            a, b = d["sum"]
+            return f"{a} + {b} = {d.get('typed', '')}_   (type it, then Enter)"
+        if s == "fn_layer" and self.phase == "test":
+            n = len(d.get("arrows", ()))
+            return f"Fn layer {'on' if d.get('layer') else 'off'}: {n} of 4 arrows" + (
+                "" if d.get("layer") else " (click Fn)")
+        if s == "pair" and self.phase == "test":
+            return "Hold Esc down to pair..." if not d.get("hold") else f"Pairing... {min(2.0, d['hold']):.1f} s"
+        if s == "pangram" and self.phase == "test":
+            rest = PANGRAM[d.get("typed", 0):]
+            return f"Type: {rest}"
+        if s == "volume" and self.phase == "test":
+            return "Down to 0, then up to 10: " + (str(getattr(self, "notch", "-")) if self.knob_music else "turn it")
+        if s == "shake":
+            return f"Shaken out: {d['shaken']} of {self.shake_goal()}"
+        if s == "swap":
+            kinds = {s_.style for s_ in self.switches if s_.placed}
+            return f"{sum(s_.placed for s_ in self.switches)} of {len(self.switches)} in" + (
+                ", but mixed kinds" if len(kinds) > 1 else "")
+        if s in ("sticky", "contacts"):
+            total = 1 if s == "sticky" else sum(c is not None for c in self.board.special["crust"])
+            done = sum(n >= SWAB_WORK for n in d["swabs"].values())
+            return f"{done} of {total} swabbed"
+        if s == "untangle":
+            return f"{len(d['knots'])} of {len(self.board.special['knots'])} knots undone"
+        if s == "dpi" and self.phase == "test":
+            return f"{len(d['dpi'])} of {len(self.DPI)} speeds tried"
+        if s == "gain" and self.phase == "test":
+            return f"Gain {self.gain:.1f}: " + {None: "hold Space and talk", "low": "too quiet: turn it up",
+                                                "high": "too loud: it clips!", "good": "just right..."}[
+                d.get("zone")]
+        if s == "blower":
+            left = sum(len(x.left) for x in self.board.dirt if x.delicate)
+            return f"{left} specks on the capsule"
+        if s == "smudge":
+            return f"{d['swabs'].get('lens', 0)} of {SWAB_WORK} wipes"
+        if s == "focus" and self.phase == "test":
+            return "Turn the focus ring: scroll on it" + ("  (nearly!)" if abs(self.focus - FOCUS_AT) < 0.12 else "")
+        if s == "cushions":
+            off = sum(not p.placed for p in self.parts if p.key.endswith("cushion"))
+            return f"{off} of 2 old cushions off" if off < 2 else "click Fresh cushions in the box"
+        if s == "filters":
+            total = self.board.special.get("clogged", 0)
+            return f"{total - sum(q.grimy for q in self.big)} of {total} clogged filters washed"
+        if s == "paste":
+            n = d["swabs"].get("cpu", 0)
+            return f"{n} of {SWAB_WORK} wipes of the old paste" if n < SWAB_WORK else "click Thermal paste in the box"
+        return None  # (nothing to count: its name says it)
+
+    def shake_goal(self):
+        plate = [d for d in self.board.dirt if d.host.key == "plate"]
+        return min(12, len(plate[0].points)) if plate else 0
+
+    def shake(self, amount):
+        """The vintage keyboard upside down and shaken: loose crumbs fall out of it, onto the mat below."""
+        plate = next((d for d in self.board.dirt if d.host.key == "plate"), None)
+        if plate is None or not plate.host.placed or not plate.left or self.special_ok():
+            return
+        self.shake_amount = min(0.2, getattr(self, "shake_amount", 0.0) + amount)
+        render = application.base.render
+        if self.shake_amount >= 0.05 and plate.left and self.clock >= getattr(self, "next_drop", 0.0):
+            self.next_drop = self.clock + 0.12  # (a crumb at a time, rattling out)
+            self.shake_amount -= 0.05
+            i = random.choice(sorted(plate.left))
+            plate.left.discard(i)
+            p = plate.points[i]
+            flyer = plate.mesh.piece(i, self.flyers, tuple(p))
+            plate.mesh.move(i, None)
+            w = render.getRelativePoint(plate.host.root, Point3(*p))
+            self.fly(flyer, (plate.host.root, tuple(p)), (render, (w.x + random.uniform(-0.5, 0.5), DESK_Y + 0.1,
+                                                                   w.z + random.uniform(-0.5, 0.5))),
+                     0.5, 0.2, end_scale=0.4)
+            self.sounds.play("brush", 0.25, pitch=1.6, vary=0.1)
+            self.done["shaken"] += 1
+            if self.special_ok():
+                self.complete("Out they all came, onto the mat: the loose crumbs are shaken out!")
+
+    def swab(self, part, tag):
+        """The alcohol swab: on the sticky switch (with its keycap off), or a crusty battery contact (or a webcam's
+        smudged lens window, or the dried paste on a CPU)."""
+        if self.special == "paste":
+            key = getattr(part, "key", None)
+            if key == "cooler" or key == "cooler_fan":
+                self.say("Take the cooler off first: the old paste is between it and the CPU.")
+                self.nope()
+                return
+            if key != "cpu":
+                self.say("The swab's for the CPU: the old, dried paste on top of it, under the cooler.")
+                return
+            n = self.done["swabs"].get("cpu", 0)
+            if n >= SWAB_WORK:
+                self.say("It's clean already: now click Thermal paste in the parts box.")
+                return
+            self.done["swabs"]["cpu"] = n + 1
+            self.sounds.play("lube", 0.5, pitch=1.3)
+            if n + 1 < SWAB_WORK:
+                self.say("The old paste is coming away: wipe it again." if n == 0 else "Nearly clean: once more.")
+                return
+            self.board.special["paste_old"].np.stash()
+            self.sounds.play("sparkle", 0.5)
+            self.say("Shiny and clean! Now click Thermal paste in the parts box, for a fresh dot of it.", HONEY_DARK)
+            return
+        if self.special == "smudge":
+            if not tag or tag[0] != "lens":
+                self.say("The swab's for the lens window: the glass on the front, with the thumbprint on it.")
+                return
+            n = self.done["swabs"].get("lens", 0)
+            if n >= SWAB_WORK:
+                self.say("It's spotless already.")
+                return
+            self.done["swabs"]["lens"] = n + 1
+            self.sounds.play("lube", 0.5, pitch=1.4)
+            if n + 1 < SWAB_WORK:
+                self.say("The smear's fading: wipe it again." if n == 0 else "Nearly clear: once more.")
+                return
+            self.board.special["smudge"].np.stash()
+            self.sounds.play("sparkle", 0.5)
+            self.complete("Crystal clear: not a smear left on the lens window.")
+            return
+        if self.special == "sticky":
+            i = self.board.special["sticky"]
+            if not isinstance(part, KeyItem) or part.kind != "switch" or part.i != i:
+                self.say(f"The swab's for the sticky switch: the {nice_label(self.board.keys[i][0])} one, with the "
+                         "brown spill round it.")
+                return
+            if self.caps[i].placed:
+                self.say("Pull its keycap off first, with the keycap puller (3).")
+                self.nope()
+                return
+            key = i
+        else:
+            if not tag or tag[0] != "contact":
+                self.say("The swab's for the battery contacts: the crusty metal at each end of the battery bay.")
+                return
+            if any(p.placed for p in self.parts if p.key.startswith("battery")):
+                self.say("Take the batteries out first: the contacts are under them.")
+                self.nope()
+                return
+            key = tag[1]
+            if self.board.special["crust"][key] is None:
+                self.say("That contact's clean: the leak never reached it. Swab the crusty one.")
+                return
+        n = self.done["swabs"].get(key, 0)
+        if n >= SWAB_WORK:
+            self.say("That one's clean already.")
+            return
+        n += 1
+        self.done["swabs"][key] = n
+        self.sounds.play("lube", 0.5, pitch=1.3)
+        if n < SWAB_WORK:
+            self.say("Swab it again: work the alcohol in." if self.special == "sticky" else
+                     "The crust's coming away: once more.")
+            return
+        if self.special == "sticky":
+            self.board.special["spill"].stash()
+            self.sounds.play("sparkle", 0.5)
+            self.complete("The spilled drink's dissolved: that switch moves freely again.")
+        else:
+            self.board.special["crust"][key].stash()
+            self.sounds.play("sparkle", 0.5)
+            crusty = sum(c is not None for c in self.board.special["crust"])
+            if sum(v >= SWAB_WORK for v in self.done["swabs"].values()) == crusty:
+                self.complete(("Both contacts shine" if crusty == 2 else "The contact shines") +
+                              " like new: the batteries will make a good connection.")
+            else:
+                self.say("One contact clean, and one to go.")
+
+    def blow(self, part, point):
+        """The air blower: a puff of air that lifts the dust off whatever it's aimed at, the capsule's too."""
+        self.sounds.play("brush", 0.55, pitch=0.6, vary=0.05)
+        if point is None:
+            return
+        blown = 0  # (off the capsule)
+        for dirt in self.board.dirt:
+            if not dirt.host.placed or not dirt.left:
+                continue
+            cover = [q for q in self.above(dirt.host) if not q.screw] if dirt.delicate else []
+            if cover:  # it's under the headbasket still
+                if (dirt.points[0] - point).length() < 2.5:
+                    self.say(f"Take the {cover[0].name} off first: the capsule's under it.")
+                continue
+            for i in list(dirt.left):
+                if (dirt.points[i] - point).length() < 1.1:
+                    self.sweep_speck(dirt, i)
+                    blown += dirt.delicate
+        if blown:
+            left = sum(len(d.left) for d in self.board.dirt if d.delicate)
+            if left:
+                self.say(f"Puff! {left} more speck{'s' if left > 1 else ''} on the capsule.")
+            else:
+                self.complete("Not a speck left on the diaphragm, and nothing touched it but air.")
+
+    def untie(self, k):
+        """One knot in the lav's cable, worked loose."""
+        if k in self.done["knots"]:
+            return
+        self.done["knots"].add(k)
+        self.board.special["knots"][k].stash()
+        self.sounds.play("turn", 0.6, pitch=1.3)
+        left = len(self.board.special["knots"]) - len(self.done["knots"])
+        if left:
+            self.say(f"Knot undone! {left} more to go.")
+        else:
+            self.complete("The cable lies smooth: not a knot left in it.")
+
+    def fix_switch(self):
+        """The office mouse's worn left switch: its spring bent back, so it clicks once again, not twice."""
+        if self.done.get("ok"):
+            self.say("Its left switch is fixed already.")
+            return
+        self.sounds.play("mouse_click", 0.6)
+        self.soon(0.15, lambda: self.sounds.play("mouse_click", 0.6, pitch=1.02))
+        self.complete("You bent its spring back: the left switch clicks once, crisp and clean.")
+
+    def fresh_battery(self):
+        """The travel mouse: its flat battery, swapped for a fresh one."""
+        battery = next(p for p in self.parts if p.key == "mouse_battery")
+        if self.special_ok():
+            self.say("It has a fresh battery already.")
+        elif battery.placed:
+            self.say("Take the old battery out first: it's under the cover, underneath.")
+            self.nope()
+        else:
+            self.board.special["old"].stash()
+            self.board.special["fresh"].unstash()
+            self.complete("In with a fresh battery! The old one goes to recycling.")
+
+    def solder(self, part, tag):
+        """The soldering iron, on the gaming headset's loose wire: heat the pad and the wire, and the solder flows."""
+        if self.special != "solder":
+            self.say("There's nothing to solder on this one.")
+            return
+        if self.special_ok():
+            self.say("That joint's soldered already: shiny and solid.")
+            return
+        if not tag or tag[0] != "joint":
+            self.say("The iron's for the loose red wire, on the little board in the left cup.")
+            return
+        self.sounds.play("sizzle", 0.6)
+        self.board.special["loose"].np.stash()
+        self.board.special["soldered"].np.unstash()
+        self.complete("A shiny joint: the wire's back on its pad. The left side will play again.")
+
+    def fresh_cushions(self):
+        """The office headset: its flaking old cushions swapped for fresh ones."""
+        cushions = [p for p in self.parts if p.key.endswith("cushion")]
+        if self.special_ok():
+            self.say("It has fresh cushions already.")
+        elif any(c.placed for c in cushions):
+            self.say("Take both old cushions off first: they twist off by hand.")
+            self.nope()
+        else:
+            for mesh in self.board.special.get("flakes", []):
+                mesh.np.stash()
+            self.complete("Two fresh, soft cushions! The flaky old ones go in the bin.")
+
+    def new_battery(self):
+        """The wireless headphones: the swollen battery out, and a new one in."""
+        battery = next(p for p in self.parts if p.key == "battery")
+        if self.special_ok():
+            self.say("It has its new battery already.")
+        elif battery.placed:
+            self.say("Take the swollen one out first: unplug its lead, then lift it out gently.")
+            self.nope()
+        else:
+            battery.mesh.np.stash()
+            self.board.special["fresh"].np.unstash()
+            self.complete("A new battery, flat as it should be. The swollen one goes to battery recycling.")
+
+    def special_click(self, part, tag):
+        """A click that's for this one's own job. True if it was."""
+        if (tag and tag[0] == "ribbon" or getattr(part, "key", None) == "ribbon") and self.tool == "hand" and                 self.special == "flicker" and not self.special_ok():  # (pressed home first; then it lifts out)
+            self.board.special["loose"].np.stash()
+            self.board.special["seated"].np.unstash()
+            self.sounds.play("mouse_click", 0.6, pitch=0.9)
+            self.complete("Click! The ribbon's pressed home in its socket: the light won't flicker now.")
+            return True
+        if tag and tag[0] == "knot" and self.tool == "hand":
+            self.untie(tag[1])
+            return True
+        if tag and tag[0] == "left switch" and self.tool == "hand":
+            self.fix_switch()
+            return True
+        return False
 
     # -- how it's going --
 
@@ -3783,10 +7092,31 @@ class Workshop(Entity):
         elif self.phase == "build" and all(p.placed for p in self.parts) and not self.turning:
             self.start_test()
 
+    def soon(self, delay, what):
+        """Say something (or do something) in a moment."""
+        self.later.append((self.clock + delay, what))
+        self.later.sort(key=lambda w: w[0])
+
     def hint(self):
         """A word on what to do next, as each stage gets done."""
         if self.kind == "mouse":
             self.mouse_hint()
+            return
+        if self.kind == "mic":
+            self.mic_hint()
+            return
+        if self.kind in ("webcam", "headset"):
+            self.gadget_hint()
+            return
+        if self.kind == "computer":
+            self.pc_hint()
+            return
+        sticky = self.board.special.get("sticky")
+        if sticky is not None and "sticky" not in self.said and not self.caps[sticky].placed and \
+                not self.special_ok():
+            self.said.add("sticky")
+            self.say(f"There's the spill: dried drink round the {nice_label(self.caps[sticky].label)} switch. Swab "
+                     f"it with alcohol ({self.tool_no('swab')}) before you go on.", ROSE)
             return
         if "caps" not in self.said and not any(c.placed for c in self.caps):
             self.said.add("caps")
@@ -3823,10 +7153,32 @@ class Workshop(Entity):
                      else "Screws out! Flip it back over (F), and lift the top shell off with the hand (1).")
         elif battery and "battery" not in self.said and not battery.placed:
             self.said.add("battery")
-            self.say("Battery out: now it's safe to open. Flip it back over (F) and lift the top shell off.")
+            self.say("Battery out: now it's safe to open." + (
+                " It's flat, too: click Fresh battery in the parts box to swap it." if self.special == "battery"
+                else "") + " Flip it back over (F) and lift the top shell off.")
         elif "shell" not in self.said and not by_key["top_shell"].placed:
             self.said.add("shell")
-            self.say("The top shell's off! Lift the scroll wheel out, and undo the board's little screw (2).")
+            self.say("The top shell's off! " + (
+                "There's the worn left switch, at the front left of the board: click it with the hand (1) to bend "
+                "its spring back." if self.special == "double_click" and not self.special_ok() else
+                "Lift the scroll wheel out, and undo the board's little screw (2)."))
+
+    def mic_hint(self):
+        """A word as a mic comes apart, mostly about its own job."""
+        by_key = {p.key: p for p in self.parts}
+        s = self.special
+        if s == "foam" and "foam" not in self.said and not by_key["grille"].placed:
+            self.said.add("foam")
+            self.say("Grille off! See how grubby the foam is? Lift it out (1): you'll wash it once it's all apart.")
+        elif s == "contacts" and "contacts" not in self.said and \
+                not any(p.placed for p in self.parts if p.key.startswith("battery")):
+            self.said.add("contacts")
+            self.say(f"Batteries out. See the green crust on the contacts? Swab it off ({self.tool_no('swab')}).",
+                     ROSE)
+        elif s == "blower" and "blower" not in self.said and not by_key["headbasket"].placed:
+            self.said.add("blower")
+            self.say(f"There's the gold diaphragm, and it's dusty. Puff it clean with the air blower "
+                     f"({self.tool_no('blower')}): never the brush.")
 
     # -- testing it --
 
@@ -3845,10 +7197,56 @@ class Workshop(Entity):
                 lookup.setdefault(name, []).append(i)
         self.key_lookup = lookup
         self.checks, self.moved, self.mouse_down = {}, 0.0, {}
+        index = {label: i for i, (label, *_) in enumerate(self.board.keys)}
+        d = self.done
+        if self.special == "sum":  # a sum to do on it
+            d["sum"], d["typed"] = (random.randint(3, 9), random.randint(3, 9)), ""
+        elif self.special == "pangram":
+            d["typed"] = 0
+        elif self.special == "fn_layer":
+            d["layer"], d["arrows"], d["fn"] = False, set(), index.get("Fn")
+        elif self.special == "pair":
+            d["hold"], d["esc"] = 0.0, index.get("Esc")
+        d["stuck"] = None
+        self.dpi = 0
+        if "dpi" in self.board.mouse:
+            self.board.mouse["dpi"].paint(0, "light", self.DPI[0][1])
+            d["dpi"] = {0}
+        # a mic: is it on, and can it hear you; how loud it hears you; and you, talking
+        form = self.spec.get("form")
+        self.mic_on, self.muted = form not in ("wireless", "wireless_hs", "pc_case", "pc_tower"), False
+        self.pc_t, self.fan_speed = 0.0, {}  # a computer's
+        d["spun"], d["beeped"], d["temp_said"] = set(), False, False
+        self.focus, self.shutter_closed, self.ring_on, self.ring_level = 0.15, False, False, 0.5  # a webcam's
+        self.hs_volume, d["shuts"] = 0.7, 0  # a headset's
+        self.gain = 0.4 if self.special == "gain" else 0.8
+        self.mic_level = self.mic_avg = self.talked = self.voice_t = self.good_time = 0.0
+        self.speaking, self.next_voice, self.next_crackle = False, 0.0, 0.0
+        d["mutes"] = 0
+        self.light_mic()
         self.sounds.play("fanfare", 0.7)
         self.build_ui()
-        self.say("It's back together! Type on it: every key you press lights up." if self.kind == "keyboard" else
-                 "It's back together! Click, scroll and move your own mouse: this one does it too.", HONEY_DARK)
+        if self.kind == "webcam":
+            self.say("It's back together, and plugged in: there you are on its picture! Try it out.", HONEY_DARK)
+        elif self.kind == "headset":
+            self.say("It's back together! " + ("Switch it on (its button, on the right cup), then listen."
+                                               if not self.mic_on else "Click an ear cup to hear that side."),
+                     HONEY_DARK)
+        elif self.kind == "computer":
+            self.say("It's back together, and plugged in! Press its power button, at the top of its front."
+                     if form == "pc_tower" else
+                     "It's back together! Try its buttons and its front USB, and give each fan a spin.", HONEY_DARK)
+        elif self.kind == "mic":
+            self.say("It's back together! " + ("Switch it on (click its power switch), then tap it and talk."
+                                               if not self.mic_on else "Tap it, and talk into it: hold Space."),
+                     HONEY_DARK)
+        else:
+            self.say("It's back together! Type on it: every key you press lights up." if self.kind == "keyboard"
+                     else "It's back together! Click, scroll and move your own mouse: this one does it too.",
+                     HONEY_DARK)
+        if self.special in ("sum", "fn_layer", "pair", "volume", "pangram", "dpi", "gain", "focus") and \
+                not self.special_ok():
+            self.soon(4.0, "Its own job: " + self.how())
 
     def press_key(self, i):
         if i in self.keys_down or not self.caps[i].placed:
@@ -3867,16 +7265,80 @@ class Workshop(Entity):
                 self.said.add("rattle")
                 self.say(f"Hear that rattle? The {nice_label(self.caps[i].label)} key's stabiliser wants lube "
                          "(6). Next time!")
+        if self.special and not self.special_ok():
+            self.special_key(i, self.board.keys[i][0])
         if done:
             if self.knob is not None and not self.knob_turned:
                 self.say("Every key works! Now turn the knob: scroll on it, or click it.", HONEY_DARK)
             else:
                 self.check_all_tested()
 
+    def special_key(self, i, label):
+        """A key pressed in the test, for this keyboard's own job."""
+        s, d = self.special, self.done
+        if s == "sum":
+            a, b = d["sum"]
+            if label in "0123456789" and len(d["typed"]) < 3:
+                d["typed"] += label
+            elif label in ("Ent", "Enter"):
+                if d["typed"] == str(a + b):
+                    self.complete(f"{a} + {b} = {a + b}. The sums add up!")
+                else:
+                    self.say(f"{a} + {b} isn't {d['typed'] or 'nothing'}: try again!", ROSE)
+                    d["typed"] = ""
+            elif label in ("Back", "Num", "/", "*", "-", "+", "."):
+                d["typed"] = ""
+        elif s == "fn_layer":
+            if label == "Fn":
+                self.fn_layer(not d["layer"])
+            elif d["layer"] and label in "IJKL":
+                d["arrows"].add(label)
+                arrow = {"I": "Up", "J": "Left", "K": "Down", "L": "Right"}[label]
+                if len(d["arrows"]) == 4:
+                    self.fn_layer(False)
+                    self.complete("All four arrows, on the Fn layer: the 60% has them after all.")
+                else:
+                    self.say(f"Fn + {label} is {arrow}: {4 - len(d['arrows'])} more to go.")
+            elif not d["layer"] and label in "IJKL" and "fn" not in self.said:
+                self.said.add("fn")
+                self.say("That's just the letter. Click Fn first: then I, J, K and L are the arrows.")
+        elif s == "pangram":
+            want = PANGRAM[d["typed"]]
+            if label.lower() == want or (label == "Space" and want == " "):
+                d["typed"] += 1
+                if d["typed"] == len(PANGRAM):
+                    self.complete("The quick brown fox, every letter: no dead keys hiding anywhere.")
+        elif s == "sticky" and i == self.board.special["sticky"]:  # the spilled drink: it sticks, and repeats
+            d["stuck"] = [i, 0.9, 0.0]
+            if "stuck" not in self.said:
+                self.said.add("stuck")
+                self.say(f"It sticks down and repeats: {label.lower() * 8}! That's the dried drink. Next time, swab "
+                         "it with alcohol.", ROSE)
+        elif s == "pair" and label == "Esc":
+            d["hold"] = 0.001
+
+    def fn_layer(self, on):
+        """The 60%'s Fn layer: on, I, J, K and L wear the arrows; off, their own letters again."""
+        self.done["layer"] = on
+        legends, where = self.board.caps.meshes[1], self.board.legend_where
+        for label, arrow in (("I", "Up"), ("J", "Left"), ("K", "Down"), ("L", "Right")):
+            i = next(k for k, key in enumerate(self.board.keys) if key[0] == label)
+            legends.show_glyph(i, where[KEY_LEGENDS[arrow] if on else label])
+            self.flash[i] = 0.6
+        self.sounds.play("chime" if on else "knob", 0.4)
+        if on:
+            self.say("Fn layer on: I, J, K and L are the arrows now. Press them!")
+
     def release_key(self, i):
+        stuck = self.done.get("stuck")
+        if stuck and stuck[0] == i:
+            return  # (it's stuck down: it comes up by itself, slowly)
         if i in self.keys_down:
             self.keys_down.discard(i)
             self.board.caps.on_board(i, (0, 0, 0))
+        if self.special == "pair" and i == self.done.get("esc") and not self.special_ok():
+            self.done["hold"] = 0.0
+            self.board.special["light"].paint(0, "light", (40, 52, 70))
 
     def test_key(self, key):
         up = key.endswith(" up")
@@ -3908,6 +7370,30 @@ class Workshop(Entity):
                 ks.meshes[1].paint(i, "legend", hue(k / 4, 0.6) if self.wave < 2.4 else look(cap)[1])
             if self.wave >= 2.4:
                 self.wave = -1.0
+        d = self.done
+        stuck = d.get("stuck")
+        if stuck:  # the sticky key, stuck down, repeating
+            i = stuck[0]
+            stuck[1] -= time.dt
+            stuck[2] -= time.dt
+            if stuck[2] <= 0:
+                stuck[2] = 0.11
+                self.sounds.play(f"press_{SWITCH_KINDS[self.switches[i].style][0]}", 0.45, vary=0.08)
+                self.flash[i] = 0.3
+            if stuck[1] <= 0:
+                d["stuck"] = None
+                self.release_key(i)
+        if self.special == "pair" and d.get("hold") and not self.special_ok():  # Esc held down: pairing
+            if d["esc"] in self.keys_down:
+                d["hold"] += time.dt
+                blink = int(d["hold"] * 6) % 2 == 0
+                self.board.special["light"].paint(0, "light", (90, 150, 255) if blink else (40, 52, 70))
+                if d["hold"] >= 2.0:
+                    self.board.special["light"].paint(0, "light", (90, 150, 255))
+                    self.sounds.play("sparkle", 0.6)
+                    self.complete("Its light stops blinking and glows blue: paired over Bluetooth!")
+            else:
+                d["hold"] = 0.0
 
     def finish_test(self):
         self.show_result()
@@ -3937,6 +7423,11 @@ class Workshop(Entity):
         if self.phase == "test" and not self.confirming and self.test_key(key):
             return
         if self.phase == "test" and self.kind == "mouse" and not self.confirming and self.mouse_input(key):
+            return
+        if self.phase == "test" and self.kind in ("webcam", "headset") and not self.confirming and \
+                self.gadget_input(key):
+            return
+        if self.phase == "test" and self.kind in HEARS and not self.confirming and self.mic_input(key):
             return
         if key == "escape":
             if self.help_open:
@@ -4000,9 +7491,23 @@ class Workshop(Entity):
             if tag and tag[0] == "side":
                 self.sounds.play("mouse_click", 0.5, pitch=1.2)
                 self.mouse_try("side")
+            elif tag and tag[0] == "dpi":
+                self.next_dpi()
             else:
                 self.mouse_button("left", True)
                 self.dragging = True  # (and a drag still turns it round)
+            return
+        if self.phase == "test" and self.kind == "mic":
+            self.mic_click(part, tag)
+            return
+        if self.phase == "test" and self.kind == "webcam":
+            self.cam_click(part, tag)
+            return
+        if self.phase == "test" and self.kind == "headset":
+            self.hs_click(part, tag)
+            return
+        if self.phase == "test" and self.kind == "computer":
+            self.pc_click(part, tag)
             return
         if self.phase == "test":
             i = self.slot_at(part, point) if isinstance(part, KeyItem) else None
@@ -4037,13 +7542,23 @@ class Workshop(Entity):
         if part is None:
             self.dragging = True
             return
+        if self.special_click(part, tag):
+            return
         tool = self.tool
-        if tool == "driver":
-            screw = self.screw_under(part, tag)
+        screw = self.screw_under(part, tag)
+        if tool == "hand" and screw is not None and screw.thumb:  # a thumb screw: it turns by hand
+            self.start_turn(screw)
+        elif tool == "driver":
             if screw:
                 self.start_turn(screw)
             else:
                 self.say(self.advice(part))
+        elif tool == "swab":
+            self.swab(part, tag)
+        elif tool == "blower":
+            self.blow(part, point)
+        elif tool == "solder":
+            self.solder(part, tag)
         elif tool in ("puller", "switcher"):
             if isinstance(part, KeyItem):
                 self.key_action("pull keycaps" if tool == "puller" else "pull switches", part.i)
@@ -4066,7 +7581,8 @@ class Workshop(Entity):
     def advice(self, part):
         """Which tool a part needs."""
         if part is not None and part.screw:
-            return "Screws need the screwdriver (2): click one with it."
+            return ("Thumb screws turn by hand (1), or with the screwdriver (2)." if part.thumb else
+                    "Screws need the screwdriver (2): click one with it.")
         if isinstance(part, KeyItem):
             return ("Keycaps come off with the keycap puller (3)." if part.kind == "keycap" else
                     "Switches come out with the switch puller (4).")
@@ -4077,8 +7593,12 @@ class Workshop(Entity):
         if part is None:
             return False
         if isinstance(part, Bowl):  # (whatever's in your hand)
+            if self.kind in ("mic", "computer"):
+                return isinstance(self.held, Part3D) and self.held.grimy
             return self.phase != "test" and any(not c.placed and c.grimy for c in self.caps)
-        if self.phase == "test":  # the keys to press, and the knob to turn
+        if self.phase == "test":  # the keys to press, and the knob to turn (or a mic, all of it)
+            if self.kind in HEARS or self.kind == "computer":
+                return isinstance(part, Part3D)
             return part is self.knob or isinstance(part, KeyItem) and part.kind == "keycap"
         if self.held is not None:
             return False
@@ -4087,8 +7607,14 @@ class Workshop(Entity):
         tool = self.tool
         if tool == "lube":
             return part in self.stabs and not part.lubed
+        if tool == "swab":
+            return isinstance(part, KeyItem) and part.kind == "switch" and \
+                part.i == self.board.special.get("sticky") or self.special == "contacts" and part.key == "body" or \
+                self.special == "paste" and getattr(part, "key", None) == "cpu"
+        if tool == "blower":
+            return isinstance(part, Part3D)
         if tool == "hand":
-            return isinstance(part, Part3D) and not part.screw
+            return isinstance(part, Part3D) and (not part.screw or part.thumb)
         if tool == "driver":
             return part.screw
         if tool == "puller":
@@ -4130,6 +7656,13 @@ class Workshop(Entity):
         self.update_steam()
         self.update_wash()
         self.update_mouse_test()
+        self.update_mic_test()
+        self.update_gadget_test()
+        self.update_pc_test()
+        while self.later and self.clock >= self.later[0][0]:  # what was to be said, or done, in a moment
+            _, what = self.later.pop(0)
+            if self.state == "play":
+                what() if callable(what) else self.say(what)
         if abs(window.aspect_ratio - self.layout_aspect) > 0.01:
             self.vignette.scale = (window.aspect_ratio + 0.02, 1.02)
             {"menu": self.menu_ui, "play": self.build_ui, "result": self.result_ui}[self.state]()
@@ -4147,8 +7680,12 @@ class Workshop(Entity):
         if self.dragging and (held_keys["left mouse"] or held_keys["right mouse"]):
             self.yaw.rotation_y -= mouse.velocity.x * 260
             self.pitch.rotation_x += mouse.velocity.y * 260
+            upside_down = abs(abs((self.pitch.rotation_x + 180) % 360 - 180) - 180) < 50
+            if self.special == "shake" and self.phase != "test" and upside_down:  # shaken about, upside down
+                self.shake(Vec3(mouse.velocity).length() * 0.5)
         self.keep_above_desk()
         self.update_turns()
+        self.update_twists()
         busy = self.dragging or self.over_panel() or self.help_open or self.confirming
         under = (None, None, None) if busy else self.pick()
         if self.brushing:
@@ -4188,11 +7725,23 @@ class Workshop(Entity):
         on = sum(p.placed for p in self.parts)
         if phase == "test":
             done, total = len(self.tested), len(self.caps)
-            if self.kind == "mouse":
-                checks = self.mouse_checks()
+            if self.kind != "keyboard":
+                checks = self.test_checks()
                 done, total = sum(c in self.checks for c, _ in checks), len(checks)
         else:
             done = total - on if phase == "apart" else on
+        if self.special:  # its own job, on the job card (and on the test card, while it's being tested)
+            ok = self.special_ok()
+            status = self.special_status()
+            self.set_text(self.special_text, SPECIALS[self.special][0] + (
+                "  -  done!" if ok else f":  {status}" if status and phase != "test" else ""))
+            for e, col in ((self.special_star, HONEY if ok else PAPER_DARK), (self.special_text,
+                                                                            HONEY_DARK if ok else MUTED)):
+                if getattr(e, "tinted", None) != col:
+                    e.color, e.tinted = rgb(col), col
+            if self.test_special is not None:
+                self.set_text(self.test_special, ("Its own job: " + SPECIALS[self.special][0] + ", done!") if ok
+                              else status or self.how())
         for i, t in enumerate(self.steps):
             now = ("apart", "build", "test").index(phase)
             col = HONEY_DARK if i == now else SAGE if i < now else MUTED
@@ -4204,7 +7753,8 @@ class Workshop(Entity):
         self.set_text(self.bar_text, f"{done} / {total}")
         left = sum(len(d.left) for d in self.board.dirt)
         found = "" if not self.found else f",  and you found a {self.found}"
-        self.set_text(self.clean_text, (f"Crumbs left: {left}" if left else "Spotless inside") + found)
+        self.set_text(self.clean_text, (f"{self.board.mess}: {left} crumbs left" if left else "Spotless inside") +
+                      found)
         if phase != "test":
             in_box = sum(not p.placed for p in self.big)
             self.set_text(self.box_count, f"{in_box} of {len(self.big)} in it")
@@ -4215,6 +7765,8 @@ class Workshop(Entity):
                     n = sum(not q.placed for q in group)
                     label = f"{'Keycaps' if item == 'keycaps' else 'Switches'}  {n}"
                     boxed, held = n > 0, self.held == item
+                elif item in FRESH.values():  # (until it's swapped in)
+                    label, boxed, held = item[0].upper() + item[1:], not self.special_ok(), False
                 else:
                     label = item.name[0].upper() + item.name[1:]
                     boxed, held = not item.placed, self.held is item
@@ -4245,7 +7797,7 @@ class Workshop(Entity):
                         e.color, e.tinted = rgb(col), col
             if self.test_count is not None:
                 self.set_text(self.test_count, f"{len(self.tested)} of {len(self.caps)} keys tested")
-            if self.knob is not None:
+            if self.knob is not None and self.knob_text is not None:  # (a keyboard's: a mic's is its gain)
                 self.set_text(self.knob_text, "The knob works!" if self.knob_turned else
                               "And turn the knob: scroll on it.")
         if self.message_time > 0:
@@ -4427,6 +7979,248 @@ def take_shots(app, shop, folder):
     snap("3d_result", 1.4)
     assert shop.state == "result"
     print("3D cycle ok:", len(shop.parts), "parts")
+    every_job(shop, wait, snap)
+
+
+def every_job(shop, wait, snap):
+    """Every keyboard, mouse and mic taken apart and built back as a player would, each doing its own job on the
+    way, then tested: so every one is checked, and has its pictures."""
+    def press(label):
+        i = next(k for k, key in enumerate(shop.board.keys) if key[0] == label)
+        shop.press_key(i)
+        shop.release_key(i)
+
+    def act(stage):
+        s, b, d = shop.special, shop.board, shop.done
+        by_key = {p.key: p for p in shop.parts}
+        if stage == "start" and s in ("sticky", "blower", "dpi"):  # how to play, and its own job, on the help card
+            shop.toggle_help()
+            snap(f"help_{shop.spec['key']}", 0.3)
+            shop.toggle_help()
+        if s == "shake" and stage == "start":  # upside down, and shaken
+            shop.pitch.rotation_x = 180
+            for _ in range(60):
+                shop.shake(0.06)
+                wait(0.13)
+                if shop.special_ok():
+                    break
+            snap("job_shake", 0.3)
+            shop.pitch.rotation_x = 0
+        elif s == "sticky" and stage == f"keycap{b.special['sticky']}":
+            snap("job_sticky", 0.6)
+            for _ in range(SWAB_WORK):
+                shop.swab(shop.switches[b.special["sticky"]], None)
+        elif s == "double_click" and stage == "top_shell":
+            shop.fix_switch()
+        elif s == "battery" and stage == "mouse_battery":
+            shop.fresh_battery()
+        elif s == "untangle" and stage == "start":
+            snap("job_knots", 1.0)
+            for k in range(len(b.special["knots"])):
+                shop.untie(k)
+        elif s == "contacts" and stage.startswith("battery") and not any(
+                p.placed for p in shop.parts if p.key.startswith("battery")):
+            snap("job_contacts", 0.6)
+            for k in (0, 1):
+                for _ in range(SWAB_WORK):
+                    shop.swab(by_key["body"], ("contact", k))
+        elif s == "blower" and stage == "headbasket":
+            snap("job_capsule", 0.6)
+            shop.brush_at(Vec3(0, 7.75, -0.215))  # (it won't: never a brush on a capsule)
+            for dirt in [x for x in b.dirt if x.delicate]:
+                for i in list(dirt.left):
+                    shop.blow(by_key["capsule"], dirt.points[i])
+        elif s == "smudge" and stage == "start":
+            snap("job_smudge", 0.6)
+            for _ in range(SWAB_WORK):
+                shop.swab(by_key["front_cover"], ("lens",))
+        elif s == "flicker" and stage == "front_panel":
+            snap("job_ribbon", 0.6)
+            shop.pick_tool("hand")
+            shop.special_click(by_key["ribbon"], ("ribbon",))
+        elif s == "solder" and stage == "left_baffle":
+            snap("job_solder", 0.6)
+            shop.pick_tool("solder")
+            shop.solder(by_key["control_board"], ("joint",))
+            snap("job_soldered", 0.3)
+        elif s == "swollen" and stage == "battery":
+            snap("job_swollen", 0.3)
+            shop.pick_up("new battery")
+        elif s == "cushions" and stage.endswith("cushion") and not any(
+                p.placed for p in shop.parts if p.key.endswith("cushion")):
+            shop.pick_up("fresh cushions")
+        elif s == "foam" and stage == "build":
+            shop.held = by_key["foam"]
+            shop.wash()
+            wait(1.7)
+            shop.held = None
+        elif s == "paste" and stage == "cooler":
+            snap("job_paste", 0.4)
+            for _ in range(SWAB_WORK):
+                shop.swab(by_key["cpu"], None)
+            shop.pick_up("thermal paste")
+            snap("job_pasted", 0.3)
+        elif s == "filters" and stage == "build":
+            for f in [q for q in shop.big if q.grimy]:
+                shop.held = f
+                shop.wash()
+                wait(1.7)
+            shop.held = None
+        elif s == "swap" and stage == "build":
+            shop.switch_kind = 1  # all brown, where it came with reds
+        elif stage == "test":
+            if s == "sum":
+                a, c = d["sum"]
+                for ch in str(a + c):
+                    press(ch)
+                press("Ent")
+            elif s == "fn_layer":
+                press("Fn")
+                snap("job_fn_layer", 0.3)
+                for ch in "IJKL":
+                    press(ch)
+            elif s == "pair":
+                esc = d["esc"]
+                shop.press_key(esc)
+                wait(1.0)
+                snap("job_pairing", 0.0)
+                wait(1.3)
+                shop.release_key(esc)
+            elif s == "volume":
+                for way in [-1] * 11 + [1] * 11:
+                    shop.turn_knob(way)
+            elif s == "pangram":
+                for ch in PANGRAM:
+                    press("Space" if ch == " " else ch.upper())
+            elif s == "dpi":
+                for _ in range(len(shop.DPI) - 1):
+                    shop.next_dpi()
+                snap("job_dpi", 0.3)
+            if shop.kind == "webcam":  # every button and the shutter, a photo, and talking (and its focus)
+                form = shop.spec["form"]
+                if form == "clipcam":
+                    shop.cam_click(by_key["shutter"], None)
+                    snap("job_shutter_closed", 0.3)
+                    shop.cam_click(by_key["shutter"], None)
+                elif form == "ballcam":
+                    snap("job_blurry", 0.3)
+                    for _ in range(30):
+                        if shop.special_ok():
+                            break
+                        shop.turn_knob(1 if shop.focus < FOCUS_AT else -1)
+                    shop.cam_click(by_key["back_half"], ("snap",))
+                else:
+                    shop.cam_click(by_key["housing"], ("light",))
+                    shop.ring_level = 0.9
+                    shop.mic_try("bright")
+                if form != "ballcam":
+                    shop.gadget_input("p")
+                shop.mic_input("space")
+                wait(1.6)
+                snap(f"{shop.spec['key']}_test", 0.0)
+                shop.mic_input("space up")
+            elif shop.kind == "headset":  # switch it on, each ear, mute, the volume, and talking
+                if not shop.mic_on:
+                    shop.mic_click(by_key["right_cup"], ("power",))
+                shop.hs_click(by_key["left_cup"], None)
+                shop.hs_click(by_key["right_cup"], None)
+                if "mute" in dict(shop.test_checks()):
+                    shop.hs_click(by_key["boom"], None)
+                    shop.hs_click(by_key["boom"], None)
+                shop.mic_try("volume")
+                shop.mic_input("space")
+                wait(1.6)
+                snap(f"{shop.spec['key']}_test", 0.0)
+                shop.mic_input("space up")
+            elif shop.kind == "computer":  # its buttons, its front USB, and its fans (or switching it on)
+                chassis = by_key["chassis"]
+                shop.pc_click(chassis, ("power",))
+                wait(2.0)
+                shop.pc_click(chassis, ("usb",))
+                for key in ("front_fan0", "front_fan1", "rear_fan"):
+                    if key in by_key:
+                        shop.pc_click(by_key[key], None)
+                wait(0.5)
+                snap(f"{shop.spec['key']}_test", 0.0)
+                shop.pc_click(chassis, ("reset",))
+                wait(1.6)
+            elif shop.kind == "keyboard":
+                for i in range(len(shop.caps)):
+                    shop.press_key(i)
+                    shop.release_key(i)
+                if shop.knob is not None and not shop.knob_turned:
+                    shop.turn_knob(1)
+            elif shop.kind == "mouse":
+                for check, _ in shop.mouse_checks():
+                    shop.mouse_try(check)
+            else:  # a mic: switch it on, mute it and back, tap it, and talk (with its gain set)
+                body = by_key["body"] if "body" in by_key else shop.parts[0]
+                if not shop.mic_on:
+                    shop.mic_click(body, ("power",))
+                if s == "gain":
+                    for _ in range(6):
+                        shop.turn_knob(1)
+                if "mute" in dict(shop.mic_checks()):
+                    shop.mic_click(body, ("mute",))
+                    shop.mic_click(body, ("mute",))
+                shop.mic_click(body, None)
+                shop.mic_input("space")
+                wait(2.2)
+                snap(f"{shop.spec['key']}_test", 0.0)
+                shop.mic_input("space up")
+
+    for kind in ("mic", "webcam", "headset", "computer"):
+        shop.show_menu()
+        shop.pick_kind(kind)
+        snap(f"3d_menu_{kind}s", 1.2)
+    for spec in [m for m in ALL_MODELS if m.get("special")]:
+        shop.start(spec)
+        wait(0.3)
+        if shop.kind in HEARS + ("computer",):
+            snap(f"{spec['key']}_start", 1.0)
+        act("start")
+        for _ in range(800):  # apart: whatever's free, each with its own tool
+            free = [p for p in reversed(shop.parts) if p.placed and not shop.above(p)]
+            if not free:
+                break
+            p = free[0]
+            if isinstance(p, KeyItem):
+                shop.pull(p)
+            elif p.twist:
+                shop.take_off(p)
+                wait(0.7)
+            else:
+                shop.lift_off(p)
+            act(p.key)
+        wait(0.6)
+        assert shop.phase == "build", f"{spec['key']}: still {shop.phase} after taking everything off"
+        if shop.kind in HEARS + ("computer",):
+            snap(f"{spec['key']}_apart", 0.2)
+        act("build")
+        for p in shop.parts:  # and back together
+            assert all(q.placed for q in p.below), f"{spec['key']}: {p.name} would go on before what it sits on"
+            if isinstance(p, KeyItem):
+                shop.put_key(p)
+            elif p.screw:
+                p.root.unstash()
+                p.placed = True
+                shop.dish_mesh.move(shop.screws.index(p), None)
+                shop.after_change()
+            else:
+                shop.put_on(p)
+        wait(1.0)
+        assert shop.phase == "test", f"{spec['key']}: phase is {shop.phase} once it's built"
+        act("test")
+        wait(0.2)
+        ok, tested = shop.special_ok(), shop.all_tested()
+        shop.finish_test()
+        if shop.kind in HEARS + ("computer",) or spec["key"] in ("tkl", "mouse_gaming"):
+            snap(f"{spec['key']}_result", 1.4)
+        print(f"{spec['key']:14} {SPECIALS[spec['special']][1]:14} job {'done' if ok else 'NOT DONE'},"
+              f" tested {'all' if tested else 'NOT ALL'}, {len(shop.parts)} parts")
+        assert ok, f"{spec['key']}: its own job ({spec['special']}) isn't done"
+        assert tested or shop.kind == "keyboard", f"{spec['key']}: not everything tested"
+    print("every job ok")
 
 
 if __name__ == "__main__":

@@ -24,7 +24,7 @@ from array import array
 
 RATE = 44100  # for the sound effects
 SLOW_RATE = 16000  # for the music and the rain: they're soft, so they don't need the high notes
-VERSION = 6  # bump to make them all again
+VERSION = 9  # bump to make them all again
 TAKES = 3  # how many takes there are of the sounds you hear most
 
 
@@ -128,10 +128,12 @@ TIN = [(1250, 0.045, 0.6), (2050, 0.03, 0.3), (3200, 0.018, 0.1)]  # the switch 
 WOOD = [(620, 0.018, 1.0), (1710, 0.01, 0.4), (3100, 0.006, 0.15)]  # a small wooden button
 BLOCK = [(380, 0.03, 1.0), (1050, 0.016, 0.45), (2300, 0.008, 0.15)]  # knocking on the desk
 CERAMIC = [(1960, 0.07, 0.6), (3420, 0.045, 0.3), (5300, 0.03, 0.1)]  # a little paint pot
+GLASS = [(1650, 0.06, 0.55), (2950, 0.04, 0.28), (4400, 0.025, 0.1)]  # a glass panel, set down gently
 
 # The big parts, by what they're made of: (what rings, how soft a tap)
 MATERIALS = {"plastic": (CASE, 0.002), "metal": (PLATE, 0.0015), "board": (BOARD, 0.0015),
-             "foam": (RUBBER, 0.006), "rubber": (RUBBER, 0.003), "cable": (PLUG, 0.0009)}
+             "foam": (RUBBER, 0.006), "rubber": (RUBBER, 0.003), "cable": (PLUG, 0.0009),
+             "glass": (GLASS, 0.0016)}
 
 
 # ---- keycaps and switches ----
@@ -333,6 +335,72 @@ def effect_mouse_click(v=0):
     return warm(b, 5500)
 
 
+def effect_ear(side):
+    """A headset's test: a soft two-note chime, in one ear only (a stereo file, silent on the other side)."""
+    def make(v=0):
+        b = bells([76, 72], 0.16, 0.45, 0.4)
+        quiet = [0.0] * len(b)
+        return (b, quiet) if side == "left" else (quiet, b)
+    return make
+
+
+def effect_shutter(v=0):
+    """A webcam taking a picture: a soft click-clack, and a breath of air."""
+    b = blank(0.22)
+    knock(b, 0, [(2400, 0.006, 1.0), (3900, 0.004, 0.3)], 1.0, 0.0006)
+    knock(b, 0.055, [(1800, 0.008, 1.0), (3100, 0.005, 0.3)], 0.6, 0.0008)
+    swish(b, 0.01, 0.12, 0.25, seed=61, low=900, high=3000)
+    return warm(b, 5500)
+
+
+def effect_sizzle(v=0):
+    """A soldering iron on a joint: a short, soft hiss as the solder flows, and a tiny crackle of flux."""
+    rnd = random.Random(62)
+    b = blank(0.5)
+    swish(b, 0, 0.42, 0.5, seed=62, low=1800, high=5200)
+    for _ in range(7):
+        bubble(b, rnd.uniform(0.04, 0.36), rnd.uniform(2400, 3600), rnd.uniform(0.05, 0.12))
+    return warm(b, 6000)
+
+
+def effect_pc_on(v=0):
+    """A desktop PC switched on: its fans hush up to speed, and its drive gives a soft tick."""
+    b = blank(1.6)
+    swish(b, 0.0, 1.5, 0.35, seed=71, low=120, high=700)
+    knock(b, 0.05, [(1500, 0.01, 1.0), (2600, 0.006, 0.3)], 0.3, 0.001)
+    return warm(b, 3000)
+
+
+def effect_pc_off(v=0):
+    """A desktop PC shutting down: its fans whirr softly to a stop."""
+    b = blank(1.3)
+    swish(b, 0.0, 1.2, 0.28, seed=72, low=100, high=500)
+    return warm(b, 2500)
+
+
+def effect_beep(v=0):
+    """The one short beep a PC gives when it starts and all's well: round and soft, not shrill."""
+    b = blank(0.4)
+    tone(b, 0.0, hz(84), 0.06, 0.22, attack=0.004, partials=((1, 1.0), (2, 0.08)), length=0.18)
+    return warm(b, 4000)
+
+
+def effect_usb_in(v=0):
+    """A USB stick found: a click as it goes in, and a soft two-note chime."""
+    b = blank(1.3)
+    knock(b, 0, [(2200, 0.006, 1.0), (3600, 0.004, 0.3)], 0.6, 0.0008)
+    tone(b, 0.18, hz(72), 0.22, 0.24, attack=0.006, partials=((1, 1.0), (2, 0.2)))
+    tone(b, 0.34, hz(79), 0.3, 0.24, attack=0.006, partials=((1, 1.0), (2, 0.2)))
+    return warm(b, 4500)
+
+
+def effect_fan_spin(v=0):
+    """A fan given a spin by hand: a soft whirr that slows away."""
+    b = blank(1.4)
+    swish(b, 0.0, 1.3, 0.3, seed=73, low=200, high=900)
+    return warm(b, 3000)
+
+
 def effect_turn(v=0):
     """The keyboard turned over in your hands: a soft hush as it moves."""
     b = blank(0.32)
@@ -428,6 +496,39 @@ def effect_fanfare(v=0):  # it's back together
     return b
 
 
+# ---- microphones ----
+
+def effect_thump(v=0):
+    """A finger tapping a mic's grille, heard through the mic: a deep, round thud, and the mesh's little ring."""
+    _, d = take(100, v)
+    b = blank(0.4)
+    knock(b, 0, [(95, 0.07, 1.0), (190, 0.04, 0.5), (420, 0.02, 0.25)], 1.0, 0.004, d)
+    knock(b, 0.002, [(2400, 0.01, 0.4), (3900, 0.006, 0.2)], 0.25, 0.0008, d)
+    return warm(b, 2500)
+
+
+def effect_voice(v=0):
+    """Someone saying "one, two" into a mic, the way a soundcheck goes: two hummed syllables, each with a voice's
+    vowel (its overtones loudest round the voice's own resonances) and a little falling pitch."""
+    _, d = take(110, v, 0.06)
+    b = blank(0.85)
+    for start, length, f_from, f_to in ((0.0, 0.3, 175, 150), (0.4, 0.34, 196, 160)):
+        s0, n = int(start * RATE), int(length * RATE)
+        phase = 0.0
+        for k in range(n):
+            t = k / RATE
+            f0 = (f_from + (f_to - f_from) * t / length) * d * (1 + 0.01 * math.sin(2 * math.pi * 5.5 * t))
+            phase += 2 * math.pi * f0 / RATE
+            env = min(1.0, t / 0.03, (length - t) / 0.07)
+            s = 0.0
+            for h in range(1, 13):
+                f = h * f0
+                s += (math.exp(-((f - 520) / 260) ** 2) + 0.55 * math.exp(-((f - 1150) / 320) ** 2) + 0.12 / h) * \
+                    math.sin(h * phase)
+            b[s0 + k] += 0.35 * env * s
+    return warm(b, 3200)
+
+
 # name: (how to make it, how many takes)
 EFFECTS = {
     "pop": (effect_pop, TAKES), "clack": (effect_clack, TAKES), "snick": (effect_snick, TAKES),
@@ -443,6 +544,11 @@ EFFECTS = {
     "nope": (effect_nope, 1), "swap": (effect_swap, 1), "fanfare": (effect_fanfare, 1),
     "chime": (lambda v=0: bells([72, 76, 79, 84], 0.09), 1),
     "sparkle": (lambda v=0: bells([88, 91, 95, 100], 0.05, 0.25, 0.22), 1),
+    "thump": (effect_thump, 2), "voice": (effect_voice, 2),
+    "ear_left": (effect_ear("left"), 1), "ear_right": (effect_ear("right"), 1),
+    "shutter": (effect_shutter, 1), "sizzle": (effect_sizzle, 1),
+    "pc_on": (effect_pc_on, 1), "pc_off": (effect_pc_off, 1), "beep": (effect_beep, 1), "usb_in": (effect_usb_in, 1),
+    "fan_spin": (effect_fan_spin, 1),
 }
 
 
@@ -516,12 +622,16 @@ def path(folder, name):
 
 
 def write_wav(file, samples, rate=RATE, peak=0.9):
+    """Write a sound out: one list of samples, or two (left and right) for a stereo one."""
+    stereo = isinstance(samples, tuple)
+    if stereo:  # (interleaved: left, right, left, right...)
+        samples = [x for pair in zip(*samples) for x in pair]
     top = max(1e-9, max(abs(s) for s in samples))
     scale = peak / top * 32767
     data = array("h", (int(s * scale) for s in samples))
     part = file + ".part"  # written whole, then renamed: the game never loads half a file
     with wave.open(part, "wb") as w:
-        w.setnchannels(1)
+        w.setnchannels(2 if stereo else 1)
         w.setsampwidth(2)
         w.setframerate(rate)
         w.writeframes(data.tobytes())
@@ -535,7 +645,8 @@ def make_effects(folder):
         for v, file in enumerate(files(name)):
             if not os.path.exists(path(folder, file)):
                 samples = make(v)
-                fade_out(samples)
+                for channel in (samples if isinstance(samples, tuple) else (samples,)):
+                    fade_out(channel)
                 write_wav(path(folder, file), samples)
 
 
