@@ -24,17 +24,19 @@ Each product also has a **special job**: a sum to type, a sticky key to clean, a
 | 3D models | None loaded from files: every part is built in code from boxes, cylinders and turned (lathe) shapes, each corner with its own colour |
 | Look | A custom "cozy" shader with soft lighting and shadows |
 | Pictures | The desk's wood, the cutting mat, the stickers under each product and the icons are drawn in code with Pillow when the game starts |
-| Sounds and music | Made in code by `fixer3d_sounds.py`: no sound files. They're written to a temp folder the first time the game runs |
-| Keyboard layouts | Borrowed from the 2D game, `fixer.py` |
+| Sounds and music | Made in code by `fixer3d_sounds.py`: no sound files. From Python, they're written to a temp folder the first time the game runs; the packaged app brings them with it, made when it was built |
 | Saved progress | `%APPDATA%\Fixer3D\save.json`: what you've fixed, your special stars, the trinkets you've found, your volume settings |
 
 All the keycaps of a keyboard are one mesh, and so are all its switches: a keycap comes off by moving just its own corners. That keeps a 104-key keyboard with hundreds of parts running fast.
 
 | File | What it is |
 | --- | --- |
-| `fixer3d.py` | Fixer 3D, the game this guide is about (about 6,150 lines) |
+| `fixer3d.py` | Fixer 3D, the game this guide is about (about 8,300 lines) |
 | `fixer3d_sounds.py` | Makes every sound and the music |
-| `fixer.py` | The original 2D game, made with pygame: fans, radios, keyboards and mice, as levels that each teach one real fault |
+| `requirements.txt` | What to install to run it from Python |
+| `build_app.py` | Builds Fixer 3D into a Windows app that plays without Python, zipped for itch.io |
+| `itch/` | The itch.io page: how to publish it, its text, cover and screenshots |
+| `DEVELOPING.md` | For working on the code: how it's laid out, how to test it, how to add a product |
 
 ## How to run it
 
@@ -43,11 +45,10 @@ All the keycaps of a keyboard are one mesh, and so are all its switches: a keyca
 | Fixer 3D | `python Fixer/fixer3d.py` |
 | Fixer 3D in a window | `python Fixer/fixer3d.py --windowed` |
 | Other options | `--fps N` sets the frame cap (120 by default, 0 for none); `--vsync` matches the monitor instead |
-| Fixer (2D) | `python Fixer/fixer.py` |
 
-Fixer 3D needs Python 3.12 or newer (Ursina 8 needs it), Ursina and pygame (it borrows the keyboard layouts from the 2D game): `pip install -r Fixer/requirements.txt`. Ursina brings Pillow with it. The 2D game needs only pygame.
+Fixer 3D needs Python 3.12 or newer (Ursina 8 needs it) and Ursina: `pip install -r Fixer/requirements.txt`. Ursina brings Pillow with it. Players don't need any of this: the app `build_app.py` makes runs on its own (see `itch/README.md`).
 
-Both are desktop games: they open their own window, so they run on Windows, macOS or Linux, not in a web browser.
+It's a desktop game: it opens its own window, so it runs on Windows, macOS or Linux from Python, not in a web browser. The packaged app is for Windows.
 
 ## The screens
 

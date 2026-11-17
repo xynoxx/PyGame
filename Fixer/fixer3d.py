@@ -3,8 +3,8 @@
 Pick a keyboard and take it all apart: every keycap and every switch one by one, the stabilisers, the plate, the
 foam, the circuit board, down to the bare case, with a screwdriver for the screws underneath. Brush out the crumbs
 (and find what was lost in there), build it back up in your own colours and switches, then type on it to test
-every key. fixer.py is the 2D game; this borrows its keyboard layouts. It needs the Ursina engine
-(pip install ursina), which brings Pillow with it; the sounds are made by fixer3d_sounds.py.
+every key. It needs the Ursina engine (pip install ursina), which brings Pillow with it; the sounds are
+made by fixer3d_sounds.py.
 
 Mouse: drag to turn it round (right button anywhere, or left on an empty spot), scroll to zoom. Click to use the
 tool in your hand: one click, one part, whether it's a keycap, a switch or a screw. The brush is the one you hold
@@ -32,10 +32,8 @@ import time
 from array import array
 from pathlib import Path
 
-os.environ.setdefault("PYGAME_HIDE_SUPPORT_PROMPT", "1")  # fixer.py imports pygame
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
-from fixer import KEY_LEGENDS, KEYBOARD_MODELS, keyboard_layout, shade  # noqa: E402
 
 import fixer3d_sounds  # noqa: E402
 import ursina  # noqa: E402
@@ -50,9 +48,78 @@ from ursina.lights import DirectionalLight  # noqa: E402
 from ursina.models.procedural.quad import Quad  # noqa: E402
 from ursina.shader import Shader  # noqa: E402
 
+FROZEN = getattr(sys, "frozen", False)  # running as the packaged app (built by build_app.py), not from Python
 CACHE = os.path.join(tempfile.gettempdir(), "fixer3d")  # made sounds, the window icon, fonts
-SOUNDS = os.path.join(CACHE, f"sounds{fixer3d_sounds.VERSION}")
+# The packaged app brings its sounds with it, made when it was built; from Python they're made the first time.
+BUNDLED_SOUNDS = os.path.join(getattr(sys, "_MEIPASS", HERE), "sounds")
+SOUNDS = BUNDLED_SOUNDS if FROZEN and os.path.isdir(BUNDLED_SOUNDS) else os.path.join(
+    CACHE, f"sounds{fixer3d_sounds.VERSION}")
 SAVE_FILE = os.path.join(os.environ.get("APPDATA") or os.path.expanduser("~"), "Fixer3D", "save.json")
+
+# ---- the first three keyboards, every keyboard's key layout, and a colour helper ----
+
+KEYBOARD_MODELS = [
+    dict(key="full", name="Full-size keyboard", size="full", keys=104, switch="red",
+         about="The classic office layout, with a number pad on the right. Its red switches are smooth and quiet.",
+         case=(46, 48, 56), cap=(70, 72, 82), mod=(54, 56, 64), legend=(226, 228, 236), accent=(214, 60, 56),
+         cable=(36, 36, 40)),
+    dict(key="tkl", name="Tenkeyless keyboard", size="tkl", keys=87, switch="brown",
+         about="A full keyboard without the number pad, so the mouse sits closer. Brown switches give a soft bump.",
+         case=(222, 222, 218), cap=(246, 244, 238), mod=(188, 190, 198), legend=(60, 62, 72), accent=(236, 150, 60),
+         cable=(236, 236, 230)),
+    dict(key="compact", name="Compact 60% keyboard", size="60", keys=61, switch="blue",
+         about="Tiny: no number pad, arrows or F keys (Fn reaches them). Its blue switches click with every press.",
+         case=(58, 74, 120), cap=(232, 226, 210), mod=(84, 132, 196), legend=(48, 52, 66), accent=(250, 205, 60),
+         cable=(250, 205, 60)),
+]
+KEY_LEGENDS = {"Up": "^", "Down": "v", "Left": "<", "Right": ">", "Space": ""}  # (what a key shows, where not its label)
+
+
+def shade(color, k):
+    """A darker (k < 1) or lighter (k > 1) version of a color."""
+    return tuple(max(0, min(255, round(c * k))) for c in color)
+
+
+def keyboard_layout(size):
+    """Every key on a keyboard of this size, in key widths ("units"): (label, x, y, w, h), and the width and height
+    of the whole layout. "full" has a number pad, "tkl" stops after the arrows, "60" is just the main block."""
+    keys = []
+    top = 0.0 if size == "60" else 1.25
+    if size != "60":  # the F row
+        keys.append(("Esc", 0, 0, 1, 1))
+        for i in range(12):
+            keys.append((f"F{i + 1}", 2 + i + (i // 4) * 0.5, 0, 1, 1))
+    rows = [[("Esc" if size == "60" else "`", 1)] + [(c, 1) for c in "1234567890-="] + [("Back", 2)],
+            [("Tab", 1.5)] + [(c, 1) for c in "QWERTYUIOP[]"] + [("\\", 1.5)],
+            [("Caps", 1.75)] + [(c, 1) for c in "ASDFGHJKL;'"] + [("Enter", 2.25)],
+            [("Shift", 2.25)] + [(c, 1) for c in "ZXCVBNM,./"] + [("Shift", 2.75)],
+            [("Ctrl", 1.25), ("Win", 1.25), ("Alt", 1.25), ("Space", 6.25), ("Alt", 1.25), ("Fn", 1.25),
+             ("Menu", 1.25), ("Ctrl", 1.25)]]
+    for r, row in enumerate(rows):
+        x = 0.0
+        for label, w in row:
+            keys.append((label, x, top + r, w, 1))
+            x += w
+    width = 15.0
+    if size != "60":  # the arrows and the keys above them
+        for i, label in enumerate(("PrtSc", "ScrLk", "Pause")):
+            keys.append((label, 15.25 + i, 0, 1, 1))
+        for r, labels in ((0, ("Ins", "Home", "PgUp")), (1, ("Del", "End", "PgDn"))):
+            for i, label in enumerate(labels):
+                keys.append((label, 15.25 + i, top + r, 1, 1))
+        keys.append(("Up", 16.25, top + 3, 1, 1))
+        for i, label in enumerate(("Left", "Down", "Right")):
+            keys.append((label, 15.25 + i, top + 4, 1, 1))
+        width = 18.25
+    if size == "full":  # the number pad
+        for label, x, y in (("Num", 0, 0), ("/", 1, 0), ("*", 2, 0), ("-", 3, 0), ("7", 0, 1), ("8", 1, 1),
+                            ("9", 2, 1), ("4", 0, 2), ("5", 1, 2), ("6", 2, 2), ("1", 0, 3), ("2", 1, 3),
+                            ("3", 2, 3), (".", 2, 4)):
+            keys.append((label, 18.5 + x, top + y, 1, 1))
+        keys += [("+", 21.5, top + 1, 1, 2), ("Ent", 21.5, top + 3, 1, 2), ("0", 18.5, top + 4, 2, 1)]
+        width = 22.5
+    return keys, width, top + 5
+
 
 # Sizes are in key widths: one key is 1 unit across (19 mm in real life). y is up; the front of the keyboard is -z.
 MARGIN = 0.55  # how far the case reaches past the keys
@@ -118,13 +185,13 @@ SIDED = {"Shift": "shift", "Ctrl": "control", "Alt": "alt"}
 # The cozy look: warm wood, cream paper, cocoa ink
 BACKDROP, CREAM, PAPER, PAPER_DARK = (40, 30, 26), (250, 244, 232), (236, 226, 208), (214, 200, 178)
 COCOA, MUTED, HONEY, HONEY_DARK = (74, 54, 44), (150, 128, 112), (238, 172, 84), (196, 120, 44)
-SAGE, ROSE, INK_LIGHT = (126, 170, 120), (222, 118, 108), (255, 252, 246)
+SAGE, ROSE = (126, 170, 120), (222, 118, 108)
 SUN = (206, 186, 160)  # the lamp's light
 GLOW = (255, 214, 120)  # a tested key's legend
 GRIME = (150, 124, 78)  # years of fingers: keycaps go yellow and a little greasy
 WASH_TIME = 1.4  # seconds the keycaps spend in the bowl
 
-# More keyboards, here in 3D (the first three are the 2D game's too). Each is a real kind, with something of its own:
+# More keyboards (after the first three, above). Each is a real kind, with something of its own:
 # grime is how many of its keycaps are grubby (1 for all of them), dirt how much more crumbs and dust it has.
 MORE_KEYBOARDS = [
     dict(key="numpad", name="Number pad", size="numpad", switch="pink", grime=0.25,
@@ -148,7 +215,7 @@ MORE_KEYBOARDS = [
          cable=(214, 204, 178),
          intro="An old office keyboard, yellowed and dusty: wash its keycaps in the bowl before they go back on."),
 ]
-# Computer mice: the 2D game's three kinds, with their insides. size is (width, length, height) in key widths (an
+# Computer mice: three kinds, with their insides. size is (width, length, height) in key widths (an
 # office mouse is about 65 x 120 x 38 mm); feet is how many skates are on the bottom, each over a screw.
 MICE = [
     dict(kind="mouse", key="mouse_office", name="Office mouse", size=(3.4, 6.3, 1.95), feet=2,
@@ -433,7 +500,7 @@ def grubby(body, legend):
 
 def layout_for(size):
     """Every key on a keyboard of this size, in key widths: (label, x, y, w, h), and the layout's width and height.
-    The full-size, tenkeyless and 60% layouts are the 2D game's; these are the rest:
+    The full-size, tenkeyless and 60% layouts are keyboard_layout's; these are the rest:
     "numpad", the number pad on its own; "65", a 60% with a column of keys down the right and the arrows tucked in
     under it; "75", the same with a tight row of F keys on top; "96", the 75% with a number pad beside it."""
     if size in ("full", "tkl", "60"):
@@ -3265,7 +3332,6 @@ def build_headset(board, part, spec, rnd, extras):
     cz, top = -0.5, 1.7 if gaming else 1.55
     zb, depth = cz + R + 0.65, 2.4
     angles = (45, 135, 225, 315) if gaming else (30, 150, 270)
-    cushion_col = spec["bottom"]
     path = [(-X * math.cos(math.pi * k / 30), zb + 0.5 + depth * math.sin(math.pi * k / 30)) for k in range(31)]
     band = part("headband", "headband")
     ribbon(band.colour("case", None), path, 0.06, 0.84, 0.22)
@@ -4292,7 +4358,7 @@ class Sounds:
         self.next_check = 0.0
         if not enabled:
             return
-        if os.path.isdir(CACHE):  # sounds made by an older version of the game
+        if os.path.isdir(CACHE) and SOUNDS != BUNDLED_SOUNDS:  # sounds made by an older version of the game
             for name in os.listdir(CACHE):
                 old = os.path.join(CACHE, name)
                 if name.startswith("sounds") and name[6:].isdigit() and old != SOUNDS:
@@ -4300,8 +4366,10 @@ class Sounds:
         if not all(os.path.exists(fixer3d_sounds.path(SOUNDS, n)) for n in [*fixer3d_sounds.ALL_FILES, "rain", "music"]):
             try:
                 flags = getattr(subprocess, "CREATE_NO_WINDOW", 0)
-                subprocess.Popen([sys.executable, os.path.join(HERE, "fixer3d_sounds.py"), SOUNDS],
-                                 creationflags=flags)
+                # the packaged app is its own Python: it makes them when it's started with --make-sounds
+                command = ([sys.executable, "--make-sounds", SOUNDS] if FROZEN else
+                           [sys.executable, os.path.join(HERE, "fixer3d_sounds.py"), SOUNDS])
+                subprocess.Popen(command, creationflags=flags)
             except OSError:
                 fixer3d_sounds.make_effects(SOUNDS)
 
@@ -7858,6 +7926,11 @@ def cap_frame_rate(fps):
 
 def main():
     args = sys.argv[1:]
+    if "--make-sounds" in args:  # the packaged app, asked to make its sounds (see Sounds)
+        folder = args[args.index("--make-sounds") + 1]
+        fixer3d_sounds.make_effects(folder)
+        fixer3d_sounds.make_ambience(folder)
+        return
     shots = args[args.index("--shot") + 1] if "--shot" in args else None
     fps = int(args[args.index("--fps") + 1]) if "--fps" in args else 120
     vsync = "--vsync" in args  # wait for the monitor instead: no tearing, but no faster than it refreshes
@@ -8223,5 +8296,21 @@ def every_job(shop, wait, snap):
     print("every job ok")
 
 
+def main_logging_crashes():
+    """The packaged app has no console to show what went wrong: write it to a crash log next to the save file
+    (where a player can find it and send it in), then let it fail as it would have."""
+    try:
+        main()
+    except Exception:
+        import traceback
+        try:
+            os.makedirs(os.path.dirname(SAVE_FILE), exist_ok=True)
+            with open(os.path.join(os.path.dirname(SAVE_FILE), "crash.log"), "a", encoding="utf-8") as f:
+                f.write(time.strftime("---- %Y-%m-%d %H:%M:%S\n") + traceback.format_exc() + "\n")
+        except OSError:
+            pass
+        raise
+
+
 if __name__ == "__main__":
-    main()
+    main_logging_crashes() if FROZEN else main()
