@@ -1,14 +1,15 @@
-"""The square map: bare ground, each team's HQ, and finding a way across it.
+"""The square map: which tiles are blocked (by the HQ or a turret), finding a
+way across it, and whether a shot can fly between two points.
 
 The map is MAP_SIZE x MAP_SIZE tiles, each one unit wide. Tile (i, j) covers
-x in [i, i+1] and z in [j, j+1]; the ground is at height 0.
+x in [i, i+1] and z in [j, j+1]; the ground is at height 0. Off the map there
+are no walls: the zombies walk in from out there.
 """
 import heapq
 import math
 from collections import namedtuple
 
-MAP_SIZE = 64
-START_INSET = 8            # how far each start sits from its corner
+MAP_SIZE = 96
 DIAGONAL = math.sqrt(2)
 
 HQ_WIDTH, HQ_DEPTH = 5, 4  # tiles the HQ stands on; its door faces +Z
@@ -25,61 +26,48 @@ def hash01(i, j, seed):
     return ((n ^ (n >> 16)) & 0xFFFFFFFF) / 0xFFFFFFFF
 
 
-def value_noise(x, z, seed):
-    """Smooth noise in 0..1, used to vary the ground colour across the map."""
-    i, j = math.floor(x), math.floor(z)
-    fx, fz = x - i, z - j
-    fx, fz = fx * fx * (3 - 2 * fx), fz * fz * (3 - 2 * fz)
-    a, b = hash01(i, j, seed), hash01(i + 1, j, seed)
-    c, d = hash01(i, j + 1, seed), hash01(i + 1, j + 1, seed)
-    top = a + (b - a) * fx
-    bottom = c + (d - c) * fx
-    return top + (bottom - top) * fz
-
-
 class World:
-    def __init__(self, size=MAP_SIZE, seed=7):
+    def __init__(self, size=MAP_SIZE):
         self.size = size
-        self.seed = seed
         self.blocked = [False] * (size * size)
-        far = size - START_INSET - 0.5
-        near = START_INSET + 0.5
-        # One start per corner. Only the player uses theirs for now; the ally
-        # and the two enemies will take the others.
-        self.starts = {
-            "player": (near, far),
-            "ally": (far, far),
-            "enemy 1": (near, near),
-            "enemy 2": (far, near),
-        }
         self.hqs = {}
         self.spawns = {}
-        self.plaza = set()         # concrete tiles round the HQs
-        self.build_hq("player")
-        self.reachable = self._flood(tuple(int(v) for v in self.spawns["player"]))
+        self.aprons = {}           # the concrete round each HQ: x0, z0, x1, z1
+        self.reachable = set()     # tiles the player can walk to, worked out once their HQ is built
 
     # ------------------------------------------------------------ building the map
 
-    def build_hq(self, owner):
-        """Put an HQ on a start, with a concrete apron, and a spawn point at its door."""
-        sx, sz = self.starts[owner]
-        i0, j0 = int(sx) - HQ_WIDTH // 2, int(sz) - HQ_DEPTH // 2
+    @staticmethod
+    def hq_tiles_at(x, z):
+        """The tile an HQ's corner goes on when it's centred as near (x, z) as the tiles allow."""
+        return round(x - HQ_WIDTH / 2), round(z - HQ_DEPTH / 2)
+
+    @staticmethod
+    def apron_of(i0, j0):
+        """The concrete round an HQ on tile (i0, j0): x0, z0, x1, z1 (one more tile in front of its door)."""
+        return (i0 - APRON, j0 - APRON, i0 + HQ_WIDTH + APRON, j0 + HQ_DEPTH + APRON + 1)
+
+    def can_build_hq(self, i0, j0):
+        """An HQ fits if it and its concrete are on the map, and nothing else is in the way."""
+        x0, z0, x1, z1 = self.apron_of(i0, j0)
+        if x0 < 0 or z0 < 0 or x1 > self.size or z1 > self.size:
+            return False
+        return not any(self.is_blocked(i, j)
+                       for i in range(i0, i0 + HQ_WIDTH) for j in range(j0, j0 + HQ_DEPTH))
+
+    def build_hq(self, owner, i0, j0):
+        """Build an HQ with its corner on tile (i0, j0), its concrete, and a spawn point at its door."""
         hq = HQ(owner, i0, j0, HQ_WIDTH, HQ_DEPTH)
         self.hqs[owner] = hq
         n = self.size
         for i in range(i0, i0 + hq.w):
             for j in range(j0, j0 + hq.d):
                 self.blocked[j * n + i] = True
-        i_lo, i_hi = i0 - APRON, i0 + hq.w + APRON - 1
-        j_lo, j_hi = j0 - APRON, j0 + hq.d + APRON
-        for i in range(i_lo, i_hi + 1):
-            for j in range(j_lo, j_hi + 1):
-                edge = i in (i_lo, i_hi) or j in (j_lo, j_hi)
-                if edge and hash01(i, j, self.seed + 21) < 0.35:
-                    continue       # broken slabs round the edge
-                if 0 <= i < n and 0 <= j < n:
-                    self.plaza.add((i, j))
+        self.aprons[owner] = self.apron_of(i0, j0)
         self.spawns[owner] = (i0 + hq.w / 2, j0 + hq.d + 1.5)
+        if owner == "player":
+            self.reachable = self._flood(tuple(int(v) for v in self.spawns[owner]))
+        return hq
 
     # ------------------------------------------------------------ asking about the map
 
@@ -124,6 +112,41 @@ class World:
                     if (x - cx) ** 2 + (z - cz) ** 2 < r * r:
                         return False
         return True
+
+    def hits_wall(self, x, z, r):
+        """Does something round, of radius r, at (x, z) overlap a blocked tile? (Off the map
+        there are none: the dead walk in from out there.)"""
+        n = self.size
+        for i in range(max(int(x - r), 0), min(int(x + r), n - 1) + 1):
+            for j in range(max(int(z - r), 0), min(int(z + r), n - 1) + 1):
+                if self.blocked[j * n + i]:
+                    cx = min(max(x, i), i + 1)
+                    cz = min(max(z, j), j + 1)
+                    if (x - cx) ** 2 + (z - cz) ** 2 < r * r:
+                        return True
+        return False
+
+    def line_clear(self, x0, z0, x1, z1, skip=None):
+        """Can a shot fly straight from one point to the other without hitting a wall?
+        `skip` is a tile the shot may cross (the one a turret firing it stands on)."""
+        steps = max(1, int(math.hypot(x1 - x0, z1 - z0) / 0.25))
+        n = self.size
+        for k in range(1, steps):
+            t = k / steps
+            x, z = x0 + (x1 - x0) * t, z0 + (z1 - z0) * t
+            if 0 <= x < n and 0 <= z < n and self.blocked[int(z) * n + int(x)] and (int(x), int(z)) != skip:
+                return False
+        return True
+
+    def can_build_turret(self, i, j):
+        """A turret needs one free tile on the map."""
+        return 0 <= i < self.size and 0 <= j < self.size and not self.is_blocked(i, j)
+
+    def set_blocked(self, i, j, blocked):
+        """Put something on a tile, or take it away, and work out afresh where the player's units can walk."""
+        self.blocked[j * self.size + i] = blocked
+        if "player" in self.spawns:
+            self.reachable = self._flood(tuple(int(v) for v in self.spawns["player"]))
 
     def segment_free(self, x0, z0, x1, z1, r):
         """Can something of radius r walk straight from one point to the other?"""

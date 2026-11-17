@@ -42,11 +42,6 @@ def v_norm(a):
     return (a[0] / length, a[1] / length, a[2] / length)
 
 
-def mix(a, b, t):
-    """Blend two colours (or any tuples) by t in 0..1."""
-    return tuple(x + (y - x) * t for x, y in zip(a, b))
-
-
 def clamp(x, lo, hi):
     return lo if x < lo else hi if x > hi else x
 
@@ -144,3 +139,11 @@ def look_at(eye, target, up):
 
 def to_bytes(m):
     return array("f", m).tobytes()
+
+
+def apply(m, p):
+    """Where the point p ends up after the matrix m (a position, so it's moved too)."""
+    x, y, z = p
+    return (m[0] * x + m[4] * y + m[8] * z + m[12],
+            m[1] * x + m[5] * y + m[9] * z + m[13],
+            m[2] * x + m[6] * y + m[10] * z + m[14])

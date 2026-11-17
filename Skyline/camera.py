@@ -5,7 +5,7 @@ import mathx
 
 
 class RTSCamera:
-    MIN_DIST, MAX_DIST = 8.0, 48.0
+    MIN_DIST, MAX_DIST = 8.0, 72.0
 
     def __init__(self, map_size, aspect):
         self.map_size = map_size
@@ -93,6 +93,16 @@ class RTSCamera:
         ny = (1 - 2 * my / height) * half
         d = mathx.v_add(fwd, mathx.v_add(mathx.v_scale(right, nx), mathx.v_scale(up, ny)))
         return eye, mathx.v_norm(d)
+
+    def to_screen(self, x, y, z, width, height, view_proj=None):
+        """Where a point in the world shows on the screen, in pixels, or None if it's behind the camera."""
+        m = view_proj or self.view_proj()
+        cx = m[0] * x + m[4] * y + m[8] * z + m[12]
+        cy = m[1] * x + m[5] * y + m[9] * z + m[13]
+        cw = m[3] * x + m[7] * y + m[11] * z + m[15]
+        if cw <= 1e-6:
+            return None
+        return (cx / cw + 1) * 0.5 * width, (1 - cy / cw) * 0.5 * height
 
     def ground_point(self, mx, my, width, height):
         """Where on the ground (y = 0) the mouse points, as (x, z), or None for the sky."""

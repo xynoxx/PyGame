@@ -1,79 +1,18 @@
-"""Builds the low-poly meshes: the bare ground, the HQ and the commander.
+"""Builds the low-poly meshes: the HQ, the soldier and the engineer (and their
+guns), the turret, the zombies, and the marks drawn on the ground.
 
-The look is a zombie apocalypse: dead grass, bare dirt, scorch marks and old
-stains, a fortified concrete HQ, and a commander in black tactical gear.
+Everything is made of boxes (and a cone or two) with a colour per face, built
+in code: there are no model files. People share one skeleton: a body standing
+on y = 0 facing +Z, legs hung from hips at y = 0.42 (x = +-0.1) and arms from
+shoulders at y = 0.80 (x = +-0.29), so main.Game can swing them. The look is a
+zombie apocalypse. (The ground isn't a mesh: gfx.GROUND_FS paints it.)
 """
 from gfx import MeshBuilder
-from mathx import mix
-from world import hash01, value_noise
-
-# the ground
-DEAD_GRASS_DARK = (0.27, 0.29, 0.19)
-DEAD_GRASS = (0.40, 0.39, 0.25)
-DRY_GRASS = (0.52, 0.47, 0.31)
-DIRT = (0.36, 0.29, 0.21)
-MUD = (0.23, 0.20, 0.16)
-SCORCH = (0.13, 0.12, 0.11)
-OLD_BLOOD = (0.30, 0.12, 0.10)
-CONCRETE = (0.53, 0.52, 0.49)
-
-ISLAND_DEPTH = 3.0
+from world import hash01
 
 
 def shade(color, k):
     return tuple(min(1.0, c * k) for c in color)
-
-
-def ramp(v, start, width):
-    """0 below `start`, rising to 1 at `start + width`."""
-    return min(1.0, max(0.0, (v - start) / width))
-
-
-# ---------------------------------------------------------------- the map
-
-def build_ground(world):
-    """The ground tiles, and the dirt sides of the slab the map stands on."""
-    mb = MeshBuilder()
-    n, seed = world.size, world.seed
-
-    def ground(x, z):
-        col = mix(DEAD_GRASS_DARK, DEAD_GRASS, value_noise(x / 9, z / 9, seed + 1))
-        col = mix(col, DRY_GRASS, ramp(value_noise(x / 5, z / 5, seed + 2), 0.55, 0.4))
-        col = mix(col, DIRT, ramp(value_noise(x / 7, z / 7, seed + 3), 0.52, 0.25))
-        col = mix(col, MUD, 0.8 * ramp(value_noise(x / 4, z / 4, seed + 4), 0.72, 0.15))
-        col = mix(col, SCORCH, 0.9 * ramp(value_noise(x / 3.2, z / 3.2, seed + 8), 0.80, 0.12))
-        col = mix(col, OLD_BLOOD, 0.75 * ramp(value_noise(x / 2.1, z / 2.1, seed + 11), 0.86, 0.08))
-        return col
-
-    corner = [[ground(i, j) for j in range(n + 1)] for i in range(n + 1)]
-    for j in range(n):
-        for i in range(n):
-            if (i, j) in world.plaza:
-                # cracked concrete slabs, some stained with oil or soot
-                k = 1 + (hash01(i, j, seed + 5) - 0.5) * 0.16
-                colors = shade(CONCRETE, k)
-                stain = hash01(i, j, seed + 6)
-                if stain > 0.88:
-                    colors = mix(colors, SCORCH, 0.15 + (stain - 0.88) * 1.2)
-            else:
-                k = 1 + (hash01(i, j, seed + 3) - 0.5) * 0.06
-                colors = [shade(corner[i][j], k), shade(corner[i + 1][j], k),
-                          shade(corner[i + 1][j + 1], k), shade(corner[i][j + 1], k)]
-            mb.quad((i, 0, j), (i + 1, 0, j), (i + 1, 0, j + 1), (i, 0, j + 1), (0, 1, 0), colors)
-
-    # the sides of the slab, in bands, one strip per tile so the colour can vary
-    bands = [(0.0, -0.25, (0.30, 0.29, 0.20)), (-0.25, -1.6, (0.35, 0.28, 0.20)),
-             (-1.6, -ISLAND_DEPTH, (0.25, 0.22, 0.20))]
-    for k in range(n):
-        for top, bottom, color in bands:
-            c = shade(color, 1 + (hash01(k, int(top * 10), seed + 6) - 0.5) * 0.1)
-            mb.quad((k, top, 0), (k + 1, top, 0), (k + 1, bottom, 0), (k, bottom, 0), (0, 0, -1), c)
-            mb.quad((k, top, n), (k, bottom, n), (k + 1, bottom, n), (k + 1, top, n), (0, 0, 1), c)
-            mb.quad((0, top, k), (0, bottom, k), (0, bottom, k + 1), (0, top, k + 1), (-1, 0, 0), c)
-            mb.quad((n, top, k), (n, top, k + 1), (n, bottom, k + 1), (n, bottom, k), (1, 0, 0), c)
-    mb.quad((0, -ISLAND_DEPTH, 0), (0, -ISLAND_DEPTH, n), (n, -ISLAND_DEPTH, n), (n, -ISLAND_DEPTH, 0),
-            (0, -1, 0), (0.22, 0.19, 0.17))
-    return mb
 
 
 # ---------------------------------------------------------------- the HQ
@@ -218,76 +157,237 @@ def build_hq(hq, team):
     return mb
 
 
-# ---------------------------------------------------------------- the commander
+# ---------------------------------------------------------------- colours the people share
 
 SKIN = (0.86, 0.68, 0.54)
-BLACK = (0.10, 0.10, 0.11)
-CARRIER = (0.15, 0.15, 0.16)
-POUCH = (0.20, 0.20, 0.21)
-STRAP = (0.06, 0.06, 0.07)
 GUNMETAL = (0.18, 0.19, 0.20)
-LENS = (0.20, 0.55, 0.45)
 
 
-def build_commander(team):
-    """The commander in black tactical gear, in parts so the arms and legs can swing.
+# ---------------------------------------------------------------- the soldier
 
-    Returns (body, leg, arm). The body stands on y = 0 and faces +Z. A leg hangs
-    down from its hip at y = 0, an arm from its shoulder at y = 0. The team's
-    colour is on the armbands, the chest and back patches and the helmet band.
-    """
-    light = shade(team, 1.3)
+OLIVE = (0.33, 0.36, 0.23)
+OLIVE_DARK = (0.25, 0.28, 0.18)
+KHAKI = (0.47, 0.42, 0.30)
+KHAKI_DARK = (0.38, 0.34, 0.24)
+BOOT = (0.17, 0.13, 0.10)
 
+
+def build_soldier(team):
+    """A rifleman in olive fatigues and a khaki vest, in parts (the shared skeleton: see the top; same
+    joints, so they walk the same way). The team's colour is on the armbands, the chest
+    patch and the helmet band. Returns (body, leg, arm)."""
     body = MeshBuilder()
-    body.box(0, 0.36, 0, 0.36, 0.12, 0.21, BLACK)                     # hips
-    body.box(0, 0.40, 0, 0.38, 0.07, 0.23, STRAP)                     # belt
-    body.box(0, 0.415, 0.116, 0.06, 0.045, 0.01, GUNMETAL)            # buckle
+    body.box(0, 0.36, 0, 0.35, 0.12, 0.20, OLIVE_DARK)                # hips
+    body.box(0, 0.40, 0, 0.37, 0.06, 0.22, KHAKI_DARK)                # belt
+    body.box(0, 0.46, 0, 0.35, 0.37, 0.19, OLIVE)                     # shirt
+    body.box(0, 0.49, 0, 0.38, 0.31, 0.24, KHAKI)                     # vest
+    for k in (-1, 1):
+        body.box(k * 0.09, 0.50, 0.135, 0.11, 0.12, 0.035, KHAKI_DARK)   # vest pockets
+    body.box(0.10, 0.70, 0.123, 0.09, 0.06, 0.01, team)               # chest patch
     for side in (-1, 1):
-        body.box(side * 0.20, 0.33, 0.02, 0.05, 0.13, 0.10, POUCH)    # belt pouches
-    body.box(0, 0.47, 0, 0.36, 0.36, 0.20, BLACK)                     # shirt
-    body.box(0, 0.50, 0, 0.39, 0.30, 0.25, CARRIER)                   # plate carrier
+        body.box(side * 0.19, 0.31, 0.03, 0.05, 0.12, 0.09, KHAKI_DARK)  # belt pouches
+    body.box(0, 0.83, 0, 0.11, 0.03, 0.11, SKIN)                      # neck
+    body.box(0, 0.84, 0, 0.20, 0.20, 0.20, SKIN)                      # head
     for side in (-1, 1):
-        body.box(side * 0.12, 0.80, 0, 0.08, 0.03, 0.25, STRAP)       # shoulder straps
-    for k in (-1, 0, 1):
-        body.box(k * 0.095, 0.51, 0.14, 0.085, 0.13, 0.04, POUCH)    # magazine pouches
-    body.box(0, 0.67, 0.128, 0.14, 0.08, 0.01, team)                  # chest patch
-    body.box(-0.015, 0.73, -0.128, 0.12, 0.06, 0.01, team)            # back patch
-    body.box(0, 0.83, 0, 0.12, 0.03, 0.12, BLACK)                     # neck
-    body.box(0, 0.84, 0, 0.21, 0.21, 0.21, BLACK)                     # head, in a balaclava
-    body.box(0, 0.905, 0.1, 0.16, 0.07, 0.02, SKIN)                   # the eye opening
-    for side in (-1, 1):
-        body.box(side * 0.045, 0.925, 0.111, 0.035, 0.03, 0.002, (0.08, 0.08, 0.10))   # eyes
-    body.box(0, 0.98, -0.005, 0.25, 0.11, 0.24, GUNMETAL)             # helmet
-    body.box(0, 0.98, -0.005, 0.255, 0.025, 0.245, team)              # helmet band
-    for side in (-1, 1):
-        body.box(side * 0.115, 0.90, -0.01, 0.03, 0.09, 0.14, GUNMETAL)  # ear protectors
-    body.box(0, 1.00, 0.125, 0.07, 0.05, 0.02, STRAP)                 # night-vision mount
-    body.box(0, 0.995, 0.140, 0.10, 0.03, 0.01, LENS)
-
-    # on the back: a rifle on its sling (muzzle up past the shoulder) and a radio
-    body.box(0.09, 0.38, -0.155, 0.05, 0.70, 0.05, GUNMETAL)          # rifle
-    body.box(0.09, 0.38, -0.155, 0.06, 0.13, 0.06, STRAP)             # stock
-    body.box(0.09, 0.56, -0.195, 0.04, 0.12, 0.04, STRAP)             # magazine
-    body.box(-0.09, 0.52, -0.16, 0.11, 0.20, 0.06, POUCH)             # radio
-    body.box(-0.12, 0.72, -0.16, 0.015, 0.36, 0.015, STRAP)           # radio antenna
+        body.box(side * 0.045, 0.925, 0.101, 0.035, 0.03, 0.005, (0.10, 0.09, 0.08))   # eyes
+    body.box(0, 0.86, 0.101, 0.07, 0.015, 0.005, (0.55, 0.40, 0.32))  # mouth
+    body.box(0, 0.97, -0.005, 0.25, 0.11, 0.25, OLIVE_DARK, top=OLIVE)  # helmet
+    body.box(0, 0.965, 0.0, 0.27, 0.03, 0.27, OLIVE_DARK)             # its rim
+    body.box(0, 1.00, -0.005, 0.255, 0.025, 0.255, team)              # helmet band
+    body.box(0, 0.50, -0.165, 0.22, 0.26, 0.08, KHAKI_DARK)           # pack
+    body.box(0, 0.76, -0.16, 0.20, 0.06, 0.07, OLIVE_DARK)            # rolled blanket on it
 
     leg = MeshBuilder()
-    leg.box(0, -0.42, 0, 0.13, 0.42, 0.15, BLACK)                     # trousers
-    leg.box(0, -0.25, 0.02, 0.135, 0.08, 0.15, STRAP)                 # knee pad
-    leg.box(0, -0.12, 0, 0.14, 0.035, 0.16, STRAP)                    # thigh strap
-    leg.box(0, -0.42, 0.02, 0.145, 0.11, 0.19, STRAP, top=GUNMETAL)  # boot
+    leg.box(0, -0.42, 0, 0.13, 0.42, 0.15, OLIVE)                     # trousers
+    leg.box(0.0, -0.20, 0.0, 0.135, 0.09, 0.155, OLIVE_DARK)          # thigh pocket
+    leg.box(0, -0.42, 0.02, 0.145, 0.11, 0.19, BOOT)                  # boot
 
     arm = MeshBuilder()
-    arm.box(0, -0.36, 0, 0.11, 0.36, 0.12, BLACK)                     # sleeve
+    arm.box(0, -0.36, 0, 0.11, 0.36, 0.12, OLIVE)                     # sleeve
     arm.box(0, -0.12, 0, 0.115, 0.045, 0.125, team)                   # armband
-    arm.box(0, -0.44, 0, 0.09, 0.09, 0.09, STRAP)                     # glove
+    arm.box(0, -0.44, 0, 0.09, 0.09, 0.09, SKIN)                      # hand
     return body, leg, arm
+
+
+def build_rifle():
+    """The soldier's rifle, held in his hands: it lies along +Z from its grip at the
+    origin, the stock behind, the muzzle at z = 0.62 (RIFLE_MUZZLE)."""
+    mb = MeshBuilder()
+    wood = (0.33, 0.24, 0.15)
+    mb.box(0, -0.035, 0.22, 0.045, 0.07, 0.62, GUNMETAL)              # body and barrel
+    mb.box(0, -0.06, -0.17, 0.05, 0.10, 0.20, wood)                   # stock
+    mb.box(0, -0.13, 0.10, 0.04, 0.10, 0.06, GUNMETAL)                # magazine
+    mb.box(0, -0.05, 0.38, 0.05, 0.05, 0.16, wood)                    # handguard
+    mb.box(0, 0.035, 0.02, 0.02, 0.025, 0.05, GUNMETAL)               # rear sight
+    return mb
+
+
+RIFLE_MUZZLE = (0.0, 0.0, 0.62)
+
+ZOMBIE_SKIN = (0.58, 0.64, 0.50)
+ZOMBIE_SHIRTS = [(0.52, 0.48, 0.42), (0.36, 0.42, 0.52), (0.55, 0.30, 0.26)]
+ZOMBIE_TROUSERS = [(0.26, 0.28, 0.34), (0.34, 0.30, 0.24), (0.22, 0.22, 0.22)]
+GORE = (0.36, 0.08, 0.07)
+
+
+def build_zombie(variant):
+    """A shambling dead man in torn clothes, in parts like a soldier (same joints). Three looks,
+    by variant. Returns (body, leg, arm); the arms are drawn reaching forward."""
+    shirt, trousers = ZOMBIE_SHIRTS[variant % 3], ZOMBIE_TROUSERS[variant % 3]
+    torn = shade(shirt, 0.75)
+    body = MeshBuilder()
+    body.box(0, 0.36, 0, 0.34, 0.12, 0.20, trousers)                  # hips
+    body.box(0, 0.46, 0, 0.36, 0.36, 0.20, shirt)                     # shirt
+    body.box(0.06, 0.46, 0.0, 0.18, 0.10, 0.205, torn)                # its ragged hem
+    body.box(-0.08, 0.60, 0.096, 0.12, 0.14, 0.01, GORE)              # old blood down the front
+    body.box(0.10, 0.70, 0.096, 0.07, 0.06, 0.01, GORE)
+    body.box(0.0, 0.58, -0.096, 0.16, 0.10, 0.01, ZOMBIE_SKIN)        # skin through a tear at the back
+    body.box(0, 0.82, 0.01, 0.11, 0.04, 0.11, ZOMBIE_SKIN)            # neck
+    body.box(0.02, 0.84, 0.03, 0.20, 0.20, 0.20, ZOMBIE_SKIN)         # head, hanging forward
+    for side in (-1, 1):
+        body.box(0.02 + side * 0.045, 0.93, 0.131, 0.04, 0.035, 0.005, (0.85, 0.80, 0.55))   # pale eyes
+    body.box(0.02, 0.865, 0.131, 0.09, 0.03, 0.005, (0.20, 0.06, 0.05))   # open mouth
+    body.box(0.02, 1.03, 0.02, 0.21, 0.02, 0.19, (0.16, 0.14, 0.12))  # what's left of the hair
+    body.box(-0.07, 1.04, -0.03, 0.08, 0.02, 0.08, ZOMBIE_SKIN)       # a bald patch
+
+    leg = MeshBuilder()
+    leg.box(0, -0.42, 0, 0.13, 0.42, 0.15, trousers)
+    leg.box(0, -0.28, 0.0, 0.135, 0.08, 0.155, shade(trousers, 0.7))  # a rip
+    leg.box(0, -0.42, 0.02, 0.14, 0.09, 0.18, (0.20, 0.17, 0.14))     # shoe
+
+    arm = MeshBuilder()
+    arm.box(0, -0.30, 0, 0.11, 0.30, 0.12, shirt)                     # sleeve
+    arm.box(0, -0.44, 0, 0.09, 0.14, 0.09, ZOMBIE_SKIN)               # bare forearm and hand
+    arm.box(0, -0.40, 0.046, 0.06, 0.05, 0.005, GORE)
+    return body, leg, arm
+
+
+# ---------------------------------------------------------------- the engineer, and what he builds
+
+HIVIS = (0.95, 0.48, 0.10)
+REFLECTIVE = (0.86, 0.87, 0.84)
+HARD_HAT = (0.96, 0.78, 0.14)
+WORKWEAR = (0.24, 0.27, 0.32)
+LEATHER = (0.36, 0.24, 0.14)
+GLOVE = (0.62, 0.50, 0.32)
+
+
+def build_engineer(team):
+    """An engineer in dark workwear, an orange hi-vis vest with silver stripes, a yellow hard
+    hat and a tool belt, in parts like a soldier (same joints). The team's colour is on the
+    armbands and the hat's band. Returns (body, leg, arm)."""
+    body = MeshBuilder()
+    body.box(0, 0.36, 0, 0.35, 0.12, 0.20, WORKWEAR)                  # hips
+    body.box(0, 0.40, 0, 0.38, 0.07, 0.23, LEATHER)                   # tool belt
+    for side, w in ((-1, 0.07), (1, 0.06)):
+        body.box(side * 0.15, 0.30, 0.08, w, 0.12, 0.06, shade(LEATHER, 0.85))   # its pouches
+    body.box(0.07, 0.24, 0.125, 0.03, 0.16, 0.015, STEEL)             # a wrench hung on it
+    body.box(0, 0.46, 0, 0.35, 0.37, 0.19, WORKWEAR)                  # shirt
+    body.box(0, 0.48, 0, 0.375, 0.32, 0.225, HIVIS)                   # hi-vis vest
+    for y in (0.54, 0.66):
+        body.box(0, y, 0, 0.38, 0.03, 0.23, REFLECTIVE)               # its stripes, all round
+    for side in (-1, 1):
+        body.box(side * 0.10, 0.48, 0.0, 0.03, 0.32, 0.23, REFLECTIVE)   # and up over the shoulders
+    body.box(0, 0.83, 0, 0.11, 0.03, 0.11, SKIN)                      # neck
+    body.box(0, 0.84, 0, 0.20, 0.20, 0.20, SKIN)                      # head
+    for side in (-1, 1):
+        body.box(side * 0.045, 0.925, 0.101, 0.035, 0.03, 0.005, (0.10, 0.09, 0.08))   # eyes
+    body.box(0, 0.86, 0.101, 0.07, 0.015, 0.005, (0.55, 0.40, 0.32))  # mouth
+    body.box(0, 0.98, 0, 0.23, 0.10, 0.23, HARD_HAT)                  # hard hat
+    body.box(0, 0.975, 0.03, 0.27, 0.02, 0.29, HARD_HAT)              # its brim, longer in front
+    body.box(0, 1.08, 0, 0.05, 0.025, 0.21, shade(HARD_HAT, 1.08))    # the ridge on top
+    body.box(0, 0.995, 0, 0.235, 0.025, 0.235, team)                  # hat band
+    body.box(0, 0.48, -0.17, 0.24, 0.20, 0.10, (0.62, 0.15, 0.12), top=(0.70, 0.18, 0.14))   # tool bag
+
+    leg = MeshBuilder()
+    leg.box(0, -0.42, 0, 0.13, 0.42, 0.15, WORKWEAR)                  # trousers
+    leg.box(0, -0.25, 0.02, 0.135, 0.08, 0.15, shade(WORKWEAR, 0.75))  # knee pad
+    leg.box(0, -0.42, 0.02, 0.145, 0.11, 0.19, LEATHER)               # work boot
+
+    arm = MeshBuilder()
+    arm.box(0, -0.36, 0, 0.11, 0.36, 0.12, WORKWEAR)                  # sleeve
+    arm.box(0, -0.12, 0, 0.115, 0.045, 0.125, team)                   # armband
+    arm.box(0, -0.44, 0, 0.09, 0.09, 0.09, GLOVE)                     # glove
+    return body, leg, arm
+
+
+def build_shotgun():
+    """The engineer's pump shotgun, held like the rifle: grip at the origin, along +Z, the
+    muzzle at SHOTGUN_MUZZLE."""
+    mb = MeshBuilder()
+    wood = (0.40, 0.27, 0.16)
+    mb.box(0, -0.03, 0.20, 0.05, 0.06, 0.56, GUNMETAL)                # receiver and barrel
+    mb.box(0, -0.075, 0.30, 0.04, 0.04, 0.36, GUNMETAL)               # the tube under it
+    mb.box(0, -0.085, 0.30, 0.055, 0.055, 0.14, wood)                 # the pump
+    mb.box(0, -0.07, -0.16, 0.05, 0.10, 0.20, wood)                   # stock
+    return mb
+
+
+SHOTGUN_MUZZLE = (0.0, 0.0, 0.48)
+
+
+def build_hammer():
+    """A claw hammer for the engineer's right hand: the handle along -Y from the grip at the origin."""
+    mb = MeshBuilder()
+    mb.box(0, -0.02, 0, 0.03, 0.26, 0.03, (0.45, 0.32, 0.18))          # handle
+    mb.box(0, 0.22, 0.0, 0.05, 0.05, 0.13, STEEL)                     # head
+    return mb
+
+
+def build_turret_base(team):
+    """A turret's block, filling one tile (centred on the origin): a concrete plinth with the
+    team's colour round it, an ammo box, and the steel post the gun turns on."""
+    mb = MeshBuilder()
+    mb.box(0, 0, 0, 0.92, 0.30, 0.92, HQ_CONCRETE_DARK, top=HQ_CONCRETE)
+    mb.box(0, 0.18, 0, 0.935, 0.05, 0.935, team)                      # the team's band
+    mb.box(0, 0.30, 0, 0.30, 0.45, 0.30, STEEL_DARK)                  # post
+    mb.box(0.30, 0.30, -0.22, 0.20, 0.16, 0.30, (0.30, 0.34, 0.22), top=(0.36, 0.40, 0.26))   # ammo box
+    mb.box(0.30, 0.46, -0.22, 0.06, 0.02, 0.10, STEEL)                # its latch
+    return mb
+
+
+def build_turret_head(team):
+    """The part that turns: a gun with a shield in front, its barrel along +Z at TURRET height
+    (y = 1.05, the muzzle at z = 0.78). Built centred on the post, so it's drawn turned about it."""
+    mb = MeshBuilder()
+    drab = (0.32, 0.35, 0.24)
+    mb.box(0, 0.75, 0, 0.44, 0.06, 0.44, STEEL_DARK)                  # turntable
+    mb.box(0, 0.81, 0.02, 0.26, 0.22, 0.50, GUNMETAL, top=shade(GUNMETAL, 1.2))   # gun body
+    mb.box(0.16, 0.86, -0.02, 0.07, 0.10, 0.14, drab)                 # the feed from the box
+    mb.box(0, 0.76, 0.33, 0.58, 0.38, 0.04, drab, top=shade(drab, 1.15))   # shield
+    mb.box(0, 1.12, 0.33, 0.58, 0.03, 0.045, team)                    # the team's colour along it
+    mb.box(0, 1.02, 0.52, 0.06, 0.06, 0.52, GUNMETAL)                 # barrel, from the body through the shield
+    mb.box(0, 1.01, 0.76, 0.09, 0.08, 0.05, STEEL_DARK)               # muzzle brake
+    mb.box(0, 1.03, -0.20, 0.05, 0.12, 0.05, STEEL_DARK)              # the handles at the back
+    return mb
+
+
+def build_beam():
+    """A tracer: a thin bright bar from z = 0 to z = 1, stretched and turned to where a shot went."""
+    mb = MeshBuilder()
+    mb.box(0, -0.012, 0.5, 0.024, 0.024, 1.0, (1.0, 1.0, 1.0), bottom=True)
+    return mb
+
+
+def build_flag(team):
+    """The rally point's flag: a thin pole with a pennant in the team's colour, standing on y = 0."""
+    mb = MeshBuilder()
+    mb.box(0, 0, 0, 0.05, 1.3, 0.05, (0.55, 0.56, 0.58))
+    mb.box(0.24, 0.95, 0, 0.42, 0.28, 0.02, team)
+    return mb
 
 
 def build_ring():
     """A unit ring (radius 1), drawn scaled and tinted for selection and move markers."""
     mb = MeshBuilder()
     mb.ring(0, 0, 0, 0.80, 1.0, (1.0, 1.0, 1.0))
+    return mb
+
+
+def build_thin_ring():
+    """A thin unit ring (radius 1), smooth enough to scale up big: a soldier's range."""
+    mb = MeshBuilder()
+    mb.ring(0, 0, 0, 0.988, 1.0, (1.0, 1.0, 1.0), segments=120)
     return mb
 
 

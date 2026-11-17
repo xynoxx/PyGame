@@ -37,7 +37,6 @@ uniform vec3 u_eye;
 uniform vec3 u_fog;
 uniform vec2 u_fog_range;
 uniform vec4 u_tint;
-uniform float u_grid;
 in vec3 v_world;
 in vec3 v_normal;
 in vec3 v_color;
@@ -52,15 +51,186 @@ void main() {
     col = mix(vec3(grey), col, 0.82) * vec3(1.0, 0.99, 0.93);
     float d = distance(v_world, u_eye);
     float fog = clamp((d - u_fog_range.x) / (u_fog_range.y - u_fog_range.x), 0.0, 1.0);
-    if (u_grid > 0.5 && n.y > 0.9) {
-        // thin tile lines, about one pixel wide at any zoom
-        vec2 w = max(fwidth(v_world.xz), vec2(1e-4));
-        vec2 to_line = (0.5 - abs(fract(v_world.xz) - 0.5)) / w;
-        float line = 1.0 - clamp(min(to_line.x, to_line.y) - 0.5, 0.0, 1.0);
-        col *= 1.0 - 0.12 * line * (1.0 - fog);
-    }
     col = mix(col, u_fog, fog);
     f_color = vec4(col * u_tint.rgb, u_tint.a);
+}
+"""
+
+GROUND_VS = """
+#version 330
+uniform mat4 u_vp;
+in vec2 in_pos;
+out vec3 v_world;
+void main() {
+    v_world = vec3(in_pos.x, 0.0, in_pos.y);
+    gl_Position = u_vp * vec4(v_world, 1.0);
+}
+"""
+
+GROUND_FS = """
+#version 330
+// The ground, worked out for every pixel from where it is on the map: dead grass,
+// bare dirt, puddles, burn marks, a rutted dirt track, and the concrete apron
+// round the HQ. Nothing is a texture, so it's sharp at every zoom.
+uniform vec3 u_light;
+uniform vec3 u_eye;
+uniform vec3 u_fog;
+uniform vec2 u_fog_range;
+uniform vec3 u_sky;
+uniform float u_size;      // the map is u_size x u_size; outside it the ground fades
+uniform vec4 u_apron;      // the concrete round the HQ: x0, z0, x1, z1
+uniform vec4 u_hq;         // the HQ's own walls, to darken the ground at its foot
+uniform vec4 u_mark;       // an outlined area (where an HQ would go), and its colour;
+uniform vec4 u_mark_color; //   alpha 0 for none
+in vec3 v_world;
+out vec4 f_color;
+
+float hash(vec2 p) {
+    p = fract(p * vec2(123.34, 456.21));
+    p += dot(p, p + 45.32);
+    return fract(p.x * p.y);
+}
+vec2 hash2(vec2 p) { return vec2(hash(p), hash(p + 17.17)); }
+
+float noise(vec2 p) {
+    vec2 i = floor(p), f = fract(p);
+    vec2 u = f * f * (3.0 - 2.0 * f);
+    return mix(mix(hash(i), hash(i + vec2(1, 0)), u.x),
+               mix(hash(i + vec2(0, 1)), hash(i + vec2(1, 1)), u.x), u.y);
+}
+
+float fbm(vec2 p) {
+    float v = 0.0, a = 0.5;
+    mat2 m = mat2(1.6, 1.2, -1.2, 1.6);
+    for (int k = 0; k < 5; k++) { v += a * noise(p); p = m * p; a *= 0.5; }
+    return v;
+}
+
+// distance to the nearest cell wall of a Voronoi pattern: thin cracks where it's small
+float cracks(vec2 p) {
+    vec2 i = floor(p), f = fract(p);
+    float d1 = 8.0, d2 = 8.0;
+    for (int y = -1; y <= 1; y++) for (int x = -1; x <= 1; x++) {
+        vec2 g = vec2(x, y);
+        float d = length(g + hash2(i + g) - f);
+        if (d < d1) { d2 = d1; d1 = d; } else if (d < d2) { d2 = d; }
+    }
+    return d2 - d1;
+}
+
+// round scorch marks: a few cells in every hundred hold one
+float scorch(vec2 p) {
+    float cell = 11.0, mark = 0.0;
+    vec2 i = floor(p / cell);
+    for (int y = -1; y <= 1; y++) for (int x = -1; x <= 1; x++) {
+        vec2 c = i + vec2(x, y);
+        if (hash(c + 3.1) > 0.12) continue;
+        vec2 centre = (c + 0.2 + 0.6 * hash2(c)) * cell;
+        float r = 1.2 + 1.8 * hash(c + 9.7);
+        float d = length(p - centre) + (fbm(p * 1.3) - 0.5) * 1.4;
+        mark = max(mark, 1.0 - smoothstep(r * 0.35, r, d));
+    }
+    return mark;
+}
+
+float box_sdf(vec2 p, vec4 r) {
+    vec2 c = (r.xy + r.zw) * 0.5, h = (r.zw - r.xy) * 0.5;
+    vec2 q = abs(p - c) - h;
+    return length(max(q, 0.0)) + min(max(q.x, q.y), 0.0);
+}
+
+// the dirt track: a gentle curve across the map, drawn to fit whatever size it is
+float track_dist(vec2 p) {
+    float u = p.x / u_size;
+    float z = u_size * (0.72 + 0.13 * sin(u * 4.48 + 0.55) + 0.04 * sin(u * 12.2 + 2.0));
+    float slope = 0.13 * 4.48 * cos(u * 4.48 + 0.55) + 0.04 * 12.2 * cos(u * 12.2 + 2.0);
+    return abs(p.y - z) / sqrt(1.0 + slope * slope);
+}
+
+void main() {
+    vec2 p = v_world.xz;
+    float px = length(fwidth(p));                    // how much ground one pixel covers
+    float fine = 1.0 - smoothstep(0.03, 0.12, px);   // fine detail fades out when zoomed out
+
+    // ---- earth: dead grass over dirt
+    float patches = fbm(p * 0.06);
+    float clumps = fbm(p * 0.33 + 4.0);
+    float grass = smoothstep(0.30, 0.50, patches + (clumps - 0.5) * 0.45);
+    vec3 dirt = mix(vec3(0.30, 0.25, 0.19), vec3(0.40, 0.33, 0.25), fbm(p * 0.5 + 9.0));
+    vec3 olive = mix(vec3(0.22, 0.25, 0.15), vec3(0.35, 0.35, 0.21), clumps);
+    vec3 straw = vec3(0.50, 0.45, 0.30);
+    vec3 turf = mix(olive, straw, smoothstep(0.55, 0.8, fbm(p * 0.11 + 21.0)) * 0.8);
+    // tufts: soft light and dark grain at two sizes, and darker clumps
+    float grain = 0.6 * noise(p * 7.0) + 0.4 * noise(p * 17.0 + 3.0);
+    float tuft = smoothstep(0.55, 0.8, fbm(mat2(0.8, 0.6, -0.6, 0.8) * p * 1.6 + 13.0));
+    turf *= 0.90 + 0.22 * (grain - 0.5) * fine - 0.10 * tuft;
+    // dirt: fine grit, and a scatter of small pale stones
+    float stone = smoothstep(0.88, 0.92, noise(mat2(0.8, -0.6, 0.6, 0.8) * p * 12.0 + 5.0)) * fine;
+    dirt *= 0.94 + 0.14 * (noise(p * 11.0) - 0.5) * fine;
+    dirt = mix(dirt, vec3(0.47, 0.44, 0.39), stone * 0.3);
+    vec3 col = mix(dirt, turf, grass);
+
+    // ---- the track: worn bare, two ruts
+    float t = track_dist(p);
+    float track = 1.0 - smoothstep(0.9, 1.6, t + (clumps - 0.5) * 0.6);
+    float rut = 1.0 - smoothstep(0.08, 0.22, abs(t - 0.48));
+    vec3 trackcol = mix(vec3(0.36, 0.30, 0.23), vec3(0.24, 0.20, 0.16), rut);
+    col = mix(col, trackcol * (0.92 + 0.12 * noise(p * 5.0)), track);
+
+    // ---- burn marks: black in the middle, brown at the rim
+    float burn = scorch(p);
+    vec3 ash = mix(vec3(0.17, 0.15, 0.13), vec3(0.36, 0.35, 0.33), smoothstep(0.6, 0.75, noise(p * 6.0)) * 0.5);
+    col = mix(col, mix(vec3(0.26, 0.20, 0.15), ash, smoothstep(0.35, 0.9, burn)),
+              smoothstep(0.05, 0.45, burn) * 0.85);
+
+    // ---- the concrete apron round the HQ, its edge broken up
+    float apron_d = box_sdf(p, u_apron) + (fbm(p * 0.9 + 3.0) - 0.5) * 1.3;
+    float apron = 1.0 - smoothstep(-0.05, 0.05, apron_d);
+    if (apron > 0.0) {
+        vec3 conc = vec3(0.50, 0.49, 0.46) * (0.88 + 0.18 * fbm(p * 0.45 + 11.0));
+        conc *= 0.94 + 0.10 * noise(p * 9.0) * fine;
+        conc = mix(conc, vec3(0.20, 0.19, 0.18), smoothstep(0.62, 0.8, fbm(p * 0.7 + 5.0)) * 0.55);  // oil and soot
+        vec2 slab = abs(fract(p * 0.5) - 0.5) * 2.0;                                    // seams every 2 m
+        float seam = 1.0 - smoothstep(0.0, max(px * 1.5, 0.02), 1.0 - max(slab.x, slab.y));
+        float crack = (1.0 - smoothstep(0.0, max(px, 0.015) * 2.0, cracks(p * 0.8)))
+                    * smoothstep(0.45, 0.6, fbm(p * 0.35 + 30.0));
+        conc *= 1.0 - 0.35 * seam - 0.45 * crack;
+        float rim = smoothstep(-0.5, 0.0, apron_d);                                      // dirt washed onto the edge
+        conc = mix(conc, dirt * 0.9, rim * 0.6);
+        col = mix(col, conc, apron);
+    }
+
+    // ---- puddles in the low spots, off the concrete: they show the sky
+    float wet = fbm(p * 0.09 + 50.0) - (1.0 - grass) * 0.05;
+    float puddle = smoothstep(0.700, 0.708, wet) * (1.0 - apron);
+    float mud = smoothstep(0.655, 0.700, wet) * (1.0 - apron);
+    col = mix(col, col * vec3(0.68, 0.62, 0.56), mud);
+    vec3 view = normalize(u_eye - v_world);
+    float fres = pow(1.0 - max(view.y, 0.0), 2.0);
+    float ripple = noise(p * 3.0 + 40.0);
+    vec3 water = mix(vec3(0.21, 0.20, 0.18), u_sky * 1.35, 0.30 + 0.5 * fres + 0.12 * ripple);
+    col = mix(col, water, puddle);
+
+    // ---- light: the overcast sky and a weak, yellowed sun, on flat ground
+    col *= 0.60 + vec3(0.50, 0.47, 0.40) * max(u_light.y, 0.0);
+    float hq_d = box_sdf(p, u_hq);
+    col *= 0.62 + 0.38 * smoothstep(0.0, 1.1, hq_d);   // the HQ's shade at its foot
+    if (u_mark_color.a > 0.0) {                        // a lightly tinted area with a crisp outline
+        float md = box_sdf(p, u_mark);
+        float edge = 1.0 - smoothstep(0.05, 0.05 + max(px * 1.5, 0.02), abs(md));
+        col = mix(col, u_mark_color.rgb, (edge * 0.9 + (md < 0.0 ? 0.18 : 0.0)) * u_mark_color.a);
+    }
+    float grey = dot(col, vec3(0.299, 0.587, 0.114));
+    col = mix(vec3(grey), col, 0.82) * vec3(1.0, 0.99, 0.93);
+
+    // ---- outside the map: darker and greyer, so the edge reads without a wall
+    vec2 out2 = max(-p, p - u_size);
+    float outside = smoothstep(0.0, 3.0, max(out2.x, out2.y));
+    col = mix(col, vec3(grey) * 0.62, outside * 0.85);
+
+    float d = distance(v_world, u_eye);
+    float fog = clamp((d - u_fog_range.x) / (u_fog_range.y - u_fog_range.x), 0.0, 1.0);
+    f_color = vec4(mix(col, u_fog, fog), 1.0);
 }
 """
 
@@ -228,6 +398,8 @@ class Renderer:
         self.world = ctx.program(vertex_shader=WORLD_VS, fragment_shader=WORLD_FS)
         self.sky = ctx.program(vertex_shader=SCREEN_VS, fragment_shader=SKY_FS)
         self.overlay = ctx.program(vertex_shader=SCREEN_VS, fragment_shader=OVERLAY_FS)
+        self.ground = ctx.program(vertex_shader=GROUND_VS, fragment_shader=GROUND_FS)
+        self.ground_vao = None
 
         quad = ctx.buffer(array("f", [-1, -1, 1, -1, -1, 1, 1, 1]).tobytes())
         self.sky_vao = ctx.vertex_array(self.sky, [(quad, "2f", "in_pos")])
@@ -239,10 +411,34 @@ class Renderer:
         _set(self.sky, "u_bottom", SKY_HORIZON)
         _set(self.world, "u_light", SUN)
         _set(self.world, "u_fog", SKY_HORIZON)
+        _set(self.ground, "u_light", SUN)
+        _set(self.ground, "u_fog", SKY_HORIZON)
+        _set(self.ground, "u_sky", SKY_TOP)
         ctx.blend_func = moderngl.SRC_ALPHA, moderngl.ONE_MINUS_SRC_ALPHA
 
     def mesh(self, builder):
         return Mesh(self.ctx, self.world, builder)
+
+    def set_ground(self, size, reach=400.0):
+        """The ground: one big square reaching far past the map into the haze. The shader
+        works out how it looks; this gives it the map's size."""
+        lo, hi = -reach, size + reach
+        quad = self.ctx.buffer(array("f", [lo, lo, hi, lo, lo, hi, hi, hi]).tobytes())
+        self.ground_vao = self.ctx.vertex_array(self.ground, [(quad, "2f", "in_pos")])
+        _set(self.ground, "u_size", float(size))
+        self.set_hq_ground(None, None)
+        self.set_mark(None)
+
+    def set_hq_ground(self, apron, hq):
+        """Where the HQ's concrete is, and its walls (to shade the ground at their foot). None: no HQ."""
+        nowhere = (-1e4, -1e4, -1e4 + 1, -1e4 + 1)
+        _set(self.ground, "u_apron", tuple(float(v) for v in (apron or nowhere)))
+        _set(self.ground, "u_hq", tuple(float(v) for v in (hq or nowhere)))
+
+    def set_mark(self, rect, color=(1.0, 1.0, 1.0), strength=1.0):
+        """Outline an area of the ground in a colour (None: no outline)."""
+        _set(self.ground, "u_mark", tuple(float(v) for v in (rect or (0, 0, 0, 0))))
+        _set(self.ground, "u_mark_color", (*color, strength if rect else 0.0))
 
     def begin(self, view_proj, eye, fog_range):
         """Clear the screen, paint the sky and set up the camera for this frame."""
@@ -255,12 +451,28 @@ class Renderer:
         _set(self.world, "u_vp", mathx.to_bytes(view_proj))
         _set(self.world, "u_eye", eye)
         _set(self.world, "u_fog_range", fog_range)
+        for name, value in (("u_vp", mathx.to_bytes(view_proj)), ("u_eye", eye), ("u_fog_range", fog_range)):
+            _set(self.ground, name, value)
 
-    def draw(self, mesh, model=None, tint=(1.0, 1.0, 1.0, 1.0), grid=False):
+    def draw_ground(self):
+        if self.ground_vao:
+            self.ground_vao.render(moderngl.TRIANGLE_STRIP)
+
+    def draw(self, mesh, model=None, tint=(1.0, 1.0, 1.0, 1.0)):
         _set(self.world, "u_model", mathx.to_bytes(model or mathx.identity()))
         _set(self.world, "u_tint", tint)
-        _set(self.world, "u_grid", 1.0 if grid else 0.0)
         mesh.render()
+
+    def draw_ghost(self, mesh, model, tint):
+        """Draw a mesh see-through: first only into the depth buffer, so only its front-most
+        faces show, then its colour over that."""
+        ctx = self.ctx
+        ctx.fbo.color_mask = (False, False, False, False)
+        self.draw(mesh, model, tint)
+        ctx.fbo.color_mask = (True, True, True, True)
+        ctx.depth_func = "<="
+        self.draw(mesh, model, tint)
+        ctx.depth_func = "<"
 
     def upload_overlay(self, surface):
         """Send a pygame surface (same size as the window, with alpha) to be drawn on top."""
