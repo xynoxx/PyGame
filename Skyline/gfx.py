@@ -4,6 +4,7 @@ Pygame owns the window, the keyboard and mouse, and draws the 2D overlay
 (text and panels). ModernGL draws the 3D world into the same window.
 """
 import math
+import os
 from array import array
 
 import moderngl
@@ -56,6 +57,31 @@ void main() {
 }
 """
 
+# The same, for drawing one mesh many times in one go (Renderer.draw_many): each copy's model
+# matrix and tint come with it, rather than being set before each draw
+MANY_VS = """
+#version 330
+uniform mat4 u_vp;
+in vec3 in_pos;
+in vec3 in_normal;
+in vec3 in_color;
+in mat4 in_model;
+in vec4 in_tint;
+out vec3 v_world;
+out vec3 v_normal;
+out vec3 v_color;
+out vec4 v_tint;
+void main() {
+    vec4 world = in_model * vec4(in_pos, 1.0);
+    v_world = world.xyz;
+    v_normal = mat3(in_model) * in_normal;
+    v_color = in_color;
+    v_tint = in_tint;
+    gl_Position = u_vp * world;
+}
+"""
+MANY_FS = WORLD_FS.replace("uniform vec4 u_tint;", "in vec4 v_tint;").replace("u_tint", "v_tint")
+
 GROUND_VS = """
 #version 330
 uniform mat4 u_vp;
@@ -77,11 +103,13 @@ uniform vec3 u_eye;
 uniform vec3 u_fog;
 uniform vec2 u_fog_range;
 uniform vec3 u_sky;
-uniform float u_size;      // the map is u_size x u_size; outside it the ground fades
+uniform float u_size;      // the map is u_size x u_size
+uniform vec4 u_open;       // the open part of it, x0, z0, x1, z1: outside, the ground is darker
 uniform vec4 u_apron;      // the concrete round the HQ: x0, z0, x1, z1
 uniform vec4 u_hq;         // the HQ's own walls, to darken the ground at its foot
 uniform vec4 u_mark;       // an outlined area (where an HQ would go), and its colour;
 uniform vec4 u_mark_color; //   alpha 0 for none
+uniform sampler2D u_holes; // one texel a tile: set where a trench has been dug through the ground
 in vec3 v_world;
 out vec4 f_color;
 
@@ -142,13 +170,16 @@ float box_sdf(vec2 p, vec4 r) {
 // the dirt track: a gentle curve across the map, drawn to fit whatever size it is
 float track_dist(vec2 p) {
     float u = p.x / u_size;
-    float z = u_size * (0.72 + 0.13 * sin(u * 4.48 + 0.55) + 0.04 * sin(u * 12.2 + 2.0));
+    float z = u_size * 0.5 + 60.0 + 26.0 * sin(u * 4.48 * 3.0 + 0.55) + 8.0 * sin(u * 12.2 * 3.0 + 2.0);
     float slope = 0.13 * 4.48 * cos(u * 4.48 + 0.55) + 0.04 * 12.2 * cos(u * 12.2 + 2.0);
     return abs(p.y - z) / sqrt(1.0 + slope * slope);
 }
 
 void main() {
     vec2 p = v_world.xz;
+    vec2 cell = floor(p);
+    if (cell.x >= 0.0 && cell.y >= 0.0 && cell.x < u_size && cell.y < u_size
+            && texelFetch(u_holes, ivec2(cell), 0).r > 0.5) discard;   // the trench's own mesh shows here
     float px = length(fwidth(p));                    // how much ground one pixel covers
     float fine = 1.0 - smoothstep(0.03, 0.12, px);   // fine detail fades out when zoomed out
 
@@ -223,10 +254,13 @@ void main() {
     float grey = dot(col, vec3(0.299, 0.587, 0.114));
     col = mix(vec3(grey), col, 0.82) * vec3(1.0, 0.99, 0.93);
 
-    // ---- outside the map: darker and greyer, so the edge reads without a wall
-    vec2 out2 = max(-p, p - u_size);
+    // ---- outside the open part of the map: darker and greyer, so the edge reads without a wall
+    vec2 out2 = max(u_open.xy - p, p - u_open.zw);
     float outside = smoothstep(0.0, 3.0, max(out2.x, out2.y));
     col = mix(col, vec3(grey) * 0.62, outside * 0.85);
+    // ---- off the map altogether: darker still, so its edge shows from far out
+    vec2 off2 = max(-p, p - u_size);
+    col = mix(col, vec3(grey) * 0.3, smoothstep(0.0, 3.0, max(off2.x, off2.y)) * 0.9);
 
     float d = distance(v_world, u_eye);
     float fog = clamp((d - u_fog_range.x) / (u_fog_range.y - u_fog_range.x), 0.0, 1.0);
@@ -257,11 +291,13 @@ void main() {
 
 OVERLAY_FS = """
 #version 330
-uniform sampler2D u_tex;
+uniform sampler2D u_tex;   // the overlay's pixels as pygame keeps them: top row first,
+uniform bool u_bgra;       //   blue, green, red, alpha on most machines
 in vec2 v_uv;
 out vec4 f_color;
 void main() {
-    f_color = texture(u_tex, v_uv);
+    vec4 c = texture(u_tex, vec2(v_uv.x, 1.0 - v_uv.y));
+    f_color = u_bgra ? c.bgra : c;
 }
 """
 
@@ -270,13 +306,21 @@ SKY_HORIZON = (0.56, 0.54, 0.46)   # smoke and dust haze
 SUN = mathx.v_norm((0.45, 0.80, 0.30))
 
 
-def open_window(size, title):
-    """Open a pygame window with an OpenGL 3.3 context (with anti-aliasing if we can)."""
+def open_window(size, title, full_screen=False):
+    """Open a pygame window with an OpenGL 3.3 context (with anti-aliasing if we can): `size`
+    big, or with `full_screen`, over the whole screen at the screen's own size. (That's a window
+    without a border that covers the screen, not the screen switched to another mode, so
+    Alt+Tab to another program and back is quick.) Returns the window's surface: its size is
+    the size it opened at."""
     pygame.display.gl_set_attribute(pygame.GL_CONTEXT_MAJOR_VERSION, 3)
     pygame.display.gl_set_attribute(pygame.GL_CONTEXT_MINOR_VERSION, 3)
     pygame.display.gl_set_attribute(pygame.GL_CONTEXT_PROFILE_MASK, pygame.GL_CONTEXT_PROFILE_CORE)
     pygame.display.set_caption(title)
     flags = pygame.OPENGL | pygame.DOUBLEBUF
+    if full_screen:                     # (pygame's FULLSCREEN would take the screen over: Alt+Tab hides the game)
+        size = pygame.display.get_desktop_sizes()[0]
+        flags |= pygame.NOFRAME
+        os.environ["SDL_VIDEO_WINDOW_POS"] = "0,0"
     for samples in (4, 0):
         pygame.display.gl_set_attribute(pygame.GL_MULTISAMPLEBUFFERS, 1 if samples else 0)
         pygame.display.gl_set_attribute(pygame.GL_MULTISAMPLESAMPLES, samples)
@@ -296,17 +340,21 @@ class MeshBuilder:
 
     def __init__(self):
         self.data = array("f")
+        self.boxes = []             # each box's 8 corners, (-x or +x, bottom or top, -z or +z) in that order
 
     def vertex(self, p, n, c):
         self.data.extend((p[0], p[1], p[2], n[0], n[1], n[2], c[0], c[1], c[2]))
 
-    def tri(self, a, b, c, color, outward=None):
-        """A flat triangle. `outward` is a rough direction its face should point."""
-        n = mathx.v_norm(mathx.v_cross(mathx.v_sub(b, a), mathx.v_sub(c, a)))
-        if outward is not None and mathx.v_dot(n, outward) < 0:
-            n = (-n[0], -n[1], -n[2])
-        for p in (a, b, c):
-            self.vertex(p, n, color)
+    def add(self, other, m):
+        """Add another builder's triangles, moved and turned by the matrix m (a rigid one: no
+        stretching), to make one mesh of several parts."""
+        d = other.data
+        for k in range(0, len(d), 9):
+            p = mathx.apply(m, (d[k], d[k + 1], d[k + 2]))
+            n = (m[0] * d[k + 3] + m[4] * d[k + 4] + m[8] * d[k + 5],
+                 m[1] * d[k + 3] + m[5] * d[k + 4] + m[9] * d[k + 5],
+                 m[2] * d[k + 3] + m[6] * d[k + 4] + m[10] * d[k + 5])
+            self.vertex(p, n, (d[k + 6], d[k + 7], d[k + 8]))
 
     def quad(self, a, b, c, d, normal, color):
         """Four corners in order. `color` is one colour or a colour per corner."""
@@ -326,6 +374,8 @@ class MeshBuilder:
         def N(nx, nz):
             return (nx * c + nz * s, 0.0, -nx * s + nz * c)
 
+        self.boxes.append([P(sx * hw, sy * h, sz * hd) for sx in (-1, 1) for sy in (0, 1) for sz in (-1, 1)])
+
         self.quad(P(-hw, h, -hd), P(hw, h, -hd), P(hw, h, hd), P(-hw, h, hd), (0, 1, 0), top or color)
         if bottom:
             self.quad(P(-hw, 0, -hd), P(-hw, 0, hd), P(hw, 0, hd), P(hw, 0, -hd), (0, -1, 0), color)
@@ -333,16 +383,6 @@ class MeshBuilder:
         self.quad(P(-hw, 0, -hd), P(-hw, 0, hd), P(-hw, h, hd), P(-hw, h, -hd), N(-1, 0), color)
         self.quad(P(-hw, 0, hd), P(hw, 0, hd), P(hw, h, hd), P(-hw, h, hd), N(0, 1), color)
         self.quad(P(-hw, 0, -hd), P(-hw, h, -hd), P(hw, h, -hd), P(hw, 0, -hd), N(0, -1), color)
-
-    def cone(self, x, y, z, radius, height, color, sides=7, yaw=0.0):
-        """A low-poly cone with its base at height y. A negative height points it down."""
-        apex = (x, y + height, z)
-        ring = [(x + radius * math.cos(yaw + k * 2 * math.pi / sides), y,
-                 z + radius * math.sin(yaw + k * 2 * math.pi / sides)) for k in range(sides)]
-        for k in range(sides):
-            a, b = ring[k], ring[(k + 1) % sides]
-            outward = ((a[0] + b[0]) / 2 - x, 0.0, (a[2] + b[2]) / 2 - z)
-            self.tri(a, b, apex, color, outward)
 
     def ring(self, x, y, z, r_in, r_out, color, segments=40):
         """A flat ring lying on the ground."""
@@ -370,11 +410,37 @@ class Mesh:
     """A MeshBuilder's triangles, uploaded to the graphics card."""
 
     def __init__(self, ctx, program, builder):
+        self.ctx = ctx
         self.vbo = ctx.buffer(builder.data.tobytes())
         self.vao = ctx.vertex_array(program, [(self.vbo, "3f 3f 3f", "in_pos", "in_normal", "in_color")])
+        self.copies = None          # for drawing it many times at once: a buffer of each copy's matrix and tint...
+        self.copies_vao = None      # ...and the vertex array that reads it (made when first wanted)
+        self.room = 0               # how many copies the buffer holds
+
+    def render_many(self, program, data, count):
+        """Draw it `count` times in one go, each copy's model matrix and tint in `data`."""
+        if count > self.room:
+            if self.copies:
+                self.copies_vao.release()
+                self.copies.release()
+            self.room = max(count, self.room * 2, 64)
+            self.copies = self.ctx.buffer(reserve=self.room * 20 * 4)
+            self.copies_vao = self.ctx.vertex_array(program, [(self.vbo, "3f 3f 3f", "in_pos", "in_normal", "in_color"),
+                                                              (self.copies, "16f 4f/i", "in_model", "in_tint")])
+        self.copies.orphan()                 # (fresh room: no waiting for the card to finish with last frame's)
+        self.copies.write(data)
+        self.copies_vao.render(moderngl.TRIANGLES, instances=count)
 
     def render(self):
         self.vao.render(moderngl.TRIANGLES)
+
+    def release(self):
+        """Free it on the graphics card (for a mesh that's built again as the game goes on)."""
+        if self.copies:
+            self.copies_vao.release()
+            self.copies.release()
+        self.vao.release()
+        self.vbo.release()
 
 
 def _set(program, name, value):
@@ -396,10 +462,12 @@ class Renderer:
         self.ctx = ctx
         self.size = size
         self.world = ctx.program(vertex_shader=WORLD_VS, fragment_shader=WORLD_FS)
+        self.many = ctx.program(vertex_shader=MANY_VS, fragment_shader=MANY_FS)
         self.sky = ctx.program(vertex_shader=SCREEN_VS, fragment_shader=SKY_FS)
         self.overlay = ctx.program(vertex_shader=SCREEN_VS, fragment_shader=OVERLAY_FS)
         self.ground = ctx.program(vertex_shader=GROUND_VS, fragment_shader=GROUND_FS)
         self.ground_vao = None
+        self.holes = None          # which tiles of the ground are dug away
 
         quad = ctx.buffer(array("f", [-1, -1, 1, -1, -1, 1, 1, 1]).tobytes())
         self.sky_vao = ctx.vertex_array(self.sky, [(quad, "2f", "in_pos")])
@@ -409,12 +477,15 @@ class Renderer:
 
         _set(self.sky, "u_top", SKY_TOP)
         _set(self.sky, "u_bottom", SKY_HORIZON)
-        _set(self.world, "u_light", SUN)
-        _set(self.world, "u_fog", SKY_HORIZON)
+        for program in (self.world, self.many):
+            _set(program, "u_light", SUN)
+            _set(program, "u_fog", SKY_HORIZON)
         _set(self.ground, "u_light", SUN)
         _set(self.ground, "u_fog", SKY_HORIZON)
         _set(self.ground, "u_sky", SKY_TOP)
         ctx.blend_func = moderngl.SRC_ALPHA, moderngl.ONE_MINUS_SRC_ALPHA
+        self.u_model, self.u_tint = self.world["u_model"], self.world["u_tint"]   # (set for every draw: looked up once)
+        self.tint = None
 
     def mesh(self, builder):
         return Mesh(self.ctx, self.world, builder)
@@ -426,8 +497,25 @@ class Renderer:
         quad = self.ctx.buffer(array("f", [lo, lo, hi, lo, lo, hi, hi, hi]).tobytes())
         self.ground_vao = self.ctx.vertex_array(self.ground, [(quad, "2f", "in_pos")])
         _set(self.ground, "u_size", float(size))
+        self.set_open((0, 0, size, size))
+        if self.holes:
+            self.holes.release()
+        self.holes = self.ctx.texture((size, size), 1, bytes(size * size))
+        self.holes.filter = (moderngl.NEAREST, moderngl.NEAREST)
         self.set_hq_ground(None, None)
         self.set_mark(None)
+
+    def set_open(self, rect):
+        """The open part of the map, x0, z0, x1, z1: the ground outside it is drawn darker."""
+        _set(self.ground, "u_open", tuple(float(v) for v in rect))
+
+    def set_holes(self, tiles):
+        """Cut these tiles (i, j) out of the ground, for the trenches dug there."""
+        size = self.holes.width
+        data = bytearray(size * size)
+        for i, j in tiles:
+            data[j * size + i] = 255
+        self.holes.write(bytes(data))
 
     def set_hq_ground(self, apron, hq):
         """Where the HQ's concrete is, and its walls (to shade the ground at their foot). None: no HQ."""
@@ -448,20 +536,31 @@ class Renderer:
         ctx.disable(moderngl.DEPTH_TEST | moderngl.BLEND)
         self.sky_vao.render(moderngl.TRIANGLE_STRIP)
         ctx.enable(moderngl.DEPTH_TEST | moderngl.BLEND)
-        _set(self.world, "u_vp", mathx.to_bytes(view_proj))
-        _set(self.world, "u_eye", eye)
-        _set(self.world, "u_fog_range", fog_range)
-        for name, value in (("u_vp", mathx.to_bytes(view_proj)), ("u_eye", eye), ("u_fog_range", fog_range)):
-            _set(self.ground, name, value)
+        for program in (self.world, self.many, self.ground):
+            for name, value in (("u_vp", mathx.to_bytes(view_proj)), ("u_eye", eye), ("u_fog_range", fog_range)):
+                _set(program, name, value)
 
     def draw_ground(self):
         if self.ground_vao:
+            self.holes.use(1)
+            _set(self.ground, "u_holes", 1)
             self.ground_vao.render(moderngl.TRIANGLE_STRIP)
 
     def draw(self, mesh, model=None, tint=(1.0, 1.0, 1.0, 1.0)):
-        _set(self.world, "u_model", mathx.to_bytes(model or mathx.identity()))
-        _set(self.world, "u_tint", tint)
+        self.u_model.write(mathx.to_bytes(model or mathx.identity()))
+        if tint != self.tint:                      # (most draws are untinted: only set it when it changes)
+            self.u_tint.value = self.tint = tint
         mesh.render()
+
+    def draw_many(self, mesh, copies):
+        """Draw a mesh many times in one go: `copies` is a list of (model matrix, tint), each
+        drawn solid as draw would. (Hundreds of draws one at a time cost far more than the same
+        drawn together.)"""
+        flat = []
+        for model, tint in copies:
+            flat += model
+            flat += tint
+        mesh.render_many(self.many, array("f", flat).tobytes(), len(copies))
 
     def draw_ghost(self, mesh, model, tint):
         """Draw a mesh see-through: first only into the depth buffer, so only its front-most
@@ -475,8 +574,12 @@ class Renderer:
         ctx.depth_func = "<"
 
     def upload_overlay(self, surface):
-        """Send a pygame surface (same size as the window, with alpha) to be drawn on top."""
-        self.overlay_tex.write(pygame.image.tobytes(surface, "RGBA", True))
+        """Send a pygame surface (same size as the window, with alpha) to be drawn on top: its
+        pixels straight from where pygame keeps them, not copied into bytes first (that took a
+        few milliseconds a frame); the shader turns them right way up, and puts red first if
+        they're kept blue first."""
+        _set(self.overlay, "u_bgra", surface.get_masks()[0] == 0xFF0000)
+        self.overlay_tex.write(surface.get_view("1"))
 
     def draw_overlay(self):
         self.ctx.disable(moderngl.DEPTH_TEST)

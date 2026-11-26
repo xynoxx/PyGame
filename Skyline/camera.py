@@ -5,22 +5,33 @@ import mathx
 
 
 class RTSCamera:
-    MIN_DIST, MAX_DIST = 8.0, 72.0
+    """Zoomed in, it looks at the ground from an angle (flatter the closer it is); zoomed out
+    past PLAY_DIST, it tips over to look down on the map, out to MAX_DIST, where the whole
+    map fits on the screen."""
+    MIN_DIST, PLAY_DIST, MAX_DIST = 8.0, 72.0, 800.0
+    NEAR, FAR = 0.3, 400.0      # what it draws, at PLAY_DIST and in (further out, more of both)
 
-    def __init__(self, map_size, aspect):
-        self.map_size = map_size
+    def __init__(self, bounds, aspect):
+        self.bounds = bounds                # x0, z0, x1, z1: where on the map it can look (the open part)
         self.aspect = aspect
         self.fov = math.radians(45)
-        self.tx = self.tz = map_size / 2    # the point on the ground we look at
+        self.tx, self.tz = (bounds[0] + bounds[2]) / 2, (bounds[1] + bounds[3]) / 2   # the point on the ground we look at
         self.yaw = 0.0                      # 0: camera sits on the +Z side, looking toward -Z
         self.dist = self.dist_goal = 17.0
         self.glide = None                   # a point we're sliding toward, if any
 
     @property
     def pitch(self):
-        """Steeper when zoomed out, flatter when zoomed in."""
-        t = (self.dist - self.MIN_DIST) / (self.MAX_DIST - self.MIN_DIST)
-        return math.radians(42 + 20 * t)
+        """Steeper when zoomed out, flatter when zoomed in: from 42 degrees down to 62 out to
+        PLAY_DIST, and on to 80 (nearly straight down) out to MAX_DIST."""
+        if self.dist <= self.PLAY_DIST:
+            return math.radians(42 + 20 * (self.dist - self.MIN_DIST) / (self.PLAY_DIST - self.MIN_DIST))
+        return math.radians(62 + 18 * (self.dist - self.PLAY_DIST) / (self.MAX_DIST - self.PLAY_DIST))
+
+    @property
+    def beyond(self):
+        """How far out past PLAY_DIST it is (0 within it)."""
+        return max(0.0, self.dist - self.PLAY_DIST)
 
     @property
     def target(self):
@@ -33,11 +44,14 @@ class RTSCamera:
                 self.tz + math.cos(self.yaw) * math.cos(p) * self.dist)
 
     def fog_range(self):
-        return (self.dist + 6.0, self.dist + 70.0)    # thick haze
+        """Thick haze close to what it looks at; zoomed out past PLAY_DIST, it thins, so the map
+        shows all the way to its edge."""
+        return (self.dist + 6.0 + self.beyond * 0.6, self.dist + 70.0 + self.beyond * 1.5)
 
     def view_proj(self):
         view = mathx.look_at(self.eye(), self.target, (0.0, 1.0, 0.0))
-        proj = mathx.perspective(self.fov, self.aspect, 0.3, 400.0)
+        proj = mathx.perspective(self.fov, self.aspect, self.NEAR * (1 + self.beyond / self.PLAY_DIST),
+                                 self.FAR + self.beyond * 2.5)
         return mathx.mul(proj, view)
 
     # ------------------------------------------------------------ moving it
@@ -77,8 +91,9 @@ class RTSCamera:
         self._clamp()
 
     def _clamp(self):
-        self.tx = mathx.clamp(self.tx, 0, self.map_size)
-        self.tz = mathx.clamp(self.tz, 0, self.map_size)
+        x0, z0, x1, z1 = self.bounds
+        self.tx = mathx.clamp(self.tx, x0, x1)
+        self.tz = mathx.clamp(self.tz, z0, z1)
 
     # ------------------------------------------------------------ the mouse
 

@@ -5,7 +5,7 @@ Games made in Python. There are two projects, each in its own folder and indepen
 | Folder | What it is | Made with | State |
 | --- | --- | --- | --- |
 | [`Fixer/`](Fixer/) | **Fixer 3D**: a cozy repair bench. Take 24 gadgets (8 keyboards, 3 mice, 5 mics, 3 webcams, 3 headsets, 2 PCs) apart down to the last screw, clean them, fix their one real fault, build them back and test them | Ursina (on Panda3D), Pillow | Finished and packaged as a Windows app for itch.io |
-| [`Skyline/`](Skyline/) | **Skyline**: a 3D real-time strategy game in a zombie apocalypse. Place your HQ, train soldiers and engineers, build turrets, survive growing waves | pygame, ModernGL | A playable prototype, still growing |
+| [`Skyline/`](Skyline/) | **Skyline**: a 3D real-time strategy game in a zombie apocalypse. Hold the HQ in the middle of the map: spend supply and metal to train soldiers and engineers and build turrets and bullet factories (and a vehicle factory, for tanks), strip junkyards and warehouses for more, build a radar station to open the map round you, give them orders (queues, patrol, guard, repair), dig trenches, survive growing waves | pygame, ModernGL | A playable prototype, still growing |
 
 ## Where to start
 
@@ -24,7 +24,7 @@ pip install -r Fixer/requirements.txt     # Ursina
 python Fixer/fixer3d.py --windowed
 
 pip install pygame moderngl
-python Skyline/main.py
+python Skyline/main.py                    # full screen (--window for a 1280 × 720 window)
 ```
 
 Each game has a headless test that plays it through and saves pictures:
@@ -34,10 +34,13 @@ python Fixer/fixer3d.py --shot SOME_FOLDER      # every product, every job; ends
 python Skyline/main.py --screenshot out.png     # a scripted game; saves out_hq.png, out_build.png, out.png
 ```
 
+Each also builds into a Windows app for itch.io (`pip install pyinstaller` first; Skyline needs `pillow` too):
+`python Fixer/build_app.py` and `python Skyline/build_app.py`. Their `itch/` folders say how to publish them.
+
 ## The repository
 
 ```
-.gitignore         __pycache__, *.pyc, Fixer/build/, Fixer/dist/
+.gitignore         __pycache__, *.pyc, and each game's build/ and dist/
 README.md          this file
 CLAUDE.md          how to work on this repository (for AI agents, and useful for people)
 Fixer/             Fixer 3D (see Fixer/DEVELOPING.md)

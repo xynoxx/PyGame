@@ -11,7 +11,7 @@ Two independent Python games live here: `Fixer/` (Fixer 3D, Ursina) and `Skyline
   - **Fixer:** `python Fixer/fixer3d.py --shot DIR` must end with `every job ok`.
   - **Skyline:** use `python Skyline/main.py --screenshot out.png`, or a script that drives `main.Game` (see Skyline's README, "Testing").
 
-  For gameplay changes, simulate the game and report the numbers (who won, how long it held, the frame rate).
+  Don't simulate whole games (who won, how long it held, the frame rate) unless the owner asks for it: for gameplay changes, the checks and the pictures are enough. If a change looks likely to shift the balance a lot, say so in a line and offer a simulation.
 - **Things must make physical sense.** Parts don't overlap, float, or sit where they couldn't. Screws go into holes, cables leave from the middle of their sockets, and units stand beside a turret, not in it. Check from below and inside, not only from the top.
 - **Plain words.** Code comments, docstrings and in-game text are plain English sentences, as in the existing files. Name things for what they are.
 - **No asset files.** Models are built from boxes in code, pictures are drawn with Pillow or shaders, and sounds are made in code.
@@ -23,5 +23,5 @@ Two independent Python games live here: `Fixer/` (Fixer 3D, Ursina) and `Skyline
 
 - **Windows.** Both Git Bash and PowerShell are available. Use forward slashes in Bash.
 - **Inline scripts break on apostrophes.** In this environment, `python - <<'EOF'` blocks fail to parse when their text contains apostrophes (`doesn't`, `'s'`). Write the script to a file (in a scratch folder outside the repository) and run that instead.
-- **Test output goes outside the repository.** Write pictures, logs and builds to a scratch folder. `Fixer/build/` and `Fixer/dist/` are git-ignored build output.
-- **Some tests take a while.** Fixer's `--shot` takes about 4 minutes. Skyline's simulations run much faster than real time (a 4-minute game simulates in a few seconds).
+- **Test output goes outside the repository.** Write pictures, logs and builds to a scratch folder. Each game's `build/` and `dist/` are git-ignored build output.
+- **Some tests take a while.** Fixer's `--shot` takes about 4 minutes. Skyline's game runs much faster than real time headless (a 4-minute game in a few seconds early on; a 15-minute game with hundreds of the dead about takes a few minutes).
